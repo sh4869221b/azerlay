@@ -1,0 +1,5 @@
+# Local agent runtime and QA artifacts
+/.omo/
+
+# Local duplicate; the canonical document is docs/design-research.md
+/azerlay-system-design.md
