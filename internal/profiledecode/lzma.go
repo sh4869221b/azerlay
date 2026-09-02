@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"io"
 	"math"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/ulikunitz/xz/lzma"
 )
@@ -17,6 +19,11 @@ type lzmaHeader struct {
 }
 
 func hasLZMAHeader(source []byte) bool {
+	if utf8.Valid(source) && bytes.IndexFunc(source, func(character rune) bool {
+		return !unicode.IsPrint(character) && !unicode.IsSpace(character)
+	}) == -1 {
+		return false
+	}
 	if normalized, err := normalizeOuterText(string(source)); err == nil {
 		if _, err := detectOuter(normalized); err == nil {
 			return false
