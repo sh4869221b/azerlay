@@ -145,7 +145,7 @@ func TestDetectOuter_WhenRawLZMAHeader_RoutesReaderToLZMA(t *testing.T) {
 
 	document, err := DecodeReader(bytes.NewReader(compressed))
 
-	assertDecodeError(t, err, ERR_IMPORT_MSGPACK_TYPE)
+	assertDecodeError(t, err, ERR_IMPORT_JSON)
 	assertZeroDocument(t, document)
 }
 
@@ -167,7 +167,7 @@ func TestDecodeLZMA_WhenBase64Decoded_RoutesThroughSameDecoder(t *testing.T) {
 
 	document, err := DecodeText(text)
 
-	assertDecodeError(t, err, ERR_IMPORT_MSGPACK_TYPE)
+	assertDecodeError(t, err, ERR_IMPORT_JSON)
 	assertZeroDocument(t, document)
 }
 

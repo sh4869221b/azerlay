@@ -54,30 +54,7 @@ func DecodeText(text string) (Document, error) {
 		return Document{}, newDecodeError(ERR_IMPORT_ENCODING, nil)
 	}
 
-	rawJSON := []byte(normalized)
-	if !json.Valid(rawJSON) {
-		return Document{}, newDecodeError(ERR_IMPORT_JSON, nil)
-	}
-
-	var root map[string]json.RawMessage
-	if err := json.Unmarshal(rawJSON, &root); err != nil {
-		return Document{}, newDecodeError(ERR_IMPORT_ROOT, nil)
-	}
-	_, hasProfiles := root["profiles"]
-	_, hasInputs := root["inputs"]
-	_, hasID := root["id"]
-	_, hasName := root["name"]
-	isBundle := hasProfiles
-	isSingle := hasInputs && (hasID || hasName)
-	if isBundle == isSingle {
-		return Document{}, newDecodeError(ERR_IMPORT_ROOT, nil)
-	}
-
-	kind := RootBundle
-	if isSingle {
-		kind = RootSingle
-	}
-	return Document{JSON: append(json.RawMessage(nil), rawJSON...), Kind: kind}, nil
+	return decodeJSONDocument([]byte(normalized))
 }
 
 // DecodeReader reads one bounded source and delegates to DecodeText.
@@ -100,10 +77,15 @@ func DecodeReader(reader io.Reader) (Document, error) {
 }
 
 func decodeCompressedDocument(compressed []byte) (Document, error) {
-	if _, err := decodeLZMA(compressed); err != nil {
+	envelope, err := decodeLZMA(compressed)
+	if err != nil {
 		return Document{}, err
 	}
-	return Document{}, newDecodeError(ERR_IMPORT_MSGPACK_TYPE, nil)
+	rawJSON, err := decodeMsgpackString(envelope)
+	if err != nil {
+		return Document{}, err
+	}
+	return decodeJSONDocument(rawJSON)
 }
 
 // DecodeFile opens a source read-only and delegates to DecodeReader.

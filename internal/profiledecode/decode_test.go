@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/binary"
-	"errors"
-	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -50,6 +48,42 @@ func TestDecodeSupportedCorpus(t *testing.T) {
 			}
 		})
 	}
+
+	bundle := []byte(`{"profiles":[]}`)
+	single := []byte(`{"id":0,"inputs":[]}`)
+	rawLZMA := mustCompressLZMA(t, msgpackString(t, 0xa0, bundle), false)
+	urlPadded, urlPaddedJSON := mustEncodedEnvelope(t, bundle, syntheticEncoding{tag: 0xd9, codec: base64.URLEncoding, padded: true})
+	standardPadded, standardPaddedJSON := mustEncodedEnvelope(t, single, syntheticEncoding{tag: 0xdb, codec: base64.StdEncoding, padded: true})
+	standardUnpadded, standardUnpaddedJSON := mustEncodedEnvelope(t, single, syntheticEncoding{tag: 0xd9, codec: base64.RawStdEncoding})
+	wrapped := []struct {
+		name   string
+		decode func() (Document, error)
+		json   []byte
+		kind   RootKind
+	}{
+		{name: "raw LZMA fixstr bundle", decode: func() (Document, error) { return DecodeReader(bytes.NewReader(rawLZMA)) }, json: bundle, kind: RootBundle},
+		{name: "Base64URL padded str8 bundle", decode: func() (Document, error) { return DecodeText(urlPadded) }, json: urlPaddedJSON, kind: RootBundle},
+		{name: "Base64URL unpadded str16 bundle", decode: func() (Document, error) {
+			return DecodeText(base64.RawURLEncoding.EncodeToString(mustCompressLZMA(t, msgpackString(t, 0xda, bundle), false)))
+		}, json: bundle, kind: RootBundle},
+		{name: "standard Base64 padded str32 single", decode: func() (Document, error) { return DecodeText(standardPadded) }, json: standardPaddedJSON, kind: RootSingle},
+		{name: "standard Base64 unpadded str8 single", decode: func() (Document, error) { return DecodeText(standardUnpadded) }, json: standardUnpaddedJSON, kind: RootSingle},
+	}
+	for _, tt := range wrapped {
+		t.Run(tt.name, func(t *testing.T) {
+			document, err := tt.decode()
+
+			if err != nil {
+				t.Fatalf("decode() error = %v", err)
+			}
+			if !bytes.Equal(document.JSON, tt.json) {
+				t.Fatalf("JSON = %q, want %q", document.JSON, tt.json)
+			}
+			if document.Kind != tt.kind {
+				t.Fatalf("Kind = %q, want %q", document.Kind, tt.kind)
+			}
+		})
+	}
 }
 
 func TestDecodeRejectsMalformedAndOverLimitInput(t *testing.T) {
@@ -67,6 +101,12 @@ func TestDecodeRejectsMalformedAndOverLimitInput(t *testing.T) {
 	overCompressed := append([]byte(nil), completeLZMA...)
 	overCompressed = append(overCompressed, make([]byte, maxCompressedSize+1-len(overCompressed))...)
 	overOutput := mustCompressLZMARepeated(t, maxOutputSize+1, false)
+	invalidUTF8 := encodeLZMATestText(mustCompressLZMA(t, msgpackString(t, 0xd9, []byte{0xff}), false))
+	malformedEnvelopeJSON := encodeSyntheticEnvelopeText(t, msgpackString(t, 0xd9, []byte(`{"profiles":`)))
+	trailingEnvelopeJSON := encodeSyntheticEnvelopeText(t, msgpackString(t, 0xd9, []byte(`{"profiles":[]} true`)))
+	ambiguousEnvelopeRoot := encodeSyntheticEnvelopeText(t, msgpackString(t, 0xd9, []byte(`{"profiles":[],"inputs":[],"id":0}`)))
+	completeStr32 := mustCompressLZMA(t, msgpackString(t, 0xdb, []byte(`{"profiles":[]}`)), false)
+	corruptStr32 := encodeLZMATestText(completeStr32[:len(completeStr32)-1])
 
 	tests := []struct {
 		name string
@@ -96,6 +136,24 @@ func TestDecodeRejectsMalformedAndOverLimitInput(t *testing.T) {
 		{name: "LZMA truncated intact header", text: encodeLZMATestText(completeLZMA[:len(completeLZMA)-1]), code: ERR_IMPORT_LZMA_CORRUPT},
 		{name: "LZMA wrong known size", text: encodeLZMATestText(wrongKnownSize), code: ERR_IMPORT_LZMA_CORRUPT},
 		{name: "LZMA trailing compressed byte", text: encodeLZMATestText(append(append([]byte(nil), completeLZMA...), 0)), code: ERR_IMPORT_LZMA_CORRUPT},
+		{name: "MessagePack map", text: encodeSyntheticEnvelopeText(t, []byte{0x80}), code: ERR_IMPORT_MSGPACK_TYPE},
+		{name: "MessagePack binary", text: encodeSyntheticEnvelopeText(t, []byte{0xc4, 0}), code: ERR_IMPORT_MSGPACK_TYPE},
+		{name: "MessagePack missing tag", text: encodeSyntheticEnvelopeText(t, nil), code: ERR_IMPORT_LENGTH_MISMATCH},
+		{name: "MessagePack str8 missing length", text: encodeSyntheticEnvelopeText(t, []byte{0xd9}), code: ERR_IMPORT_LENGTH_MISMATCH},
+		{name: "MessagePack str16 missing length", text: encodeSyntheticEnvelopeText(t, []byte{0xda}), code: ERR_IMPORT_LENGTH_MISMATCH},
+		{name: "MessagePack str16 partial length", text: encodeSyntheticEnvelopeText(t, []byte{0xda, 0}), code: ERR_IMPORT_LENGTH_MISMATCH},
+		{name: "MessagePack str32 missing length", text: encodeSyntheticEnvelopeText(t, []byte{0xdb}), code: ERR_IMPORT_LENGTH_MISMATCH},
+		{name: "MessagePack str32 one length byte", text: encodeSyntheticEnvelopeText(t, []byte{0xdb, 0}), code: ERR_IMPORT_LENGTH_MISMATCH},
+		{name: "MessagePack str32 two length bytes", text: encodeSyntheticEnvelopeText(t, []byte{0xdb, 0, 0}), code: ERR_IMPORT_LENGTH_MISMATCH},
+		{name: "MessagePack str32 three length bytes", text: encodeSyntheticEnvelopeText(t, []byte{0xdb, 0, 0, 0}), code: ERR_IMPORT_LENGTH_MISMATCH},
+		{name: "MessagePack uint32 maximum", text: encodeSyntheticEnvelopeText(t, []byte{0xdb, 0xff, 0xff, 0xff, 0xff, '{'}), code: ERR_IMPORT_LENGTH_MISMATCH},
+		{name: "MessagePack short payload", text: encodeSyntheticEnvelopeText(t, []byte{0xd9, 2, '{'}), code: ERR_IMPORT_LENGTH_MISMATCH},
+		{name: "MessagePack trailing payload", text: encodeSyntheticEnvelopeText(t, []byte{0xd9, 1, '{', '}'}), code: ERR_IMPORT_LENGTH_MISMATCH},
+		{name: "invalid UTF-8", text: invalidUTF8, code: ERR_IMPORT_UTF8},
+		{name: "malformed envelope JSON", text: malformedEnvelopeJSON, code: ERR_IMPORT_JSON},
+		{name: "trailing envelope JSON", text: trailingEnvelopeJSON, code: ERR_IMPORT_JSON},
+		{name: "ambiguous envelope root", text: ambiguousEnvelopeRoot, code: ERR_IMPORT_ROOT},
+		{name: "corrupt str32 equivalent", text: corruptStr32, code: ERR_IMPORT_LZMA_CORRUPT},
 		{name: "source over limit", text: string(validBundleOfSize(maxSourceSize + 1)), code: ERR_IMPORT_LIMIT_EXCEEDED},
 	}
 
@@ -109,6 +167,43 @@ func TestDecodeRejectsMalformedAndOverLimitInput(t *testing.T) {
 			assertZeroDocument(t, document)
 		})
 	}
+}
+
+func TestDecodeText_WhenSampleEquivalentStr16_ReturnsExactOwnedBundle(t *testing.T) {
+	t.Parallel()
+
+	payload := []byte(`{"profiles":[],"version":"synthetic"}`)
+	envelope := msgpackString(t, 0xda, payload)
+	text := base64.RawURLEncoding.EncodeToString(mustCompressLZMA(t, envelope, false))
+
+	document, err := DecodeText(text)
+
+	if err != nil {
+		t.Fatalf("DecodeText() error = %v", err)
+	}
+	if !bytes.Equal(document.JSON, payload) {
+		t.Fatalf("JSON = %q, want %q", document.JSON, payload)
+	}
+	if document.Kind != RootBundle {
+		t.Fatalf("Kind = %q, want %q", document.Kind, RootBundle)
+	}
+	payload[2] = 'X'
+	if string(document.JSON) != `{"profiles":[],"version":"synthetic"}` {
+		t.Fatalf("JSON changed with fixture mutation: %q", document.JSON)
+	}
+}
+
+func TestDecodeText_WhenCorruptStr32Equivalent_ReturnsNoDocument(t *testing.T) {
+	t.Parallel()
+
+	payload := []byte(`{"profiles":[]}`)
+	compressed := mustCompressLZMA(t, msgpackString(t, 0xdb, payload), false)
+	text := base64.RawURLEncoding.EncodeToString(compressed[:len(compressed)-1])
+
+	document, err := DecodeText(text)
+
+	assertDecodeError(t, err, ERR_IMPORT_LZMA_CORRUPT)
+	assertZeroDocument(t, document)
 }
 
 func TestDecodeTextEntrypoints(t *testing.T) {
@@ -160,43 +255,3 @@ func TestDecodeFileEntrypoints(t *testing.T) {
 		t.Fatalf("DecodeFile() = %#v", document)
 	}
 }
-
-type failingReader struct {
-	cause error
-	sent  bool
-}
-
-func (r *failingReader) Read(destination []byte) (int, error) {
-	if r.sent {
-		return 0, r.cause
-	}
-	r.sent = true
-	return copy(destination, "{"), nil
-}
-
-func encodeLZMATestText(compressed []byte) string {
-	return base64.RawURLEncoding.EncodeToString(compressed)
-}
-
-func assertDecodeError(t *testing.T, err error, code ErrorCode) {
-	t.Helper()
-	if err == nil {
-		t.Fatalf("error = nil, want code %q", code)
-	}
-	var decodeErr *DecodeError
-	if !errors.As(err, &decodeErr) {
-		t.Fatalf("error type = %T, want *DecodeError", err)
-	}
-	if decodeErr.Code != code {
-		t.Fatalf("error code = %q, want %q", decodeErr.Code, code)
-	}
-}
-
-func assertZeroDocument(t *testing.T, document Document) {
-	t.Helper()
-	if !reflect.DeepEqual(document, Document{}) {
-		t.Fatalf("document = %#v, want zero Document", document)
-	}
-}
-
-var _ io.Reader = (*failingReader)(nil)
