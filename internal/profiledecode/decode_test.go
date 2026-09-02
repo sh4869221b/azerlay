@@ -2,6 +2,8 @@ package profiledecode
 
 import (
 	"bytes"
+	"encoding/base64"
+	"encoding/binary"
 	"errors"
 	"io"
 	"os"
@@ -53,6 +55,19 @@ func TestDecodeSupportedCorpus(t *testing.T) {
 func TestDecodeRejectsMalformedAndOverLimitInput(t *testing.T) {
 	t.Parallel()
 
+	completeLZMA := mustCompressLZMA(t, []byte("partial output must not be adopted"), false)
+	invalidProperty := append([]byte(nil), completeLZMA...)
+	invalidProperty[0] = 0xff
+	overDictionary := append([]byte(nil), completeLZMA...)
+	binary.LittleEndian.PutUint32(overDictionary[1:5], 128<<20)
+	overKnownSize := append([]byte(nil), completeLZMA...)
+	binary.LittleEndian.PutUint64(overKnownSize[5:13], uint64(maxOutputSize)+1)
+	wrongKnownSize := append([]byte(nil), completeLZMA...)
+	binary.LittleEndian.PutUint64(wrongKnownSize[5:13], uint64(len("partial output must not be adopted")+1))
+	overCompressed := append([]byte(nil), completeLZMA...)
+	overCompressed = append(overCompressed, make([]byte, maxCompressedSize+1-len(overCompressed))...)
+	overOutput := mustCompressLZMARepeated(t, maxOutputSize+1, false)
+
 	tests := []struct {
 		name string
 		text string
@@ -73,6 +88,14 @@ func TestDecodeRejectsMalformedAndOverLimitInput(t *testing.T) {
 		{name: "Base64 invalid character", text: "YW$J", code: ERR_IMPORT_ENCODING},
 		{name: "Base64 invalid Unicode", text: "YWéJ", code: ERR_IMPORT_ENCODING},
 		{name: "Base64 modulo one length", text: "A", code: ERR_IMPORT_ENCODING},
+		{name: "LZMA malformed property", text: encodeLZMATestText(invalidProperty), code: ERR_IMPORT_LZMA_HEADER},
+		{name: "LZMA dictionary over limit", text: encodeLZMATestText(overDictionary), code: ERR_IMPORT_LIMIT_EXCEEDED},
+		{name: "LZMA known output over limit", text: encodeLZMATestText(overKnownSize), code: ERR_IMPORT_LIMIT_EXCEEDED},
+		{name: "LZMA compressed input over limit", text: encodeLZMATestText(overCompressed), code: ERR_IMPORT_LIMIT_EXCEEDED},
+		{name: "LZMA unknown output over limit", text: encodeLZMATestText(overOutput), code: ERR_IMPORT_LIMIT_EXCEEDED},
+		{name: "LZMA truncated intact header", text: encodeLZMATestText(completeLZMA[:len(completeLZMA)-1]), code: ERR_IMPORT_LZMA_CORRUPT},
+		{name: "LZMA wrong known size", text: encodeLZMATestText(wrongKnownSize), code: ERR_IMPORT_LZMA_CORRUPT},
+		{name: "LZMA trailing compressed byte", text: encodeLZMATestText(append(append([]byte(nil), completeLZMA...), 0)), code: ERR_IMPORT_LZMA_CORRUPT},
 		{name: "source over limit", text: string(validBundleOfSize(maxSourceSize + 1)), code: ERR_IMPORT_LIMIT_EXCEEDED},
 	}
 
@@ -149,6 +172,10 @@ func (r *failingReader) Read(destination []byte) (int, error) {
 	}
 	r.sent = true
 	return copy(destination, "{"), nil
+}
+
+func encodeLZMATestText(compressed []byte) string {
+	return base64.RawURLEncoding.EncodeToString(compressed)
 }
 
 func assertDecodeError(t *testing.T, err error, code ErrorCode) {

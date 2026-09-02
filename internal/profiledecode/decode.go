@@ -45,10 +45,11 @@ func DecodeText(text string) (Document, error) {
 	switch form {
 	case outerRawJSON:
 	case outerBase64URLPadded, outerBase64URLUnpadded, outerBase64StandardPadded, outerBase64StandardUnpadded:
-		if _, err := decodeBase64(normalized, form); err != nil {
+		compressed, err := decodeBase64(normalized, form)
+		if err != nil {
 			return Document{}, err
 		}
-		return Document{}, newDecodeError(ERR_IMPORT_LZMA_HEADER, nil)
+		return decodeCompressedDocument(compressed)
 	default:
 		return Document{}, newDecodeError(ERR_IMPORT_ENCODING, nil)
 	}
@@ -92,7 +93,17 @@ func DecodeReader(reader io.Reader) (Document, error) {
 	if len(source) > maxSourceSize {
 		return Document{}, newDecodeError(ERR_IMPORT_LIMIT_EXCEEDED, nil)
 	}
+	if hasLZMAHeader(source) {
+		return decodeCompressedDocument(source)
+	}
 	return DecodeText(string(source))
+}
+
+func decodeCompressedDocument(compressed []byte) (Document, error) {
+	if _, err := decodeLZMA(compressed); err != nil {
+		return Document{}, err
+	}
+	return Document{}, newDecodeError(ERR_IMPORT_MSGPACK_TYPE, nil)
 }
 
 // DecodeFile opens a source read-only and delegates to DecodeReader.
