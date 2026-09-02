@@ -71,6 +71,39 @@ func TestDecodeLZMA_WhenComplete_AcceptsExactDictionaryLimit(t *testing.T) {
 	}
 }
 
+func TestDecodeLZMA_WhenDictionaryDeclarationIsNoncanonicalAndBounded_AcceptsPublicForms(t *testing.T) {
+	t.Parallel()
+
+	const bundle = `{"profiles":[]}`
+	compressed := mustCompressLZMA(t, msgpackString(t, 0xda, []byte(bundle)), true)
+	binary.LittleEndian.PutUint32(compressed[1:5], lzma.MinDictCap+1)
+	tests := []struct {
+		name   string
+		decode func() (Document, error)
+	}{
+		{name: "raw reader", decode: func() (Document, error) { return DecodeReader(bytes.NewReader(compressed)) }},
+		{name: "Base64URL text", decode: func() (Document, error) {
+			return DecodeText(base64.RawURLEncoding.EncodeToString(compressed))
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			document, err := tt.decode()
+
+			if err != nil {
+				t.Fatalf("decode() error = %v", err)
+			}
+			if string(document.JSON) != bundle {
+				t.Fatalf("JSON = %q, want %q", document.JSON, bundle)
+			}
+			if document.Kind != RootBundle {
+				t.Fatalf("kind = %q, want %q", document.Kind, RootBundle)
+			}
+		})
+	}
+}
+
 func TestDecodeLZMA_WhenCorrupt_RejectsMalformedOrIncompleteStream(t *testing.T) {
 	t.Parallel()
 
@@ -107,7 +140,7 @@ func TestDecodeLZMA_WhenCorrupt_RejectsMalformedOrIncompleteStream(t *testing.T)
 func TestDecodeLZMA_WhenLimitExceeded_RejectsBeforeAdoption(t *testing.T) {
 	complete := mustCompressLZMA(t, []byte("bounded payload"), false)
 	overDictionary := append([]byte(nil), complete...)
-	binary.LittleEndian.PutUint32(overDictionary[1:5], 128<<20)
+	binary.LittleEndian.PutUint32(overDictionary[1:5], maxDictionarySize+1)
 	overKnownSize := append([]byte(nil), complete...)
 	binary.LittleEndian.PutUint64(overKnownSize[5:13], uint64(maxOutputSize)+1)
 	overCompressed := append([]byte(nil), complete...)
@@ -117,7 +150,7 @@ func TestDecodeLZMA_WhenLimitExceeded_RejectsBeforeAdoption(t *testing.T) {
 		name       string
 		compressed []byte
 	}{
-		{name: "dictionary 128 MiB", compressed: overDictionary},
+		{name: "dictionary 64 MiB plus one", compressed: overDictionary},
 		{name: "known output 64 MiB plus one", compressed: overKnownSize},
 		{name: "compressed input 8 MiB plus one", compressed: overCompressed},
 		{name: "unknown output 64 MiB plus one", compressed: overOutput},

@@ -17,8 +17,8 @@ type lzmaHeader struct {
 }
 
 func hasLZMAHeader(source []byte) bool {
-	_, err := parseLZMAHeader(source)
-	return err == nil
+	header, err := parseLZMAHeader(source)
+	return err == nil && header.dictionarySize <= maxDictionarySize
 }
 
 func parseLZMAHeader(source []byte) (lzmaHeader, error) {
@@ -26,17 +26,8 @@ func parseLZMAHeader(source []byte) (lzmaHeader, error) {
 		return lzmaHeader{}, newDecodeError(ERR_IMPORT_LZMA_HEADER, nil)
 	}
 
-	dictionarySize := binary.LittleEndian.Uint32(source[1:5])
-	validDictionarySize := dictionarySize == math.MaxUint32
-	for exponent := uint(10); !validDictionarySize && exponent < 32; exponent++ {
-		base := uint32(1) << exponent
-		validDictionarySize = dictionarySize == base || dictionarySize == base+base/2
-	}
-	if !validDictionarySize {
-		return lzmaHeader{}, newDecodeError(ERR_IMPORT_LZMA_HEADER, nil)
-	}
 	return lzmaHeader{
-		dictionarySize: dictionarySize,
+		dictionarySize: binary.LittleEndian.Uint32(source[1:5]),
 		outputSize:     binary.LittleEndian.Uint64(source[5:13]),
 	}, nil
 }
