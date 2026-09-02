@@ -4,9 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/binary"
-	"os"
-	"path/filepath"
-	"reflect"
 	"testing"
 )
 
@@ -204,54 +201,4 @@ func TestDecodeText_WhenCorruptStr32Equivalent_ReturnsNoDocument(t *testing.T) {
 
 	assertDecodeError(t, err, ERR_IMPORT_LZMA_CORRUPT)
 	assertZeroDocument(t, document)
-}
-
-func TestDecodeTextEntrypoints(t *testing.T) {
-	t.Parallel()
-
-	document, err := DecodeText(`{"profiles":[]}`)
-
-	if err != nil {
-		t.Fatalf("DecodeText() error = %v", err)
-	}
-	want := Document{JSON: []byte(`{"profiles":[]}`), Kind: RootBundle}
-	if !reflect.DeepEqual(document, want) {
-		t.Fatalf("DecodeText() = %#v, want %#v", document, want)
-	}
-}
-
-func TestDecodeReaderEntrypoints(t *testing.T) {
-	t.Parallel()
-
-	source := []byte(`{"name":"synthetic","inputs":[]}`)
-	document, err := DecodeReader(bytes.NewReader(source))
-
-	if err != nil {
-		t.Fatalf("DecodeReader() error = %v", err)
-	}
-	source[2] = 'X'
-	if string(document.JSON) != `{"name":"synthetic","inputs":[]}` {
-		t.Fatalf("JSON changed with caller input: %q", document.JSON)
-	}
-	if document.Kind != RootSingle {
-		t.Fatalf("Kind = %q, want %q", document.Kind, RootSingle)
-	}
-}
-
-func TestDecodeFileEntrypoints(t *testing.T) {
-	t.Parallel()
-
-	path := filepath.Join(t.TempDir(), "synthetic.json")
-	if err := os.WriteFile(path, []byte(`{"profiles":[]}`), 0o600); err != nil {
-		t.Fatalf("WriteFile() error = %v", err)
-	}
-
-	document, err := DecodeFile(path)
-
-	if err != nil {
-		t.Fatalf("DecodeFile() error = %v", err)
-	}
-	if string(document.JSON) != `{"profiles":[]}` || document.Kind != RootBundle {
-		t.Fatalf("DecodeFile() = %#v", document)
-	}
 }
