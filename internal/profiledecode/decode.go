@@ -38,7 +38,18 @@ func DecodeText(text string) (Document, error) {
 	if err != nil {
 		return Document{}, newDecodeError(ERR_IMPORT_ENCODING, err)
 	}
-	if normalized == "" || (normalized[0] != '{' && normalized[0] != '[') {
+	form, err := detectOuter(normalized)
+	if err != nil {
+		return Document{}, err
+	}
+	switch form {
+	case outerRawJSON:
+	case outerBase64URLPadded, outerBase64URLUnpadded, outerBase64StandardPadded, outerBase64StandardUnpadded:
+		if _, err := decodeBase64(normalized, form); err != nil {
+			return Document{}, err
+		}
+		return Document{}, newDecodeError(ERR_IMPORT_LZMA_HEADER, nil)
+	default:
 		return Document{}, newDecodeError(ERR_IMPORT_ENCODING, nil)
 	}
 

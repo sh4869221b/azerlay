@@ -65,6 +65,14 @@ func TestDecodeRejectsMalformedAndOverLimitInput(t *testing.T) {
 		{name: "non-object root", text: `[]`, code: ERR_IMPORT_ROOT},
 		{name: "unmatched fence", text: "```\n{\"profiles\":[]}", code: ERR_IMPORT_ENCODING},
 		{name: "mismatched quote", text: `' {"profiles":[]} "`, code: ERR_IMPORT_ENCODING},
+		{name: "mixed Base64 alphabets", text: "+_8=", code: ERR_IMPORT_ENCODING},
+		{name: "Base64 padding in middle", text: "YW=Jj", code: ERR_IMPORT_ENCODING},
+		{name: "Base64 excess padding", text: "YQ===", code: ERR_IMPORT_ENCODING},
+		{name: "Base64 embedded whitespace", text: "YW Jj", code: ERR_IMPORT_ENCODING},
+		{name: "Base64 embedded newline", text: "YW\nJj", code: ERR_IMPORT_ENCODING},
+		{name: "Base64 invalid character", text: "YW$J", code: ERR_IMPORT_ENCODING},
+		{name: "Base64 invalid Unicode", text: "YWéJ", code: ERR_IMPORT_ENCODING},
+		{name: "Base64 modulo one length", text: "A", code: ERR_IMPORT_ENCODING},
 		{name: "source over limit", text: string(validBundleOfSize(maxSourceSize + 1)), code: ERR_IMPORT_LIMIT_EXCEEDED},
 	}
 
