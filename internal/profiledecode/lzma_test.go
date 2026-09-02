@@ -104,6 +104,18 @@ func TestDecodeLZMA_WhenDictionaryDeclarationIsNoncanonicalAndBounded_AcceptsPub
 	}
 }
 
+func TestDecodeReader_WhenRawLZMAHeaderDeclaresDictionaryOverLimit_ReturnsLimitAndZeroDocument(t *testing.T) {
+	t.Parallel()
+
+	compressed := mustCompressLZMA(t, msgpackString(t, 0xda, []byte(`{"profiles":[]}`)), true)
+	binary.LittleEndian.PutUint32(compressed[1:5], maxDictionarySize+1)
+
+	document, err := DecodeReader(bytes.NewReader(compressed))
+
+	assertDecodeError(t, err, ERR_IMPORT_LIMIT_EXCEEDED)
+	assertZeroDocument(t, document)
+}
+
 func TestDecodeLZMA_WhenCorrupt_RejectsMalformedOrIncompleteStream(t *testing.T) {
 	t.Parallel()
 

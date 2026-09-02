@@ -17,8 +17,13 @@ type lzmaHeader struct {
 }
 
 func hasLZMAHeader(source []byte) bool {
-	header, err := parseLZMAHeader(source)
-	return err == nil && header.dictionarySize <= maxDictionarySize
+	if normalized, err := normalizeOuterText(string(source)); err == nil {
+		if _, err := detectOuter(normalized); err == nil {
+			return false
+		}
+	}
+	_, err := parseLZMAHeader(source)
+	return err == nil
 }
 
 func parseLZMAHeader(source []byte) (lzmaHeader, error) {
