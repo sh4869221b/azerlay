@@ -82,9 +82,9 @@ func FuzzDecodeBase64(f *testing.F) {
 		if len(first) > maxCompressedSize {
 			t.Fatalf("decoded length = %d, limit = %d", len(first), maxCompressedSize)
 		}
-		codec := base64.URLEncoding
+		codec := base64.URLEncoding.Strict()
 		if form == outerBase64StandardPadded || form == outerBase64StandardUnpadded {
-			codec = base64.StdEncoding
+			codec = base64.StdEncoding.Strict()
 		}
 		padded := text + strings.Repeat("=", (4-len(text)%4)%4)
 		want, referenceErr := codec.DecodeString(padded)

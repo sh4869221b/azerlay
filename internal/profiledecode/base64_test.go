@@ -140,6 +140,50 @@ func TestDecodeBase64_WhenInvalid_RejectsWithStableCodeAndNilBytes(t *testing.T)
 	}
 }
 
+func TestDecodeBase64_WhenTerminalPadBitsAreNonzero_RejectsWithStableCodeAndNilBytes(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		text string
+		form outerForm
+	}{
+		{name: "Base64URL padded", text: "_x==", form: outerBase64URLPadded},
+		{name: "standard Base64 padded", text: "/x==", form: outerBase64StandardPadded},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := decodeBase64(tt.text, tt.form)
+
+			assertDecodeError(t, err, ERR_IMPORT_ENCODING)
+			if got != nil {
+				t.Fatalf("decodeBase64() = %x, want nil", got)
+			}
+		})
+	}
+}
+
+func TestDecodeText_WhenCompressedEnvelopeHasNoncanonicalPadBits_ReturnsEncodingAndZeroDocument(t *testing.T) {
+	t.Parallel()
+
+	const bundle = `{"profiles":[]}`
+	canonical, _ := mustEncodedEnvelope(t, []byte(bundle), syntheticEncoding{
+		tag:    0xda,
+		codec:  base64.URLEncoding,
+		padded: true,
+	})
+	alphabet := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+	alias := []byte(canonical)
+	lastDataIndex := strings.IndexByte(canonical, '=') - 1
+	canonicalValue := strings.IndexByte(alphabet, canonical[lastDataIndex])
+	alias[lastDataIndex] = alphabet[canonicalValue|1]
+
+	document, err := DecodeText(string(alias))
+
+	assertDecodeError(t, err, ERR_IMPORT_ENCODING)
+	assertZeroDocument(t, document)
+}
+
 func TestDecodeBase64_WhenEmpty_RejectsEveryBase64Form(t *testing.T) {
 	t.Parallel()
 
