@@ -24,11 +24,6 @@ func hasLZMAHeader(source []byte) bool {
 	}) == -1 {
 		return false
 	}
-	if normalized, err := normalizeOuterText(string(source)); err == nil {
-		if _, err := detectOuter(normalized); err == nil {
-			return false
-		}
-	}
 	_, err := parseLZMAHeader(source)
 	return err == nil
 }
