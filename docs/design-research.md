@@ -1301,9 +1301,11 @@ atomic swap
 
 途中失敗時は既存状態を維持する。
 
-### 16.4 fsnotify
+### 16.4 fswatcher
 
-ファイル自身だけでなく親ディレクトリを監視し、atomic renameによる置換へ対応する。イベントは100〜300ms程度debounceし、安定化確認後に読む。具体値は実測で確定する。
+`github.com/fswatcher/fswatcher`を使用する。ファイル自身ではなく親ディレクトリを監視し、atomic renameによる置換へ対応する。監視登録時は`Create`、`Write`、`Remove`、`Rename`のうち必要なイベントだけを指定する。イベントは100〜300ms程度debounceし、安定化確認後に読む。具体値は実測で確定する。
+
+1.0では再帰監視を必須としない。Azeron LocalSourceの調査結果、または将来の階層化されたgame profile/layout監視で必要と判明した場合のみ`AddRecursive`を使用する。
 
 ---
 
@@ -1577,7 +1579,7 @@ GTK、font cache、環境差があるため、CIだけでなくターゲット�
 | LZMA | `github.com/ulikunitz/xz/lzma` | ReaderConfigで上限設定 |
 | JSON | `encoding/json` | `UseNumber`、RawMessage |
 | TOML | `github.com/pelletier/go-toml/v2` | config/game profile |
-| File watch | `github.com/fsnotify/fsnotify` | parent directory監視 |
+| File watch | `github.com/fswatcher/fswatcher` | parent directory監視、event mask指定 |
 | Hash | `crypto/sha256` | import source identity |
 | Assets | `embed` | layouts、built-in game profiles |
 | IPC | `net.UnixConn` | JSON Lines v1 |
@@ -2198,7 +2200,7 @@ fuzz testでpanic、無制限メモリ確保、部分保存が発生しない。
 - gotk4: https://github.com/diamondburned/gotk4
 - go-evdev: https://github.com/holoplot/go-evdev
 - xz/lzma for Go: https://pkg.go.dev/github.com/ulikunitz/xz/lzma
-- fsnotify: https://github.com/fsnotify/fsnotify
+- fswatcher: https://github.com/fswatcher/fswatcher
 - go-toml/v2: https://github.com/pelletier/go-toml
 - Azeron Software / manuals: https://www.azeron.eu/
 
@@ -2218,7 +2220,7 @@ Go 1.27.x
 + Cairo
 + xz/lzma
 + encoding/json
-+ fsnotify
++ fswatcher
 + go-toml/v2
 + udev uaccess
 ```
