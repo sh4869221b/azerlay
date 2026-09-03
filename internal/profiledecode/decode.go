@@ -28,7 +28,7 @@ type Document struct {
 	Kind RootKind
 }
 
-// DecodeText decodes a normalized Raw JSON export.
+// DecodeText normalizes and decodes Raw JSON or Base64 export text.
 func DecodeText(text string) (Document, error) {
 	if len(text) > maxSourceSize {
 		return Document{}, newDecodeError(ERR_IMPORT_LIMIT_EXCEEDED, nil)

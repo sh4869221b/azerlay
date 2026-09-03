@@ -47,15 +47,32 @@ and `"""..."""`. It trims around unwrapped content. Unmatched wrappers fail,
 and bytes or characters in the middle are never deleted, replaced, or scanned
 past.
 
-Selection is deterministic, not a retry loop. Reader and file input with a
-valid 13-byte LZMA-Alone header takes the raw compressed path first. Other input
-uses the text path. After normalization, a leading `{` or `[` selects Raw JSON.
-All other text must fit one Base64 alphabet and its terminal-padding form.
-Standard-only `+` or `/` and URL-only `-` or `_` characters cannot be mixed.
-Alphanumeric-only text selects Base64URL, whose decoded bytes are identical for
-both alphabets. Padding is accepted only at the end, and missing terminal
-padding is the only repair. Internal whitespace, invalid characters, excess
-padding, and impossible lengths fail.
+Selection is deterministic, not a retry loop. Reader and file input first
+applies a predicate to the whole byte sequence. A source is definitively text
+when it is valid UTF-8 and every rune is either Unicode-printable or Unicode
+whitespace. That text path remains authoritative even when normalization,
+Base64, or JSON later rejects the input. For every other byte sequence, raw
+header recognition is allowed. A source at least 13 bytes long whose first byte
+is a legal LZMA property code takes the raw compressed path. If no such header
+is recognized, the source follows `DecodeText`, which owns BOM and wrapper
+normalization and any applicable rejection. Dictionary and output declarations
+are not recognition policy; their limits are enforced by the LZMA decoder
+after selection.
+
+LZMA-Alone has no magic signature. Its first byte encodes properties and can
+legally equal ASCII `[` (`0x5b`) or `{` (`0x7b`). The whole-input predicate is
+the tie-break: definitively textual input takes precedence over coincidental
+header-shaped bytes, while header-shaped non-text input is not reclassified by
+Raw JSON's first-byte check. Once the raw path is selected, it is not retried as
+another form after an error.
+
+On the text path, normalization runs before outer-form detection. A leading
+`{` or `[` then selects Raw JSON. All other text must fit one Base64 alphabet
+and its terminal-padding form. Standard-only `+` or `/` and URL-only `-` or `_`
+characters cannot be mixed. Alphanumeric-only text selects Base64URL, whose
+decoded bytes are identical for both alphabets. Padding is accepted only at the
+end, and missing terminal padding is the only repair. Internal whitespace,
+invalid characters, excess padding, and impossible lengths fail.
 
 Raw JSON bypasses Base64, LZMA, and MessagePack. Every Base64 form must decode to
 the same compressed envelope accepted by the raw LZMA-Alone path.
