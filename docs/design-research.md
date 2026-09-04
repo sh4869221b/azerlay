@@ -593,7 +593,7 @@ Inputでは次のカテゴリが確認された。
 
 ### 8.4 Rawデータ型の方針
 
-Issue #20のmodel boundaryは`profiledecode.Document`を受け取り、decoderの暫定kindを信頼せず、JSON rootを再判定する。`Parse`成功時の`RawExport`は`Bundle`か`Single`の一方だけがnon-nilとなる。失敗時は常にzero valueを返し、部分的なrootを返さない。
+以下はIssue #20のmodel boundaryが満たす必須contractであり、現在のAPI availabilityを示すものではない。現在の実装状況はrepository READMEに従う。実装時は`profiledecode.Document`を受け取り、decoderの暫定kindを信頼せず、JSON rootを再判定しなければならない。`Parse`成功時の`RawExport`は`Bundle`か`Single`の一方だけをnon-nilとし、失敗時は常にzero valueを返して部分的なrootを返してはならない。
 
 ```go
 type RawExport struct {

@@ -137,16 +137,21 @@ mismatch with this provisional kind is an error.
 
 ## Authoritative raw model
 
-After strict decoding, `internal/profileraw.Parse` consumes the owned JSON and
-provisional kind with this signature:
+This section specifies the required Issue #20 raw-model API and behavior. It
+doesn't assert that the package is currently available; current implementation
+status remains listed in the repository README.
+
+After strict decoding, `internal/profileraw.Parse` must consume the owned JSON
+and provisional kind with this signature:
 
 ```go
 Parse(document profiledecode.Document) (RawExport, error)
 ```
 
-It returns a `RawExport` with exactly one non-nil root, either `RawBundle` or
-`RawProfile`. A bundle models optional `version`, ordered `profiles`, and
-unknown root fields. A profile models optional `id`, `name`, and `version`, plus
+A successful call must return a `RawExport` with exactly one non-nil root,
+either `RawBundle` or `RawProfile`. A bundle models optional `version`,
+ordered `profiles`, and unknown root fields. A profile models optional `id`,
+`name`, and `version`, plus
 ordered `inputs` and unknown profile fields. Each input is an opaque
 `map[string]json.RawMessage`; fields
 such as `macro`, `longMacro`, and `doubleMacro` aren't interpreted or counted

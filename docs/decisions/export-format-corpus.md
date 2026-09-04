@@ -6,7 +6,7 @@ This decision defines the Azeron export structures Azerlay 1.0 may treat as obse
 
 The sole complete observed structure is Base64URL text containing a complete LZMA-Alone stream whose output is a MessagePack `str16` string with exactly 54,739 UTF-8 bytes and a bundle JSON root. Its Azeron Software version is `unknown`, so it is `observed-version-unknown`; no evidence qualifies as `observed-supported`. A damaged `str32` stream is rejected evidence, not support. Software 1.x and 2.x compatibility remains `unobserved-unsupported`.
 
-This document defines contracts but implements no parser, dependency, fixture payload, binding adapter, or production test. Root detection is intentionally enforced at two trust boundaries. Issue #19 owns input normalization, outer-wrapper and envelope decoding, UTF-8/JSON decoding, and provisional root detection at the decoder boundary. Issue #20 independently re-detects and validates the root while constructing the lossless raw bundle/single model; its result is authoritative for model selection.
+This document defines contracts but implements no parser, dependency, fixture payload, binding adapter, or production test. Its Issue #20 sections specify required behavior rather than current API availability; current implementation status remains listed in the repository README. Root detection is intentionally enforced at two trust boundaries. Issue #19 owns input normalization, outer-wrapper and envelope decoding, UTF-8/JSON decoding, and provisional root detection at the decoder boundary. Issue #20 independently re-detects and validates the root while constructing the lossless raw bundle/single model; its result is authoritative for model selection.
 
 ## Terminology and decision vocabulary
 
