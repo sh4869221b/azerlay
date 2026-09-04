@@ -52,6 +52,7 @@ azerlay/
 ## CONVENTIONS
 
 - Require Go 1.27.x; CI currently installs 1.27.1.
+- Before implementation, read the assigned GitHub issue's scope, dependencies, blockers, acceptance criteria, and required research; unresolved release-blocking research constrains support.
 - Add packages only when an issue introduces behavior; do not pre-create the planned package tree.
 - Keep the application one Go binary and one process, controlled by CLI/configuration and a same-user Unix socket.
 - Keep tests colocated, deterministic, race-enabled, shuffled, and parallel where fixtures are isolated.
@@ -66,7 +67,7 @@ azerlay/
 - Do not require root, permanent `input`-group membership, `uinput`, or external network access.
 - Do not guess a physical control when bindings are ambiguous.
 - Do not persist partial imports or replace last-known-good state after a reload failure.
-- Do not put raw exports, complete input streams, macros, full labels, or private Azeron database contents in logs or fixtures.
+- Do not put private raw exports, complete input-event streams, macro contents, full user labels, or private Azeron database contents in logs; public fixtures must be privacy-safe and synthetic.
 - Do not claim Software 1.x/2.x support from synthetic or version-unknown format evidence.
 
 ## UNIQUE STYLES
@@ -89,6 +90,7 @@ go build ./cmd/azerlay
 ## NOTES
 
 - Current binary functionality is intentionally limited to `version` and `--help`.
+- Initial target: Linux/Wayland x86-64, Azeron Cyborg II, Niri or Hyprland, and a Bodycam profile.
 - `docs/design-research.md` describes future packages, not current code.
-- `azerlay-system-design.md` is an ignored local duplicate; the tracked canonical file is `docs/design-research.md`.
+- Preserve the README's unofficial-project trademark notice; public release remains blocked on issue #18's name, trademark, dependency-license, NOTICE, and SBOM decision.
 - Normal operation is designed to make no external network connections and send no telemetry.
