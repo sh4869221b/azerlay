@@ -135,6 +135,77 @@ boundary result. Issue #20 independently re-detects and validates the root while
 constructing the lossless raw model. Its result is authoritative, and a
 mismatch with this provisional kind is an error.
 
+## Authoritative raw model
+
+This section specifies the required Issue #20 raw-model API and behavior. It
+doesn't assert that the package is currently available; current implementation
+status remains listed in the repository README.
+
+After strict decoding, `internal/profileraw.Parse` must consume the owned JSON
+and provisional kind with this signature:
+
+```go
+Parse(document profiledecode.Document) (RawExport, error)
+```
+
+A successful call must return a `RawExport` with exactly one non-nil root,
+either `RawBundle` or `RawProfile`. A bundle models optional `version`,
+ordered `profiles`, and unknown root fields. A profile models optional `id`,
+`name`, and `version`, plus
+ordered `inputs` and unknown profile fields. Each input is an opaque
+`map[string]json.RawMessage`; fields
+such as `macro`, `longMacro`, and `doubleMacro` aren't interpreted or counted
+at this boundary.
+
+Modeled scalar fields use `RawScalar`. It distinguishes null, bool, string,
+and number, keeps the exact source value token in owned `json.RawMessage`, and
+stores numbers as `json.Number` without integer or floating-point narrowing.
+Missing fields are nil, while present `null` values have a non-nil null scalar.
+Numeric spelling such as exponents, fractions, overflow-sized integers, and
+negative zero remains unchanged. Value-token whitespace and string escapes are
+preserved, but separator whitespace isn't. Empty accepted arrays remain
+non-nil. Unknown maps exclude only the keys modeled at their level. Their
+values are also owned raw bytes, so later changes to the decoded document can't
+alter a successful model. Object key order and insignificant whitespace outside
+value tokens aren't round-trip guarantees. A scalar decode failure resets its
+receiver before returning `ERR_IMPORT_ROOT`; `Parse` maps a container-valued
+`version` to `ERR_IMPORT_UNSUPPORTED_VERSION`.
+
+Parsing scans the complete JSON token stream before model construction. It
+rejects malformed or trailing JSON, invalid UTF-8, duplicate decoded keys at
+any depth, decoded strings over 65,536 UTF-8 bytes, and container depth over
+64. Escaped and literal spellings of the same object key are duplicates. The
+limits are inclusive: depth 64 and strings of 65,536 bytes are accepted.
+Bundles allow at most 512 profiles, and each profile allows at most 256 inputs.
+Every profile and input must be an object, every profile must contain `inputs`,
+and `inputs` must be an array. Container-valued `id` or `name` is invalid. A
+bundle member doesn't need `id` or `name`. The canonical synthetic roots
+`{"version":"synthetic-1","profiles":[]}` and `{"id":null,"inputs":[]}`
+therefore pass structural validation.
+
+Root selection repeats the decoder's key-presence classifier and requires its
+result to match `Document.Kind`. Both predicates, neither predicate, an unknown
+kind, a kind mismatch, invalid field types, malformed JSON, invalid UTF-8, and
+duplicate keys return `ERR_IMPORT_ROOT`. Exact structural overflows return
+`ERR_IMPORT_LIMIT_EXCEEDED`. An optional `version` may be absent or any scalar,
+including null; an object or array version returns
+`ERR_IMPORT_UNSUPPORTED_VERSION`. Scalar preservation is raw evidence only. It
+doesn't admit that version or establish support for any Azeron Software
+generation, and this boundary exposes no generation-admission API.
+
+Validation follows this order: full-stream preflight, root classification and
+kind agreement, root version representation, then profile and input shape and
+count checks in input order. Within a profile, version is checked before
+`id`/`name`, then `inputs`. The first preflight failure wins. Model-boundary
+errors are `ParseError` values whose text is only their stable code. Every
+failure returns the zero `RawExport`, never a partial root.
+
+Macro payloads remain opaque under these structural bounds for Issue #20.
+Issue #40 must establish privacy-safe grammar evidence before macro structure
+is interpreted. Issue #42 must enforce the 1,000-step ceiling before semantic
+admission; 1,000 steps are accepted and 1,001 are rejected. Issue #20 does not
+apply that ceiling as a raw array-length check.
+
 ## Stable error codes
 
 Decode errors are typed as `DecodeError`. Its `Code` is stable for machine use:
@@ -156,9 +227,13 @@ Decode errors are typed as `DecodeError`. Its `Code` is stable for machine use:
 This boundary stops at owned JSON and provisional classification.
 
 - Issue #20 owns the lossless raw schema/model, authoritative root
-  revalidation, version handling, and structural or semantic validation.
-- Issue #40 owns privacy-safe, version-bearing binding conversion evidence. No
-  binding map or generation adapter is inferred here.
+  revalidation, scalar version representation, structural validation, and
+  opaque macro preservation.
+- Issue #40 owns privacy-safe, version-bearing binding and macro grammar
+  evidence. No binding map, macro grammar, or generation adapter is inferred
+  here.
+- Issue #42 owns adapter admission, semantic interpretation, and enforcement of
+  the 1,000-step macro ceiling before interpretation.
 - Issue #43 owns the production `import` and `validate` CLI surface.
 
 The decoder doesn't persist imports, expose private exports, define raw model

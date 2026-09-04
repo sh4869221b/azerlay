@@ -593,35 +593,57 @@ Inputでは次のカテゴリが確認された。
 
 ### 8.4 Rawデータ型の方針
 
-形式差を吸収するため、Raw構造体は必要箇所で柔軟スカラーを使用する。
+以下はIssue #20のmodel boundaryが満たす必須contractであり、現在のAPI availabilityを示すものではない。現在の実装状況はrepository READMEに従う。実装時は`profiledecode.Document`を受け取り、decoderの暫定kindを信頼せず、JSON rootを再判定しなければならない。`Parse`成功時の`RawExport`は`Bundle`か`Single`の一方だけをnon-nilとし、失敗時は常にzero valueを返して部分的なrootを返してはならない。
 
 ```go
+type RawExport struct {
+    Bundle *RawBundle
+    Single *RawProfile
+}
+
+type RawBundle struct {
+    Version  *RawScalar
+    Profiles []RawProfile
+    Unknown  map[string]json.RawMessage
+}
+
+type RawProfile struct {
+    ID      *RawScalar
+    Name    *RawScalar
+    Version *RawScalar
+    Inputs  []RawInput
+    Unknown map[string]json.RawMessage
+}
+
+type RawInput map[string]json.RawMessage
+
+type RawScalarKind uint8
+
+const (
+    ScalarNull RawScalarKind = iota
+    ScalarBool
+    ScalarString
+    ScalarNumber
+)
+
 type RawScalar struct {
-    Kind  RawScalarKind
-    Text  string
-    Int64 int64
-    Raw   json.RawMessage
+    Kind   RawScalarKind
+    Raw    json.RawMessage
+    Bool   bool
+    String string
+    Number json.Number
 }
 ```
 
-`json.Number`を利用し、floatへ暗黙変換しない。不明値を正規化層まで保持する。
+Absent scalarはnil pointer、存在する`null`はnon-nilの`ScalarNull`として区別する。空の配列はnon-nilかつ長さ0のsliceとして保持する。`RawScalar`はnull、bool、string、numberだけを受け入れ、numberをfloat64やint64へ狭めない。指数、小数、negative zero、int64を超えるnumberを含め、元のvalue tokenを`Raw`へ保持する。stringの`"001"`とnumberの`1`は別の値である。
 
-### 8.5 バージョンアダプター
+Bundle、profile、inputのunknown valueはowned `json.RawMessage`として保持する。`RawInput`は全fieldをopaqueに扱い、input ID、binding、trigger、`macro`、`longMacro`、`doubleMacro`のschemaをIssue #20では推測しない。返却したraw bytesは入力`Document.JSON`から独立させる。Object key順序とvalue token外の無意味な空白はround-trip保証の対象外とする。
 
-```go
-type ExportAdapter interface {
-    Match(meta RawExportMetadata) bool
-    Normalize(ctx context.Context, raw json.RawMessage) (*ProfileBundle, []Warning, error)
-}
-```
+### 8.5 バージョンとsemantic admission
 
-アダプター例:
+Rootまたはprofileの`version`は省略、null、bool、string、numberをraw evidenceとして保持できる。Objectまたはarrayなら`ERR_IMPORT_UNSUPPORTED_VERSION`とする。このerrorはversionの表現が非対応であることを示すだけで、scalar versionが対応世代であることを示さない。Issue #20はgeneration admission APIを提供しない。
 
-- `Legacy155Adapter`
-- `Symbolic2xAdapter`
-- `GenericCompatibleAdapter`：厳密条件を満たす既知互換形式のみ
-
-推測ベースのGeneric Adapterを最優先してはならない。
+Issue #40はprivacy-safeなversion-bearing binding evidenceとmacro grammarを確立する。Issue #42はそのevidenceに基づくadapter admission、semantic validation、normalizationを担当し、解釈前に1 macroあたり1,000 stepの上限を適用する。Issue #20はmacroをopaqueな値として構造制限の範囲で保持し、stepを数えない。推測ベースのadapterで未知世代を受け入れてはならない。
 
 ### 8.6 セキュリティ制限
 
@@ -633,11 +655,13 @@ type ExportAdapter interface {
 | LZMA展開後 | 64 MiB |
 | プロファイル数 | 512 |
 | 1プロファイルのinput数 | 256 |
-| 1マクロのstep数 | 10,000 |
-| 単一文字列 | 64 KiB |
-| JSON nesting | 実装可能な範囲で明示制限 |
+| decoded単一文字列 | 65,536 UTF-8 bytes |
+| JSON container nesting | 64 |
+| 1マクロのstep数 | 1,000、Issue #42でsemantic interpretation前に検証 |
 
-上限超過時は`ERR_IMPORT_LIMIT_EXCEEDED`とし、部分保存しない。
+Model boundaryは全JSON token streamをmap構築前にscanする。Malformed JSON、invalid UTF-8、末尾の別JSON、全階層のdecoded duplicate key、root/kind不一致、field type不正は`ERR_IMPORT_ROOT`とする。`"a"`と`"\u0061"`は同じdecoded keyとして重複になる。Container depth 64とdecoded string 65,536 bytesは受理し、それぞれ65と65,537 bytesを`ERR_IMPORT_LIMIT_EXCEEDED`で拒否する。Unicode escapeの表記方法はdecoded byte数を変えない。
+
+検証順序は、全streamのpreflight、root再判定と暫定kind一致、root version表現、profileとinputのshapeおよび件数とする。Profile内ではversion、id/name、inputsの順に検証する。Preflight中は最初に発見したfailureを返す。上限超過や他のerrorでは部分保存しない。Canonical synthetic rootの構造受理はSoftware generation supportを意味しない。
 
 ---
 
