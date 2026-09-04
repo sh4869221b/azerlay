@@ -1,0 +1,9 @@
+{
+  "single": {
+    "id": {"kind": 2, "raw": "\"001\"", "string": "001"},
+    "name": {"kind": 0, "raw": "null"},
+    "version": {"kind": 1, "raw": "false", "bool": false},
+    "inputs": [],
+    "unknown": {"singleExtra": "{\"escaped\":\"\\u0061\",\"fraction\":1.2500}"}
+  }
+}
