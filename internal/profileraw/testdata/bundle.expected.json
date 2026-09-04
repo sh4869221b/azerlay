@@ -1,0 +1,26 @@
+{
+  "bundle": {
+    "version": {"kind": 3, "raw": "1e+03", "number": "1e+03"},
+    "profiles": [
+      {
+        "id": {"kind": 0, "raw": "null"},
+        "name": {"kind": 2, "raw": "\"S\\u0079nthetic\"", "string": "Synthetic"},
+        "version": {"kind": 3, "raw": "-0", "number": "-0"},
+        "inputs": [
+          {
+            "enabled": "true",
+            "huge": "9223372036854775808",
+            "macro": "{\"steps\":[1,2]}",
+            "unset": "null"
+          }
+        ],
+        "unknown": {"profileExtra": "{\"fraction\":1.2500}"}
+      },
+      {
+        "inputs": [],
+        "unknown": {}
+      }
+    ],
+    "unknown": {"bundleExtra": "[\"opaque\",{\"negativeZero\":-0}]"}
+  }
+}
