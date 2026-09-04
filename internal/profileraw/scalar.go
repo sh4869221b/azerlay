@@ -9,7 +9,7 @@ import (
 // UnmarshalJSON parses one lossless JSON scalar.
 func (scalar *RawScalar) UnmarshalJSON(data []byte) error {
 	*scalar = RawScalar{}
-	token := bytes.TrimSpace(data)
+	token := bytes.Trim(data, " \t\r\n")
 	if len(token) == 0 || !utf8.Valid(token) {
 		return &ParseError{Code: ERR_IMPORT_ROOT}
 	}

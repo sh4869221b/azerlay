@@ -14,6 +14,7 @@ func TestRawScalar(t *testing.T) {
 		raw     string
 		want    RawScalar
 		wantErr bool
+		direct  bool
 	}{
 		{name: "number_exponent", raw: "1e+03", want: RawScalar{Kind: ScalarNumber, Raw: json.RawMessage("1e+03"), Number: json.Number("1e+03")}},
 		{name: "number_fraction", raw: "1.25", want: RawScalar{Kind: ScalarNumber, Raw: json.RawMessage("1.25"), Number: json.Number("1.25")}},
@@ -27,6 +28,8 @@ func TestRawScalar(t *testing.T) {
 		{name: "reject_array", raw: `[]`, wantErr: true},
 		{name: "reject_malformed", raw: `tru`, wantErr: true},
 		{name: "reject_trailing", raw: `true false`, wantErr: true},
+		{name: "reject_vertical_tab_whitespace", raw: "\v1", wantErr: true, direct: true},
+		{name: "reject_nbsp_whitespace", raw: "\u00a01\u00a0", wantErr: true, direct: true},
 	}
 
 	for _, tt := range tests {
@@ -35,6 +38,9 @@ func TestRawScalar(t *testing.T) {
 
 			// Given
 			source := []byte(" \t" + tt.raw + "\n")
+			if tt.direct {
+				source = []byte(tt.raw)
+			}
 			scalar := RawScalar{Kind: ScalarString, Raw: json.RawMessage(`"prior"`), String: "prior"}
 
 			// When
