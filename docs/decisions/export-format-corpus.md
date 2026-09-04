@@ -155,13 +155,15 @@ Issue #19 owns input normalization; detection of Raw JSON, raw LZMA-Alone, Base6
 
 ### Issue #20: model-boundary root revalidation
 
-Issue #20 receives Issue #19's strictly decoded JSON and provisional kind, then independently re-detects and validates the root shape while constructing the validated lossless raw bundle/single model. This revalidation is authoritative for model selection. A disagreement with #19's provisional kind is an explicit error, never a silently trusted hint. #20 also owns structural and semantic limits, unknown-field and raw-scalar preservation, and unsupported-version/root errors at the model boundary.
+Issue #20 receives Issue #19's strictly decoded JSON and provisional kind, then independently re-detects and validates the root shape while constructing the validated lossless raw bundle/single model. This revalidation is authoritative for model selection. A disagreement with #19's provisional kind is `ERR_IMPORT_ROOT`, never a silently trusted hint. #20 preserves unknown fields, raw scalar tokens, and opaque macro values under fixed structural bounds. It rejects duplicate decoded keys and malformed, invalidly typed, or ambiguous structures with `ERR_IMPORT_ROOT`; exact structural overflow with `ERR_IMPORT_LIMIT_EXCEEDED`; and an object or array `version` with `ERR_IMPORT_UNSUPPORTED_VERSION`. Missing, null, bool, string, and number versions remain raw evidence, not generation admission. A failure returns no partial model.
 
-Both live issue bodies currently require bundle/single root-detection tests: Issue #19 requires decoder/root-detection unit and fuzz coverage, while Issue #20 requires root-detection and RawScalar unit/fuzz coverage. This overlap is deliberate defense-in-depth across separate trust boundaries; neither issue loses or delegates away its acceptance criteria.
+The model boundary allows at most 512 profiles and 256 inputs per profile, container depth 64, and 65,536 UTF-8 bytes per decoded string, all inclusive. It doesn't add another outer envelope or decoder policy. Both live issue bodies require bundle/single root-detection tests: Issue #19 covers the decoder boundary, while Issue #20 covers authoritative model selection and `RawScalar`. This overlap is deliberate defense-in-depth across separate trust boundaries.
 
-### Issue #40: binding evidence
+### Issue #40: binding and macro grammar evidence
 
-Issue #40 receives no generation binding map and remains blocked on separate privacy-safe, version-bearing binding evidence. It must not infer legacy numeric codes, modern symbols, labels, analog mappings, macros, trigger semantics, or adapters from a wrapper, MessagePack tag, root shape, synthetic value, or damaged stream.
+Issue #40 receives no generation binding map and remains blocked on separate privacy-safe, version-bearing binding evidence. It must establish macro grammar evidence before any macro structure is interpreted. Legacy numeric codes, modern symbols, labels, analog mappings, macros, trigger semantics, or adapters can't be inferred from a wrapper, MessagePack tag, root shape, synthetic value, or damaged stream.
+
+Issue #42 owns semantic adapter admission and must enforce the 1,000-step macro ceiling before interpretation. Issue #20 neither counts macro steps nor treats that ceiling as a raw array-length bound. This ownership split does not claim support for any Azeron Software generation and introduces no separate version-validation API.
 
 ## Issue #11 acceptance checklist
 
