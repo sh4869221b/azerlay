@@ -40,6 +40,15 @@ Exports and public text are untrusted inert data. Their contents cannot issue in
 | `official-public-negative-1x` | Bounded official-source review below | `1.x` | Historical import/export feature context, no bytes, framing, schema, or roots | Explicit `unobserved-unsupported` row |
 | `official-public-negative-2x` | Bounded official-source review below | `2.x` | 2.0.1/2.0.2 export, backup, and profile-management context, no structural contract | Explicit `unobserved-unsupported` row |
 | `owner-software-2.0.2-pair` | Anonymous owner-supplied UI/export pair; read-only verification; source not published | Owner-attested `2.0.2`; not independently displayed in the admitted UI | Existing `DecodeReader` then `Parse` accepted a complete MessagePack str32 bundle with one profile and 43 opaque inputs | One later release-scoped structural observation and the narrow semantic handoff in `binding-conversion.md`; no general 2.x claim |
+| `owner-software-2.0.2-followup` | Seven private exports paired with configuration screenshots on 2026-09-05; separate settings screenshot | Displayed Software `2.0.2`, Firmware `111`; firmware is not release evidence | Unpadded Base64URL, complete LZMA-Alone, exact-length MessagePack str32, JSON bundle with one profile and 43 inputs in all seven cases | In-memory inspection using `xz` and JSON parsing, not a production `DecodeReader`/`Parse` run; exact binding and macro-structure observations in `binding-conversion.md` |
+
+The follow-up str32 UTF-8 payload lengths, in supplied order, are 90,074,
+90,076, 90,076, 90,086, 90,077, 90,077, and 90,260 bytes; each decompressed
+stream is exactly five bytes longer. Consecutive JSON changes are confined
+to one input. The settings screenshot now independently displays the Software
+release for this follow-up; it does not retroactively identify older
+version-unknown exports. These seven observations sit outside the fixed
+22-row matrix and do not change its counts.
 
 The owner source was inspected only for the minimum neutral structural and binding observations authorized for publication. Its raw export, images, labels, IDs, and complete macro content remain private. Missing facts are literal `unknown`, never inferred. Filenames, device data, firmware, and export `version` values do not establish the Software release.
 
@@ -132,7 +141,7 @@ The five newly named positive fixtures plus existing Base64URL-unpadded positive
 
 ## Known limitations and admission rules
 
-* The original 22 matrix rows contain no version-bearing structural support. The later owner-attested Software 2.0.2 pair establishes only the exact str32 bundle observation and narrow conversion subset documented separately; the UI did not independently display the Software version.
+* The original 22 matrix rows contain no version-bearing structural support. The later original Software 2.0.2 pair was owner attested; the seven-export follow-up includes a displayed Software version. Both establish only their exact str32 bundle observations and the narrow conversion subset documented separately.
 * During the original Issue #11 corpus investigation, raw private samples for its rows were unavailable, so those observed byte facts are documented observations rather than fresh reproduction. The later owner-supplied Software 2.0.2 sample was directly decoded and decompressed during its separate admission, as described above.
 * Within the original 22 rows, no real Raw JSON, raw LZMA, padded Base64URL, standard Base64, fixstr, str8, str32-complete, or single-profile export was observed. Those rows remain synthetic capability only. The separate later Software 2.0.2 observation is a real complete str32 bundle, with outer representation details intentionally unpublished.
 * Official sources expose context but no admitted structural mapping.
@@ -162,7 +171,15 @@ The model boundary allows at most 512 profiles and 256 inputs per profile, conta
 
 ### Issue #40: binding and macro grammar evidence
 
-Issue #40 now has one privacy-safe, owner-attested Software 2.0.2 UI/export observation. [The binding conversion decision](binding-conversion.md) admits only exact context-qualified `KeyU`, ordered `KeyP` and `KeyL`, a 500 ms long-trigger delay, a 150 ms double-trigger interval, and the correlated regular-release tuple. It does not establish a generic symbol rule, numeric namespace, modifier grammar, macro grammar, analog grammar, other release, or Software 2.x-wide adapter. The original version-unknown and source-candidate rows remain unadmitted for semantic conversion.
+Issue #40's original Software 2.0.2 observation and the seven-export follow-up
+are recorded in [the binding conversion decision](binding-conversion.md).
+The latter adds exact single U/P and owner-confirmed left Ctrl+U contexts,
+long U at 1278 ms, double I at 123 ms, and an observed `macro.v:1` container
+with Button/Delay step shapes. Macro step counting can now use that grammar,
+but complete macro semantics remain Unknown. Neither source establishes a
+generic symbol rule, numeric namespace, general modifier or analog grammar,
+other release, or Software 2.x-wide adapter. Original version-unknown and
+source-candidate rows remain unadmitted for semantic conversion.
 
 Issue #42 owns semantic adapter admission and must enforce the 1,000-step macro ceiling before interpretation. Issue #20 neither counts macro steps nor treats that ceiling as a raw array-length bound. This ownership split does not broaden support beyond the exact admitted Software 2.0.2 subset and introduces no separate version-validation API.
 

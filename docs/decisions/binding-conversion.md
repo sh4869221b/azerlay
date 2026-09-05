@@ -2,13 +2,15 @@
 
 ## Decision and scope
 
-This decision establishes a closed conversion subset for one anonymous,
-owner-supplied Azeron Software 2.0.2 UI/export pair. The unchanged production
+This decision establishes a closed conversion subset from anonymous,
+owner-supplied Azeron Software 2.0.2 UI/export evidence. For the original pair,
+the unchanged production
 path, `profiledecode.DecodeReader` followed by `profileraw.Parse`, accepted that
 source as a bundle with one profile and 43 opaque inputs. That result admits the
 raw boundary only. It does not select or implement a semantic adapter.
 
-The supported subset is intentionally small:
+The original supported subset is intentionally small; the follow-up rows below
+extend it without generalizing to unobserved settings:
 
 * `KeyU` maps to Linux `KEY_U` with value 22 only in the complete observed long
   trigger context below.
@@ -24,9 +26,9 @@ The supported subset is intentionally small:
 No row defines a general symbol spelling rule, a meaning for `"0"` or `"1"`,
 an array default, an unused-slot convention, or support for Software 2.x as a
 family. Filenames, device information, firmware, and export `version` scalars
-do not establish the Software release. The release in this decision is owner
-attested from the supplied pair. It was not independently read from a displayed
-Software version in the admitted UI images.
+do not establish the Software release. The original pair was owner attested.
+The follow-up settings image explicitly displays Software 2.0.2 and Firmware
+111; firmware is not used as an adapter selector.
 No separate source-generation identifier was established, so the adapter key
 cannot be broader than this exact release and source scope.
 
@@ -35,6 +37,8 @@ cannot be broader than this exact release and source scope.
 | Source ID | Public description | Admitted use | Limit |
 | --- | --- | --- | --- |
 | `owner-software-2.0.2-pair` | Anonymous owner-supplied Software 2.0.2 UI/export pair | Release-scoped root, field, key, timing, and regular-release observations listed here | The export, images, labels, IDs, and complete macro content are private and are not normative dependencies or reproduced artifacts. Release attribution is owner attested, not independently displayed. |
+| `owner-software-2.0.2-followup` | Seven exports paired in message order with seven configuration images on 2026-09-05, plus a settings image displaying Software 2.0.2 | Empty key field, single U/P, left Ctrl+U, long U, double I, and macro structure below | The owner explicitly confirmed left Ctrl. Full exports, images, labels, IDs, and the complete macro sequence remain private. |
+| `local-linux-uapi` | Local `/usr/include/linux/input-event-codes.h`, inspected 2026-09-05 | `KEY_W` 17, `KEY_U` 22, `KEY_I` 23, `KEY_P` 25, `KEY_LEFTCTRL` 29, `KEY_LEFTSHIFT` 42 | Constants establish Linux names and values, not Azeron numeric namespaces. |
 | `linux-uapi-654ae5d` | [Linux input event codes at commit 654ae5d](https://github.com/torvalds/linux/blob/654ae5d73c05bd2943d65636ce6cd0aa46e62f18/include/uapi/linux/input-event-codes.h) | Canonical names and values `KEY_U` 22, `KEY_P` 25, and `KEY_L` 38 | Linux constants do not prove an Azeron raw mapping by numeric equality. |
 | `linux-events-654ae5d` | [Linux input event semantics at commit 654ae5d](https://github.com/torvalds/linux/blob/654ae5d73c05bd2943d65636ce6cd0aa46e62f18/Documentation/input/event-codes.rst) | The `EV_KEY` keyboard namespace uses `KEY_<name>` | It does not establish source symbols or physical controls. |
 | `raw-boundary` | [Strict profile export decoding](../profile-format.md) | Opaque raw ownership, scalar token preservation, root validation, and the #20/#40/#42 split | Structural acceptance is not semantic admission. |
@@ -60,6 +64,69 @@ type. A near match is not a partial mapping.
 The long and double rows are separate predicates. Combining fields from them is
 allowed only when a synthetic fixture intentionally represents the one
 correlated input and retains every field required by both predicates.
+
+## Follow-up conversion evidence
+
+The seven Base64URL payloads were decoded in memory with complete LZMA-Alone
+decompression (`xz`, 64 MiB decompressor memory limit), exact MessagePack str32
+length checks, and JSON parsing. Each contains one profile with 43 inputs.
+All consecutive JSON differences are confined to the same input; no physical
+control identity is inferred from its array position. This inspection did not
+run the production decoder or raw parser on these seven payloads.
+
+The source for every following row is `owner-software-2.0.2-followup`. A row
+requires its exact `types` string array, key and modifier arrays, and the
+trigger-local JSON boolean tuple `isHold*`, `isTurbo*`, `isToggleOnHold*`, all
+`false`. The suffix is absent for single, `Long` for long, and `Double` for
+double. Other slots have four `"0"` key entries and three `"0"` modifier
+entries in these cases; those values alone do not authorize a conversion.
+
+| Case | Exact fields in addition to the common conditions | Admitted result |
+| --- | --- | --- |
+| Single U | `types:["1","11","11"]`, `keyValues:["KeyU","0","0","0"]`, `metaValues:["0","0","0"]` | Single keyboard action `KEY_U` 22, regular release |
+| Single P | Same single context, `keyValues:["KeyP","0","0","0"]`, `metaValues:["0","0","0"]` | Single keyboard action `KEY_P` 25, regular release |
+| Single left Ctrl+U | Same single context, `keyValues:["KeyU","0","0","0"]`, `metaValues:["ControlLeft","0","0"]` | Single keyboard action `KEY_U` 22 with left Ctrl (`KEY_LEFTCTRL` 29), regular release; not two sequential actions |
+| Long U | `types:["11","1","11"]`, `keyValuesLong:["KeyU","0","0","0"]`, `metaValuesLong:["0","0","0"]`, numeric `featureDelay:1278` | Long keyboard action `KEY_U` 22, `trigger_delay_ms:1278`, regular release |
+| Double I | `types:["11","11","1"]`, `keyValuesDouble:["KeyI","0","0","0"]`, `metaValuesDouble:["0","0","0"]`, numeric `doubleDelay:123` | Double keyboard action `KEY_I` 23, `trigger_interval_ms:123`; no release behavior is inferred from the double image |
+
+The first image has an empty keyboard field and Regular selected, correlated
+with `types:["11","11","11"]` and all three key/modifier arrays filled with
+string `"0"`. Preserve this exact empty-setting observation, but do not infer
+that every `"11"` or `"0"` means unassigned. In particular, the later long and
+double images retain indicators on other tabs even though their exported key
+arrays are empty. Tab indicators are not sufficient evidence of active actions.
+
+The U-to-P comparison changes only the first key entry. Adding left Ctrl
+correlates with `ControlLeft` in the first modifier entry. No right Ctrl,
+multi-modifier ordering, or general modifier grammar is established.
+The long and double exports also change active slots, so these are exact
+1278 ms and 123 ms observations, not isolated timing sweeps proving a range.
+The double export retains `featureDelay:1278` while its long key array is
+empty; an inactive timing value must not create a long action.
+
+### Observed macro grammar
+
+In the macro case `types` is `["16","11","11"]` and the active single container
+is `macro`, an object with numeric `v:1`, boolean `repeat`, and ordered array
+`steps`. The preceding non-macro cases have `repeat:false` and empty `steps`;
+the macro image shows "Repeat (while held down)" enabled, matching `repeat:true`.
+This identifies the container and step boundary for this source, not a general
+meaning for every `"16"`, a grammar for `longMacro`/`doubleMacro`, or playback
+behavior for all repeat values.
+
+The minimum step observations, without reproducing the private sequence, are:
+
+| Step representation | Correlated UI meaning | Limit |
+| --- | --- | --- |
+| String `type:"Button"`, string `direction:"Full"`, numeric `duration`, and `keyCode` | One Button editor row; numeric `keyCode:87` correlates with W and numeric duration 20 with 20 ms; string `keyCode:"ShiftLeft"` correlates with Shift and numeric duration 50 with 50 ms | W maps contextually to `KEY_W` 17, not Linux code 87. No general numeric namespace or complete press/release scheduling semantics follows. The UI does not distinguish Shift sides, so left-Shift semantics remain unconfirmed despite the raw spelling. |
+| String `type:"Delay"`, string `direction:"Full"`, numeric `duration:45`, absent `keyCode` | One Delay editor row showing 45 ms | Other values, missing/null fields, and other directions remain unobserved. |
+
+These rows admit step recognition and the stated UI parameter correlations.
+They do not yet admit a fully mapped executable or matchable macro:
+`direction:"Full"` scheduling, repeat lifecycle, and Shift-side semantics
+remain unresolved. Preserve unknown semantics and raw content rather than
+executing or guessing them. Repeating observed step shapes in synthetic
+limit fixtures is policy coverage, not evidence of a real 1,000-step export.
 
 ## Unknown, unsupported, and invalid
 
@@ -93,15 +160,15 @@ about their physical origin, which remains outside Issue #40.
 
 | Family | Software 2.0.2 admitted source scope | Other releases |
 | --- | --- | --- |
-| `types` | Only exact `["1","1","1"]` participates in the rows above. No generic discriminant table is established. Other forms are Unknown. | `unsupported_generation` |
-| Modern keyboard symbols | Only contextual `KeyU`, ordered `KeyP`, and `KeyL` are mapped. Every other symbol is Unknown. No prefix conversion is allowed. | `unsupported_generation` |
-| Modifiers and `metaValues*` | No general grammar. Exact no-modifier UI meaning is part of each whole positive predicate. Any residual or changed representation makes the composite Unknown and is preserved. Masks, enums, combinations, left/right identity, and zero semantics are unresolved. | `unsupported_generation` |
+| `types` | Only the exact original and follow-up contexts above are admitted. No generic discriminant table is established. | `unsupported_generation` |
+| Modern keyboard symbols | Contextual `KeyU`, `KeyP`, `KeyL`, and `KeyI` only. No prefix conversion is allowed. | `unsupported_generation` |
+| Modifiers and `metaValues*` | Exact no-modifier predicates and the single left Ctrl+U row only. Other modifiers, combinations, masks, enums, ordering, and general zero semantics remain unresolved. | `unsupported_generation` |
 | Legacy numeric `keyValues` and `metaValues` | Unknown if encountered in the admitted adapter. No numeric namespace, number/string coercion, or Linux numeric equivalence is established. | `unsupported_generation` |
 | Other keyboard, mouse, and `BTN_*` symbols | Unknown. No additional source symbol or namespace is correlated. | `unsupported_generation` |
-| Single trigger | Slot identity only. No single action, timing, or release grammar is established. | `unsupported_generation` |
-| Long trigger | Exact U, 500 ms trigger delay, and regular false/false/false tuple only. Other values or combinations are Unknown. | `unsupported_generation` |
-| Double trigger | Exact ordered P plus L and 150 ms trigger interval only. Other values or combinations are Unknown. | `unsupported_generation` |
-| Macro, sequence, macro hold, macro delay, and repeat | Unknown. A UI editor and ordered example were seen, but no raw container, tag, step, parameter, duration, or repeat grammar was correlated. | `unsupported_generation` |
+| Single trigger | Exact U, P, and left Ctrl+U rows with regular release; empty-setting observation does not establish a generic unassigned rule. | `unsupported_generation` |
+| Long trigger | Exact U rows at 500 ms and 1278 ms with their respective type contexts and regular tuples. Other values or combinations are Unknown. | `unsupported_generation` |
+| Double trigger | Exact ordered P plus L at 150 ms and I at 123 ms, each in its own context. Other values or combinations are Unknown. | `unsupported_generation` |
+| Macro, sequence, macro hold, macro delay, and repeat | The follow-up admits `macro.v:1`, `steps`, Button/Delay shapes, and limited parameter correlations. Full macro semantics remain Unknown. | `unsupported_generation` |
 | Turbo | Unknown except that the complete false/false/false tuple participates in the exact regular long row. Enabled encoding, rate, units, and interactions are unresolved. | `unsupported_generation` |
 | Gamepad | Unknown. No button namespace, raw value, or discriminant meaning is correlated. | `unsupported_generation` |
 | Analog | Unknown. Axis namespace, mode, sign, direction, center, range, dead zone, inversion, rotation, value type, and analog/WASD relationship are unresolved. No `ABS_*` result is inferred. | `unsupported_generation` |
@@ -328,7 +395,7 @@ selects an admitted release adapter, then recognizes a release-specific macro
 grammar, then counts syntactically identified steps, and only then interprets
 any action, delay, hold, repeat, or other parameter.
 
-For every future known grammar, table-driven coverage must include these
+For the observed grammar above and every future known grammar, table-driven coverage must include these
 literal boundaries:
 
 | Input after grammar recognition | Required result before interpretation |
@@ -337,12 +404,14 @@ literal boundaries:
 | One macro with exactly 1,001 identified steps | `invalid`, reason `macro step limit exceeded`; reject before interpreting step 1 |
 | Any array length under an unknown grammar, including 2, 1,000, or 1,001 | `unknown` with raw and context preserved; do not count or interpret it as steps |
 
-Literal 1,000 and 1,001 fixture records cannot be written until an actual raw
-step representation is admitted. Inventing a generic grammar to fill those
-records would make the boundary test dishonest. Once evidence exists, both
-records must use the exact release-specific raw container and differ only in
-their literal step count. This ceiling is semantic admission policy, not a new
-generic array cap and not evidence for any grammar.
+The follow-up now supplies an actual `macro.v:1` container and Button/Delay
+step representation. Issue #42 can construct synthetic 1,000 and 1,001 step
+records using these observed shapes, differing only in literal step count.
+Count recognized steps before interpreting key codes, durations, directions,
+or repeat behavior, even when final semantics remain Unknown. Unknown
+containers or step shapes do not authorize guessing a grammar. This ceiling
+is semantic admission policy, not a new generic array cap or proof that the
+Software produces such large macros.
 
 No adapter, fixture file, registry, fingerprint, provenance token system, or
 schema is introduced by this decision. Issue #42 may implement only the closed
