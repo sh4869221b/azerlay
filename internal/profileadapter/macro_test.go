@@ -108,22 +108,22 @@ func TestNormalizeMacro(t *testing.T) {
 	})
 
 	t.Run("exact_grammar_boundary", func(t *testing.T) {
+		validSteps := repeatedSteps(buttonStep, 1001)
 		for _, test := range []struct {
 			name  string
 			macro string
 		}{
-			{name: "v_string", macro: `{"v":"1","repeat":false,"steps":[]}`},
-			{name: "v_null", macro: `{"v":null,"repeat":false,"steps":[]}`},
-			{name: "v_other_number", macro: `{"v":1.0,"repeat":false,"steps":[]}`},
-			{name: "repeat_string", macro: `{"v":1,"repeat":"false","steps":[]}`},
-			{name: "missing_steps", macro: `{"v":1,"repeat":false}`},
-			{name: "extra_container_key", macro: `{"v":1,"repeat":false,"steps":[],"extra":0}`},
-			{name: "button_wrong_direction", macro: `{"v":1,"repeat":false,"steps":[{"type":"Button","direction":"Down","duration":1,"keyCode":1}]}`},
-			{name: "button_missing_key_code", macro: `{"v":1,"repeat":false,"steps":[{"type":"Button","direction":"Full","duration":1}]}`},
-			{name: "button_boolean_key_code", macro: `{"v":1,"repeat":false,"steps":[{"type":"Button","direction":"Full","duration":1,"keyCode":true}]}`},
-			{name: "button_extra_key", macro: `{"v":1,"repeat":false,"steps":[{"type":"Button","direction":"Full","duration":1,"keyCode":1,"extra":0}]}`},
-			{name: "delay_has_key_code", macro: `{"v":1,"repeat":false,"steps":[{"type":"Delay","direction":"Full","duration":1,"keyCode":1}]}`},
-			{name: "delay_string_duration", macro: `{"v":1,"repeat":false,"steps":[{"type":"Delay","direction":"Full","duration":"1"}]}`},
+			{name: "v_string", macro: `{"v":"1","repeat":false,"steps":[` + validSteps + `]}`},
+			{name: "v_null", macro: `{"v":null,"repeat":false,"steps":[` + validSteps + `]}`},
+			{name: "v_other_number", macro: `{"v":1.0,"repeat":false,"steps":[` + validSteps + `]}`},
+			{name: "repeat_string", macro: `{"v":1,"repeat":"false","steps":[` + validSteps + `]}`},
+			{name: "extra_container_key", macro: `{"v":1,"repeat":false,"steps":[` + validSteps + `],"extra":0}`},
+			{name: "button_wrong_direction", macro: macroObject(repeatedSteps(buttonStep, 1000) + `,{"type":"Button","direction":"Down","duration":1,"keyCode":1}`)},
+			{name: "button_missing_key_code", macro: macroObject(repeatedSteps(buttonStep, 1000) + `,{"type":"Button","direction":"Full","duration":1}`)},
+			{name: "button_boolean_key_code", macro: macroObject(repeatedSteps(buttonStep, 1000) + `,{"type":"Button","direction":"Full","duration":1,"keyCode":true}`)},
+			{name: "button_extra_key", macro: macroObject(repeatedSteps(buttonStep, 1000) + `,{"type":"Button","direction":"Full","duration":1,"keyCode":1,"extra":0}`)},
+			{name: "delay_has_key_code", macro: macroObject(repeatedSteps(buttonStep, 1000) + `,{"type":"Delay","direction":"Full","duration":1,"keyCode":1}`)},
+			{name: "delay_string_duration", macro: macroObject(repeatedSteps(buttonStep, 1000) + `,{"type":"Delay","direction":"Full","duration":"1"}`)},
 		} {
 			t.Run(test.name, func(t *testing.T) {
 				input := `{"types":["16","11","11"],"macro":` + test.macro + `}`
@@ -132,8 +132,19 @@ func TestNormalizeMacro(t *testing.T) {
 					t.Fatalf("Normalize() error = %v", err)
 				}
 				assertMacroUnknown(t, bundle.Profiles[0].Controls[0])
+				assertLiteralRaw(t, bundle.Profiles[0].Controls[0].Raw.Fields, json.RawMessage(input))
 			})
 		}
+	})
+
+	t.Run("missing_steps_preserves_raw", func(t *testing.T) {
+		input := `{"types":["16","11","11"],"macro":{"v":1,"repeat":false}}`
+		bundle, err := profileadapter.Normalize(parseExport(t, singleWithInputs(input)), admittedSource)
+		if err != nil {
+			t.Fatalf("Normalize() error = %v", err)
+		}
+		assertMacroUnknown(t, bundle.Profiles[0].Controls[0])
+		assertLiteralRaw(t, bundle.Profiles[0].Controls[0].Raw.Fields, json.RawMessage(input))
 	})
 }
 
