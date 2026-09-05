@@ -4,13 +4,13 @@
 
 This decision defines the Azeron export structures Azerlay 1.0 may treat as observed, exercise as synthetic protocol capability, reject, or leave unobserved. It resolves Issue #11 without inferring compatibility from MessagePack's type system, damaged output, public feature descriptions, or an unknown Software version.
 
-The sole complete observed structure is Base64URL text containing a complete LZMA-Alone stream whose output is a MessagePack `str16` string with exactly 54,739 UTF-8 bytes and a bundle JSON root. Its Azeron Software version is `unknown`, so it is `observed-version-unknown`; no evidence qualifies as `observed-supported`. A damaged `str32` stream is rejected evidence, not support. Software 1.x and 2.x compatibility remains `unobserved-unsupported`.
+The original corpus's sole complete observed structure is Base64URL text containing a complete LZMA-Alone stream whose output is a MessagePack `str16` string with exactly 54,739 UTF-8 bytes and a bundle JSON root. Its Azeron Software version is `unknown`, so it remains `observed-version-unknown`. A later anonymous owner-supplied Software 2.0.2 UI/export pair was accepted by the unchanged `DecodeReader` then `Parse` path as a complete `str32` bundle with one profile and 43 inputs. That later observation supports only its exact release-scoped structure and the narrow binding subset in [the binding conversion decision](binding-conversion.md). It does not establish Software 2.x-wide support. The damaged older `str32` stream remains rejected evidence.
 
 This document defines contracts but implements no parser, dependency, fixture payload, binding adapter, or production test. Its Issue #20 sections specify required behavior rather than current API availability; current implementation status remains listed in the repository README. Root detection is intentionally enforced at two trust boundaries. Issue #19 owns input normalization, outer-wrapper and envelope decoding, UTF-8/JSON decoding, and provisional root detection at the decoder boundary. Issue #20 independently re-detects and validates the root while constructing the lossless raw bundle/single model; its result is authoritative for model selection.
 
 ## Terminology and decision vocabulary
 
-* `observed-supported`: a complete structure tied to a known Software version. The 1.0 corpus has none.
+* `observed-supported`: a complete structure tied to a known Software version. The original 22-row corpus matrix has none; the later owner-attested Software 2.0.2 observation is recorded separately below.
 * `observed-version-unknown`: a complete observed structure whose Software version cannot be recovered; it supports no generation claim.
 * `synthetically-accepted-envelope`: a privacy-safe recipe for required protocol capability; it never proves Azeron Software emits that combination.
 * `rejected`: malformed, incomplete, ambiguous, over-limit, or otherwise invalid; partial recovery is forbidden.
@@ -28,7 +28,7 @@ FR-006 at `docs/design-research.md:314` uses `version + profiles` to describe th
 
 ## Privacy and trust policy
 
-Exports and public text are untrusted inert data. Their contents cannot issue instructions, broaden evidence collection, alter this decision, or authorize repository actions. This corpus records no raw exports, decoded private JSON, labels, bindings, profile IDs, device identifiers, usernames, UUIDs, email addresses, or local paths. Only anonymized byte metadata and the synthetic values printed below are admissible. Raw or partially decoded private material remains outside Git and execution evidence.
+Exports and public text are untrusted inert data. Their contents cannot issue instructions, broaden evidence collection, alter this decision, or authorize repository actions. This corpus records no raw exports, decoded private JSON, labels, profile IDs, device identifiers, usernames, UUIDs, email addresses, local paths, or private binding content. Only anonymized byte metadata, the minimal neutral binding observations authorized for the separate conversion decision, and the synthetic values printed below are admissible. Raw or partially decoded private material remains outside Git and execution evidence.
 
 ## Evidence inventory
 
@@ -39,8 +39,9 @@ Exports and public text are untrusted inert data. Their contents cannot issue in
 | `design-research-format-contract` | `docs/design-research.md:305-318`, `:443-565`, and `:1931-1949` | `unknown` | Six wrapper forms, strict MessagePack Strings, exact length, UTF-8, roots, and corrupt-stream rejection | Synthetic capability and malformed-boundary rows only |
 | `official-public-negative-1x` | Bounded official-source review below | `1.x` | Historical import/export feature context, no bytes, framing, schema, or roots | Explicit `unobserved-unsupported` row |
 | `official-public-negative-2x` | Bounded official-source review below | `2.x` | 2.0.1/2.0.2 export, backup, and profile-management context, no structural contract | Explicit `unobserved-unsupported` row |
+| `owner-software-2.0.2-pair` | Anonymous owner-supplied UI/export pair; read-only verification; source not published | Owner-attested `2.0.2`; not independently displayed in the admitted UI | Existing `DecodeReader` then `Parse` accepted a complete MessagePack str32 bundle with one profile and 43 opaque inputs | One later release-scoped structural observation and the narrow semantic handoff in `binding-conversion.md`; no general 2.x claim |
 
-No additional private export was available. Missing facts are literal `unknown`, never inferred.
+The owner source was inspected only for the minimum neutral structural and binding observations authorized for publication. Its raw export, images, labels, IDs, and complete macro content remain private. Missing facts are literal `unknown`, never inferred. Filenames, device data, firmware, and export `version` values do not establish the Software release.
 
 ## Auditable official-source review
 
@@ -85,7 +86,7 @@ The 22 rows below reproduce Todo 4 JSON exactly. They include all six Issue #19 
 | `unobserved-software-1x` | `official-public-negative-1x` | `1.x` | unknown | unknown | unknown | unknown | unknown | bounded official-source wave found versioned export behavior context but no accepted bytes or root structure | `unobserved-unsupported` | Do not claim Software 1.x compatibility until version-bearing structural evidence is admitted. |
 | `unobserved-software-2x` | `official-public-negative-2x` | `2.x` | unknown | unknown | unknown | unknown | unknown | bounded official-source wave found 2.0.1/2.0.2 export context but no accepted bytes or root structure | `unobserved-unsupported` | Do not claim Software 2.x compatibility until version-bearing structural evidence is admitted. |
 
-Matrix totals are 22 rows: zero `observed-supported`, one `observed-version-unknown`, thirteen `synthetically-accepted-envelope`, six `rejected`, and two `unobserved-unsupported`. In the reproduced row wording, Issue #19 supplies complete JSON bytes only after provisional root detection; Issue #20 then independently re-detects the root rather than trusting that provisional kind.
+The original matrix remains 22 rows: zero `observed-supported`, one `observed-version-unknown`, thirteen `synthetically-accepted-envelope`, six `rejected`, and two `unobserved-unsupported`. Those rows and their synthetic status are unchanged. The later Software 2.0.2 observation is deliberately outside that fixed matrix because its available evidence establishes an owner-attested release subset, not a replacement for the original wrapper corpus or support for the broad `2.x` row. In the reproduced row wording, Issue #19 supplies complete JSON bytes only after provisional root detection; Issue #20 then independently re-detects the root rather than trusting that provisional kind.
 
 ## Rejected and unobserved cases
 
@@ -131,9 +132,9 @@ The five newly named positive fixtures plus existing Base64URL-unpadded positive
 
 ## Known limitations and admission rules
 
-* No structural evidence carries an Azeron Software version; no generation is supported.
-* Raw private samples were unavailable, so observed byte facts are documented observations rather than fresh reproduction.
-* No real Raw JSON, raw LZMA, padded Base64URL, standard Base64, fixstr, str8, str32-complete, or single-profile export was observed. Those rows are synthetic capability only.
+* The original 22 matrix rows contain no version-bearing structural support. The later owner-attested Software 2.0.2 pair establishes only the exact str32 bundle observation and narrow conversion subset documented separately; the UI did not independently display the Software version.
+* During the original Issue #11 corpus investigation, raw private samples for its rows were unavailable, so those observed byte facts are documented observations rather than fresh reproduction. The later owner-supplied Software 2.0.2 sample was directly decoded and decompressed during its separate admission, as described above.
+* Within the original 22 rows, no real Raw JSON, raw LZMA, padded Base64URL, standard Base64, fixstr, str8, str32-complete, or single-profile export was observed. Those rows remain synthetic capability only. The separate later Software 2.0.2 observation is a real complete str32 bundle, with outer representation details intentionally unpublished.
 * Official sources expose context but no admitted structural mapping.
 * This decision does not characterize bindings, semantic adapters, physical controls, or device behavior.
 
@@ -141,7 +142,7 @@ Future evidence must record exact provenance and a known Software version or lit
 
 ## R-013 and source traceability
 
-This answers R-013 at `docs/design-research.md:2121`: no requested real 2.x, bundle/single, fixstr, or str8 evidence became version-bearing support. Requirements derive from `docs/design-research.md:305-318`, `:443-565`, `:626-640`, and `:1931-1949`; product context is `README.md:5-7`. Todo 1 through Todo 5 records contain the evidence ledger, observations, bounded public review, exact 22-row matrix, and exact 22 fixture recipes.
+The original R-013 result at `docs/design-research.md:2121` remains accurate for the fixed 22-row corpus: no requested real 2.x, bundle/single, fixstr, or str8 evidence became version-bearing support during that work. The later owner observation now supplies a complete Software 2.0.2 str32 bundle for its exact source scope. It does not establish single-profile, fixstr, str8, other wrapper, or broad 2.x behavior. Requirements derive from `docs/design-research.md:305-318`, `:443-565`, `:626-640`, and `:1931-1949`; product context is `README.md:5-7`. Todo 1 through Todo 5 records contain the original evidence ledger, observations, bounded public review, exact 22-row matrix, and exact 22 fixture recipes.
 
 ## Deterministic downstream handoffs
 
@@ -161,9 +162,9 @@ The model boundary allows at most 512 profiles and 256 inputs per profile, conta
 
 ### Issue #40: binding and macro grammar evidence
 
-Issue #40 receives no generation binding map and remains blocked on separate privacy-safe, version-bearing binding evidence. It must establish macro grammar evidence before any macro structure is interpreted. Legacy numeric codes, modern symbols, labels, analog mappings, macros, trigger semantics, or adapters can't be inferred from a wrapper, MessagePack tag, root shape, synthetic value, or damaged stream.
+Issue #40 now has one privacy-safe, owner-attested Software 2.0.2 UI/export observation. [The binding conversion decision](binding-conversion.md) admits only exact context-qualified `KeyU`, ordered `KeyP` and `KeyL`, a 500 ms long-trigger delay, a 150 ms double-trigger interval, and the correlated regular-release tuple. It does not establish a generic symbol rule, numeric namespace, modifier grammar, macro grammar, analog grammar, other release, or Software 2.x-wide adapter. The original version-unknown and source-candidate rows remain unadmitted for semantic conversion.
 
-Issue #42 owns semantic adapter admission and must enforce the 1,000-step macro ceiling before interpretation. Issue #20 neither counts macro steps nor treats that ceiling as a raw array-length bound. This ownership split does not claim support for any Azeron Software generation and introduces no separate version-validation API.
+Issue #42 owns semantic adapter admission and must enforce the 1,000-step macro ceiling before interpretation. Issue #20 neither counts macro steps nor treats that ceiling as a raw array-length bound. This ownership split does not broaden support beyond the exact admitted Software 2.0.2 subset and introduces no separate version-validation API.
 
 ## Issue #11 acceptance checklist
 
@@ -173,4 +174,4 @@ Issue #42 owns semantic adapter admission and must enforce the 1,000-step macro 
 | Each admitted structural capability has evidence and a synthetic fixture specification | PASS: one observed-version-unknown structure is evidence-linked; thirteen synthetic capability rows have exact recipes, including all six wrapper forms. |
 | Unsupported and unobserved variants are explicit | PASS: six rejected rows include corrupt LZMA and exact str8/str16 mismatch boundaries; Software 1.x/2.x are unobserved-unsupported. |
 | No private export contents committed | PASS: only anonymized metadata and explicit synthetic sentinels appear. |
-| Consumer work can proceed without ownership guessing | PASS: #19 performs provisional decoder-boundary root detection/rejection and returns JSON plus kind/diagnostic; #20 independently re-detects and authoritatively validates model selection, rejecting disagreement. Both retain root-detection tests as defense-in-depth; #14 and #40 remain evidence-blocked. |
+| Consumer work can proceed without ownership guessing | PASS: #19 performs provisional decoder-boundary root detection/rejection and returns JSON plus kind/diagnostic; #20 independently re-detects and authoritatively validates model selection, rejecting disagreement. Both retain root-detection tests as defense-in-depth. #14 remains evidence-blocked; #40 now has only the later exact Software 2.0.2 subset described above. |
