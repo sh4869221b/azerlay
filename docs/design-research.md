@@ -669,65 +669,70 @@ Model boundaryは全JSON token streamをmap構築前にscanする。Malformed JS
 
 Raw Azeron JSONをUIや入力処理へ直接渡さない。正規化済みで版非依存のモデルを唯一の内部契約とする。
 
-### 9.1 中核モデル
+### 9.1 実装済みの順序付き中核モデル
+
+Issue #42のowner承認済みoption Aでは、物理配置へ投影する前段として、次の版非依存モデルを実装した。
 
 ```go
+type SourceMetadata struct {
+    SoftwareRelease string
+    SourceScope     string
+}
+
 type ProfileBundle struct {
     SchemaVersion int
     Source        SourceMetadata
+    RootKind      RootKind
     Profiles      []Profile
-    Warnings      []Warning
+    Raw           *RawBundleReference
 }
 
 type Profile struct {
-    ID             string
-    Name           string
-    DeviceModel    DeviceModel
-    Hand           Handedness
-    Software       bool
-    Favorite       bool
-    ExportVersion  string
-    Controls       map[PhysicalControlID]ControlBinding
-    Stick          []AnalogControl
-    Settings       ProfileSettings
-    Unknown        map[string]json.RawMessage
+    ID       *string
+    Name     *string
+    Controls []ControlBinding
+    Raw      RawProfileReference
 }
 
 type ControlBinding struct {
-    PhysicalID PhysicalControlID
-    InputID    int
-    Pins       PinPair
-    Label      string
-    Single     TriggerBinding
-    Long       TriggerBinding
-    Double     TriggerBinding
-    Turbo      *TurboSettings
-    Sequence   *SequenceSettings
-    Unknown    map[string]json.RawMessage
+    Label    *string
+    Bindings []TriggerBinding
+    Raw      RawBindingReference
+}
+
+type RawBindingReference struct {
+    RootKind     RootKind
+    ProfileIndex int
+    InputIndex   int
+    Fields       map[string]json.RawMessage
 }
 
 type TriggerBinding struct {
-    Kind    BindingKind
-    Actions []Action
-    Macro   *Macro
-    Raw     RawBindingReference
+    Trigger           TriggerKind
+    Kind              BindingKind
+    Actions           []Action
+    TriggerDelayMS    *int
+    TriggerIntervalMS *int
+    ReleaseBehavior   *string
+    Unknown           *UnknownBinding
 }
 
 type Action struct {
-    Kind       ActionKind
-    Code       CanonicalCode
-    Modifiers  []CanonicalCode
-    Axis       *AxisAction
-    Value      float64
-    Delay      time.Duration
+    Kind      ActionKind
+    Code      CanonicalCode
+    Modifiers []CanonicalCode
 }
 ```
 
+`Profiles`、`Controls`、`Bindings`、`Actions`はsource順を保つ。`ProfileIndex`と`InputIndex`はprovenanceであり、物理control、input ID、pinを表さない。重複IDや同じcanonical actionを持つcontrolも統合しない。`RawBundleReference`、`RawProfileReference`、`RawBindingReference`はownedかつopaqueな保持領域であり、後段がAzeron field名を読んでbinding semanticsを追加してはならない。
+
+この段階では`RootKind`の`bundle`と`single`、`TriggerKind`の`single`、`long`、`double`、`unknown`、`BindingKind`の`keyboard`と`unknown`を扱う。実装済み`CanonicalCode`は、閉じたSoftware 2.0.2変換行に必要な`KEY_U`、`KEY_P`、`KEY_L`、`KEY_I`、`KEY_LEFTCTRL`だけである。物理control、device model、hand、pin、analog、turbo、実行可能macroへの投影は、このモデルから将来構築する別段階であり、option Aの実装範囲ではない。
+
 ### 9.2 Canonical Code
 
-Linuxの標準名を内部Canonical Codeとする。
+Linuxの標準名を内部Canonical Codeとする方針は維持する。現在実装された変換は、Software 2.0.2の7個の閉じたpredicateだけであり、symbol prefixや数値一致から変換を増やさない。
 
-例:
+次は将来のcanonical vocabulary例であり、現在の対応表でも変換evidenceでもない。
 
 ```text
 KEY_Q
@@ -742,7 +747,7 @@ ABS_Y
 
 UI用表示は別層で`Q`、`Left Alt`等に整形する。
 
-Azeron独自のsymbolic nameはアダプターでCanonical Codeへ変換する。
+次のAzeron symbolic name変換も将来要件の例であり、実装済みの一般規則ではない。
 
 ```text
 KeyW      → KEY_W
