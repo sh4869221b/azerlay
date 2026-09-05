@@ -12,12 +12,19 @@ func Normalize(raw profileraw.RawExport, source profile.SourceMetadata) (profile
 	}
 
 	if raw.Bundle != nil {
+		profiles := make([]profile.Profile, len(raw.Bundle.Profiles))
+		for index, rawProfile := range raw.Bundle.Profiles {
+			profiles[index] = preserveProfile(rawProfile, profile.RootBundle, index)
+		}
 		return profile.ProfileBundle{
 			SchemaVersion: 1,
 			Source:        source,
 			RootKind:      profile.RootBundle,
-			Profiles:      []profile.Profile{},
-			Raw:           &profile.RawBundleReference{},
+			Profiles:      profiles,
+			Raw: &profile.RawBundleReference{
+				Version: cloneScalarRaw(raw.Bundle.Version),
+				Unknown: cloneRawMap(raw.Bundle.Unknown),
+			},
 		}, nil
 	}
 
@@ -25,8 +32,8 @@ func Normalize(raw profileraw.RawExport, source profile.SourceMetadata) (profile
 		SchemaVersion: 1,
 		Source:        source,
 		RootKind:      profile.RootSingle,
-		Profiles: []profile.Profile{{
-			Controls: []profile.ControlBinding{},
-		}},
+		Profiles: []profile.Profile{
+			preserveProfile(*raw.Single, profile.RootSingle, 0),
+		},
 	}, nil
 }
