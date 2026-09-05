@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "source": {
+    "SoftwareRelease": "2.0.2",
+    "SourceScope": "azeron-software-export"
+  },
+  "root_kind": "bundle",
+  "profiles": [
+    {
+      "id": "duplicate-id",
+      "name": "Primary",
+      "controls": [
+        {
+          "label": "combo",
+          "bindings": [
+            {"trigger":"single","kind":"unknown","actions":null,"trigger_delay_ms":null,"trigger_interval_ms":null,"release_behavior":null,"unknown":{"Reason":"unmapped_binding"}},
+            {"trigger":"long","kind":"keyboard","actions":[{"kind":"keyboard","code":"KEY_U","modifiers":null}],"trigger_delay_ms":500,"trigger_interval_ms":null,"release_behavior":"regular","unknown":null},
+            {"trigger":"double","kind":"keyboard","actions":[{"kind":"keyboard","code":"KEY_P","modifiers":null},{"kind":"keyboard","code":"KEY_L","modifiers":null}],"trigger_delay_ms":null,"trigger_interval_ms":150,"release_behavior":null,"unknown":null}
+          ],
+          "raw": {
+            "root_kind": "bundle",
+            "profile_index": 0,
+            "input_index": 0,
+            "fields": {
+              "label":"\"combo\"",
+              "types":"[\"1\",\"1\",\"1\"]",
+              "keyValuesLong":"[\"KeyU\",\"0\",\"0\",\"0\"]",
+              "metaValuesLong":"[\"0\",\"0\",\"0\"]",
+              "isHoldLong":"false",
+              "isTurboLong":"false",
+              "isToggleOnHoldLong":"false",
+              "featureDelay":"500",
+              "keyValuesDouble":"[\"KeyP\",\"KeyL\",\"0\",\"0\"]",
+              "metaValuesDouble":"[\"0\",\"0\",\"0\"]",
+              "doubleDelay":"150",
+              "opaque":"null",
+              "spelling":"9e2"
+            }
+          }
+        },
+        {
+          "label": "combo",
+          "bindings": [
+            {"trigger":"single","kind":"unknown","actions":null,"trigger_delay_ms":null,"trigger_interval_ms":null,"release_behavior":null,"unknown":{"Reason":"unmapped_binding"}},
+            {"trigger":"long","kind":"keyboard","actions":[{"kind":"keyboard","code":"KEY_U","modifiers":null}],"trigger_delay_ms":500,"trigger_interval_ms":null,"release_behavior":"regular","unknown":null},
+            {"trigger":"double","kind":"keyboard","actions":[{"kind":"keyboard","code":"KEY_P","modifiers":null},{"kind":"keyboard","code":"KEY_L","modifiers":null}],"trigger_delay_ms":null,"trigger_interval_ms":150,"release_behavior":null,"unknown":null}
+          ],
+          "raw": {
+            "root_kind": "bundle",
+            "profile_index": 0,
+            "input_index": 1,
+            "fields": {
+              "label":"\"combo\"",
+              "types":"[\"1\",\"1\",\"1\"]",
+              "keyValuesLong":"[\"KeyU\",\"0\",\"0\",\"0\"]",
+              "metaValuesLong":"[\"0\",\"0\",\"0\"]",
+              "isHoldLong":"false",
+              "isTurboLong":"false",
+              "isToggleOnHoldLong":"false",
+              "featureDelay":"500",
+              "keyValuesDouble":"[\"KeyP\",\"KeyL\",\"0\",\"0\"]",
+              "metaValuesDouble":"[\"0\",\"0\",\"0\"]",
+              "doubleDelay":"150",
+              "opaque":"null",
+              "spelling":"9e2"
+            }
+          }
+        }
+      ],
+      "raw": {
+        "id":"\"duplicate-id\"",
+        "name":"\"Primary\"",
+        "version":"-0",
+        "unknown":{"profileFuture":"{\"enabled\":true}"}
+      }
+    },
+    {
+      "id": "duplicate-id",
+      "name": null,
+      "controls": [
+        {
+          "label": null,
+          "bindings": [
+            {"trigger":"single","kind":"unknown","actions":null,"trigger_delay_ms":null,"trigger_interval_ms":null,"release_behavior":null,"unknown":{"Reason":"unmapped_binding"}},
+            {"trigger":"long","kind":"unknown","actions":null,"trigger_delay_ms":null,"trigger_interval_ms":null,"release_behavior":null,"unknown":{"Reason":"unmapped_binding"}},
+            {"trigger":"double","kind":"unknown","actions":null,"trigger_delay_ms":null,"trigger_interval_ms":null,"release_behavior":null,"unknown":{"Reason":"unmapped_binding"}}
+          ],
+          "raw": {
+            "root_kind":"bundle",
+            "profile_index":1,
+            "input_index":0,
+            "fields":{"label":"7","types":"[\"11\",\"11\",\"11\"]","mystery":"[false,null,{\"n\":1e-2}]"}
+          }
+        }
+      ],
+      "raw": {
+        "id":"\"duplicate-id\"",
+        "name":"null",
+        "version":null,
+        "unknown":{"profileEmpty":"[]"}
+      }
+    }
+  ],
+  "raw": {
+    "version":"1e+09",
+    "unknown":{"bundleFlag":"false","bundleFuture":"{\"token\":-0}"}
+  }
+}

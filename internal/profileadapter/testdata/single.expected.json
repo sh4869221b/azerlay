@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "source": {
+    "SoftwareRelease": "2.0.2",
+    "SourceScope": "azeron-software-export"
+  },
+  "root_kind": "single",
+  "profiles": [
+    {
+      "id":"single-id",
+      "name":"",
+      "controls":[
+        {
+          "label":"ctrl-u",
+          "bindings":[
+            {"trigger":"single","kind":"keyboard","actions":[{"kind":"keyboard","code":"KEY_U","modifiers":["KEY_LEFTCTRL"]}],"trigger_delay_ms":null,"trigger_interval_ms":null,"release_behavior":"regular","unknown":null},
+            {"trigger":"long","kind":"unknown","actions":null,"trigger_delay_ms":null,"trigger_interval_ms":null,"release_behavior":null,"unknown":{"Reason":"unmapped_binding"}},
+            {"trigger":"double","kind":"unknown","actions":null,"trigger_delay_ms":null,"trigger_interval_ms":null,"release_behavior":null,"unknown":{"Reason":"unmapped_binding"}}
+          ],
+          "raw":{
+            "root_kind":"single",
+            "profile_index":0,
+            "input_index":0,
+            "fields":{
+              "label":"\"ctrl-u\"",
+              "types":"[\"1\",\"11\",\"11\"]",
+              "keyValues":"[\"KeyU\",\"0\",\"0\",\"0\"]",
+              "metaValues":"[\"ControlLeft\",\"0\",\"0\"]",
+              "isHold":"false",
+              "isTurbo":"false",
+              "isToggleOnHold":"false",
+              "keyValuesLong":"[\"0\",\"0\",\"0\",\"0\"]",
+              "metaValuesLong":"[\"0\",\"0\",\"0\"]",
+              "keyValuesDouble":"[\"0\",\"0\",\"0\",\"0\"]",
+              "metaValuesDouble":"[\"0\",\"0\",\"0\"]",
+              "future":"{\"raw\":true}"
+            }
+          }
+        }
+      ],
+      "raw":{
+        "id":"\"single-id\"",
+        "name":"\"\"",
+        "version":"null",
+        "unknown":{"singleExtra":"\"kept\""}
+      }
+    }
+  ],
+  "raw":null
+}

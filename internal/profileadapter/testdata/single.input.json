@@ -1,0 +1,9 @@
+{
+  "id": "single-id",
+  "name": "",
+  "version": null,
+  "inputs": [
+    {"label":"ctrl-u","types":["1","11","11"],"keyValues":["KeyU","0","0","0"],"metaValues":["ControlLeft","0","0"],"isHold":false,"isTurbo":false,"isToggleOnHold":false,"keyValuesLong":["0","0","0","0"],"metaValuesLong":["0","0","0"],"keyValuesDouble":["0","0","0","0"],"metaValuesDouble":["0","0","0"],"future":{"raw":true}}
+  ],
+  "singleExtra": "kept"
+}

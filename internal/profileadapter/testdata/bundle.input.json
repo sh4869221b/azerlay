@@ -1,0 +1,25 @@
+{
+  "version": 1e+09,
+  "profiles": [
+    {
+      "id": "duplicate-id",
+      "name": "Primary",
+      "version": -0,
+      "inputs": [
+        {"label":"combo","types":["1","1","1"],"keyValuesLong":["KeyU","0","0","0"],"metaValuesLong":["0","0","0"],"isHoldLong":false,"isTurboLong":false,"isToggleOnHoldLong":false,"featureDelay":500,"keyValuesDouble":["KeyP","KeyL","0","0"],"metaValuesDouble":["0","0","0"],"doubleDelay":150,"opaque":null,"spelling":9e2},
+        {"label":"combo","types":["1","1","1"],"keyValuesLong":["KeyU","0","0","0"],"metaValuesLong":["0","0","0"],"isHoldLong":false,"isTurboLong":false,"isToggleOnHoldLong":false,"featureDelay":500,"keyValuesDouble":["KeyP","KeyL","0","0"],"metaValuesDouble":["0","0","0"],"doubleDelay":150,"opaque":null,"spelling":9e2}
+      ],
+      "profileFuture": {"enabled":true}
+    },
+    {
+      "id": "duplicate-id",
+      "name": null,
+      "inputs": [
+        {"label":7,"types":["11","11","11"],"mystery":[false,null,{"n":1e-2}]}
+      ],
+      "profileEmpty": []
+    }
+  ],
+  "bundleFlag": false,
+  "bundleFuture": {"token":-0}
+}
