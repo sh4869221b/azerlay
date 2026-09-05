@@ -1,6 +1,7 @@
 package profileadapter_test
 
 import (
+	"encoding/json"
 	"errors"
 	"reflect"
 	"testing"
@@ -22,13 +23,16 @@ func TestNormalizeAdmission(t *testing.T) {
 	t.Run("admitted empty bundle ignores raw version", func(t *testing.T) {
 		t.Parallel()
 
-		for _, sourceText := range []string{
-			`{"profiles":[]}`,
-			`{"version":null,"profiles":[]}`,
-			`{"version":"2.0.3","profiles":[]}`,
-			`{"version":999,"profiles":[]}`,
+		for _, test := range []struct {
+			sourceText string
+			version    json.RawMessage
+		}{
+			{sourceText: `{"profiles":[]}`},
+			{sourceText: `{"version":null,"profiles":[]}`, version: json.RawMessage(`null`)},
+			{sourceText: `{"version":"2.0.3","profiles":[]}`, version: json.RawMessage(`"2.0.3"`)},
+			{sourceText: `{"version":999,"profiles":[]}`, version: json.RawMessage(`999`)},
 		} {
-			raw := parseExport(t, sourceText)
+			raw := parseExport(t, test.sourceText)
 
 			actual, err := profileadapter.Normalize(raw, admitted)
 
@@ -40,7 +44,7 @@ func TestNormalizeAdmission(t *testing.T) {
 				Source:        admitted,
 				RootKind:      profile.RootBundle,
 				Profiles:      []profile.Profile{},
-				Raw:           &profile.RawBundleReference{},
+				Raw:           &profile.RawBundleReference{Version: test.version},
 			}
 			if !reflect.DeepEqual(actual, want) {
 				t.Fatalf("Normalize() = %#v, want %#v", actual, want)
@@ -63,7 +67,12 @@ func TestNormalizeAdmission(t *testing.T) {
 			Source:        admitted,
 			RootKind:      profile.RootSingle,
 			Profiles: []profile.Profile{{
+				ID:       stringPointer("synthetic"),
 				Controls: []profile.ControlBinding{},
+				Raw: profile.RawProfileReference{
+					ID:      json.RawMessage(`"synthetic"`),
+					Version: json.RawMessage(`999`),
+				},
 			}},
 		}
 		if !reflect.DeepEqual(actual, want) {
