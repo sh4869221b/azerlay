@@ -314,8 +314,41 @@ This is the owner-approved option A foundation: parsed exports can reach an
 ordered, version-independent model while unsupported data remains inspectable.
 It isn't full original Issue #42 support for legacy formats, analog, turbo, or
 executable and matchable macros, and it doesn't satisfy product acceptance
-AC-003. Production import and validate commands remain future Issue #43 work.
-The current CLI still exposes only `version` and `--help`.
+AC-003.
+
+## CLI import and validation
+
+The production CLI accepts these read-only forms:
+
+```text
+azerlay validate [--json] [--software-release RELEASE] {FILE|-|--text PAYLOAD}
+azerlay import [--json] [--software-release RELEASE] [--profile-index N] {FILE|-|--text PAYLOAD}
+```
+
+Exactly one file, stdin marker `-`, or `--text` payload is required. The CLI
+attributes the export with the exact `--software-release` value and its fixed
+`azeron-software-export` source scope. Current admission requires `2.0.2`.
+That release attribution is separate from the raw root export `version`, which
+the report preserves as metadata and doesn't use to infer support.
+
+`validate` lists every fully normalized profile, including an empty list.
+`import` selects the sole profile when there is one. With multiple profiles,
+repeat the command with one-based `--profile-index N` and supply the input
+again. Selection is limited to that invocation and neither command saves state.
+
+With `--json`, each operation writes one schema version 1 object. A successful
+result has `schema_version`, `command`, `ok`, and a `result` containing root
+kind, export version presence and value, ordered one-based profile rows,
+selected profile index, and warnings. Failures set `ok` false and provide an
+`error` with stable `code` and `stage`. Success exits 0, operation failures
+including selection failures exit 1, and invalid command arguments exit 2.
+
+Unknown binding outcomes are successful normalization. Each affected profile
+has an ordered `WARN_IMPORT_UNKNOWN_BINDINGS` warning with its one-based index
+and outcome count. The CLI reports only permitted metadata: root kind, raw
+export version, profile name, input count, selection, and these warnings. It
+doesn't report IDs, labels, bindings, macros, unknown fields, or other private
+export content.
 
 ## Stable error codes
 
