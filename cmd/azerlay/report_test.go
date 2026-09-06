@@ -1,16 +1,78 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 )
 
 const singleReportJSON = `{"schema_version":1,"command":"validate","ok":true,"result":{"root_kind":"single","export_version":{"present":false,"value":null},"profiles":[{"index":1,"name":null,"input_count":0}],"selected_profile_index":null,"warnings":[]},"error":null}`
+
+func TestImportArgumentErrors(t *testing.T) {
+	t.Parallel()
+	// Given: all syntax is checked before reading even a failing input source.
+	cases := [][]string{
+		{}, {"-", "PRIVATE_FILE"}, {"--text", fixtureText, "-"},
+		{"--profile-index", "1", "--profile-index=2", "-"},
+		{"--help", "--profile-index", "1"}, {"--help", "-"},
+		{"--help", "--software-release", "2.0.2"}, {"--help", "--help"},
+		{"--json", "-"}, {"--json=true", "-"}, {"--help=true"},
+		{"--text", fixtureText, "--text="},
+		{"--software-release", "2.0.2", "--software-release=2.0.2", "-"},
+		{"--PRIVATE_FLAG", "-"}, {"--source-scope=PRIVATE_SCOPE", "-"},
+	}
+	for _, index := range []string{"", "0", "000", "+1", "-1", " 1", "1 ", "1.0", "1e0", "1_0", "\uff11\uff12", "\u0661", "PRIVATE_INDEX", "--help", strconv.FormatUint(uint64(1)<<(strconv.IntSize-1), 10)} {
+		cases = append(cases, []string{"--profile-index=" + index, "-"})
+	}
+	for _, args := range cases {
+		t.Run(strings.Join(args, "/"), func(t *testing.T) {
+			reader := &observedReader{}
+			var stdout, stderr bytes.Buffer
+			// When: JSON appears after invalid syntax and must still be honored.
+			status := run(append(append([]string{"import"}, args...), "--json"), reader, &stdout, &stderr)
+			// Then: usage errors are safe, complete JSON with no partial result.
+			if status != 2 || reader.reads != 0 || stderr.Len() != 0 {
+				t.Fatalf("status=%d reads=%d stdout=%q stderr=%q", status, reader.reads, &stdout, &stderr)
+			}
+			parsedJSON(t, stdout.String())
+			var report operationReport
+			if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+				t.Fatal(err)
+			}
+			if report.SchemaVersion != 1 || report.Command != "import" || report.OK || report.Result != nil || report.Error == nil || report.Error.Code != "ERR_CLI_USAGE" || report.Error.Stage != "usage" || strings.Contains(stdout.String(), "PRIVATE") || !strings.HasSuffix(stdout.String(), "\n") {
+				t.Fatalf("invalid usage envelope: %s", &stdout)
+			}
+		})
+	}
+}
+
+func TestImportOutputFailures(t *testing.T) {
+	t.Parallel()
+	for _, args := range [][]string{
+		{"--help"}, {"--json"}, {"--json", "--text", "{"},
+		{"--software-release", "2.0.2", "--text", fixtureText},
+		{"--json", "--software-release", "2.0.2", "--text", fixtureText},
+		{"--software-release", "2.0.2", "--text", `{"profiles":[{"inputs":[]},{"inputs":[]}]}`},
+	} {
+		t.Run(strings.Join(args, "/"), func(t *testing.T) {
+			// Given: the actual output sink refuses its first write.
+			writer := &refusingWriter{}
+			var stderr bytes.Buffer
+			// When
+			status := run(append([]string{"import"}, args...), &observedReader{}, writer, &stderr)
+			// Then: no fallback write, leaked cause, or success claim.
+			if status != 1 || writer.calls != 1 || stderr.Len() != 0 {
+				t.Fatalf("status=%d writes=%d stderr=%q", status, writer.calls, &stderr)
+			}
+		})
+	}
+}
 
 func parsedJSON(t *testing.T, text string) any {
 	t.Helper()

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +12,86 @@ import (
 )
 
 const fixtureText = `{"id":"fixture","inputs":[]}`
+
+func TestImportSelection(t *testing.T) {
+	t.Parallel()
+	// Given: duplicate names and IDs must retain their original positions.
+	bundle := `{"profiles":[{"id":"same","name":"same","inputs":[]},{"id":"same","name":"same","inputs":[{}]}]}`
+	for _, tc := range []struct {
+		name, text, index      string
+		status, rows, selected int
+		code                   string
+	}{
+		{"single automatic", fixtureText, "", 0, 1, 1, ""},
+		{"single explicit", fixtureText, "1", 0, 1, 1, ""},
+		{"ambiguous", bundle, "", 1, 2, 0, "ERR_PROFILE_SELECTION_REQUIRED"},
+		{"first", bundle, "1", 0, 2, 1, ""},
+		{"second", bundle, "2", 0, 2, 2, ""},
+		{"leading zeros", bundle, "0002", 0, 2, 2, ""},
+		{"out of range", bundle, "3", 1, 2, 0, "ERR_PROFILE_NOT_FOUND"},
+		{"empty", `{"profiles":[]}`, "", 1, 0, 0, "ERR_PROFILE_NOT_FOUND"},
+		{"empty explicit", `{"profiles":[]}`, "1", 1, 0, 0, "ERR_PROFILE_NOT_FOUND"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			args := []string{"import", "--json", "--software-release", "2.0.2", "--text", tc.text}
+			if tc.index != "" {
+				args = append(args, "--profile-index="+tc.index)
+			}
+			reader := &observedReader{}
+			var stdout, stderr bytes.Buffer
+			// When: each call is a fresh invocation, with no remembered selection.
+			status := run(args, reader, &stdout, &stderr)
+			// Then: selection never discards the complete listing or warnings.
+			if status != tc.status || stderr.Len() != 0 || reader.reads != 0 {
+				t.Fatalf("status=%d reads=%d stdout=%q stderr=%q", status, reader.reads, &stdout, &stderr)
+			}
+			parsedJSON(t, stdout.String())
+			var report operationReport
+			if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+				t.Fatal(err)
+			}
+			if report.SchemaVersion != 1 || report.Command != "import" || report.OK != (tc.status == 0) || report.Result == nil {
+				t.Fatalf("invalid envelope: %s", &stdout)
+			}
+			result := report.Result
+			if result.Profiles == nil || len(result.Profiles) != tc.rows || result.Warnings == nil {
+				t.Fatalf("incomplete listing: %s", &stdout)
+			}
+			if tc.selected == 0 {
+				if result.SelectedProfileIndex != nil || report.Error == nil || report.Error.Code != tc.code || report.Error.Stage != "selection" {
+					t.Fatalf("invalid selection failure: %s", &stdout)
+				}
+			} else if result.SelectedProfileIndex == nil || *result.SelectedProfileIndex != tc.selected || report.Error != nil {
+				t.Fatalf("invalid selection: %s", &stdout)
+			}
+			if tc.rows == 2 && (result.Profiles[0].Index != 1 || result.Profiles[1].Index != 2 || result.Profiles[0].InputCount != 0 || result.Profiles[1].InputCount != 1 || len(result.Warnings) != 1 || result.Warnings[0].ProfileIndex != 2 || result.Warnings[0].Count != 1) {
+				t.Fatalf("source order or warnings changed: %s", &stdout)
+			}
+		})
+	}
+}
+
+func TestImportValidatesWholeExport(t *testing.T) {
+	t.Parallel()
+	// Given: a valid first profile, then a recognized 1001-step macro.
+	step := `{"type":"Delay","direction":"Full","duration":1}`
+	text := `{"profiles":[{"inputs":[]},{"inputs":[{"types":["16","11","11"],"macro":{"v":1,"repeat":false,"steps":[` + strings.Repeat(step+",", 1000) + step + `]}}]}]}`
+	var stdout, stderr bytes.Buffer
+	// When: selecting the valid first profile cannot bypass the later failure.
+	status := run([]string{"import", "--json", "--software-release", "2.0.2", "--profile-index", "1", "--text", text}, &observedReader{}, &stdout, &stderr)
+	// Then: normalization rejects the whole export; there is no partial result.
+	if status != 1 || stderr.Len() != 0 {
+		t.Fatalf("status=%d stdout=%q stderr=%q", status, &stdout, &stderr)
+	}
+	parsedJSON(t, stdout.String())
+	var report operationReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatal(err)
+	}
+	if report.SchemaVersion != 1 || report.Command != "import" || report.OK || report.Result != nil || report.Error == nil || report.Error.Code != "ERR_IMPORT_LIMIT_EXCEEDED" || report.Error.Stage != "normalize" {
+		t.Fatalf("invalid whole-export failure: %s", &stdout)
+	}
+}
 
 func validateForTest(args []string, stdin io.Reader) (int, string, string) {
 	var stdout, stderr bytes.Buffer

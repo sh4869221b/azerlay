@@ -128,6 +128,9 @@ func renderTextReport(result *profileReport) string {
 		}
 		fmt.Fprintf(&text, "  %d. %s (%d inputs)\n", row.Index, name, row.InputCount)
 	}
+	if result.SelectedProfileIndex != nil {
+		fmt.Fprintf(&text, "Selected profile: %d\n", *result.SelectedProfileIndex)
+	}
 	for _, warning := range result.Warnings {
 		fmt.Fprintf(&text, "%s: profile %d, %d Unknown outcomes\n", warning.Code, warning.ProfileIndex, warning.Count)
 	}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"github.com/sh4869221b/azerlay/internal/profile"
@@ -22,15 +23,27 @@ Options:
 
 Use - for stdin; input is required. No state is saved.`
 
-type validateOptions struct {
+const importHelp = `Usage: azerlay import [--json] [--software-release RELEASE] [--profile-index N] {FILE|-|--text PAYLOAD}
+
+Options:
+  --json                      Print schema-versioned JSON
+  --software-release RELEASE  Attribute the exact Azeron Software release
+  --profile-index N           Select a one-based profile index for this invocation
+  --text PAYLOAD              Read literal export text instead of a file
+  --help                      Print this help without reading input
+
+Use - for stdin; input is required. No state is saved.`
+
+type exportOptions struct {
 	json, help bool
 	release    string
 	source     string
 	text       *string
+	index      int // Zero means no selector; explicit indices are positive.
 }
 
-func parseValidateArgs(args []string) (validateOptions, *reportError) {
-	var options validateOptions
+func parseExportArgs(command string, args []string) (exportOptions, *reportError) {
+	var options exportOptions
 	seen := make(map[string]bool)
 	sources := 0
 	valid, flags := true, true
@@ -78,39 +91,64 @@ func parseValidateArgs(args []string) (validateOptions, *reportError) {
 			case "--software-release":
 				options.release = value
 			case "--profile-index":
-				valid = false
+				index, err := strconv.Atoi(value)
+				if command != "import" || err != nil || index <= 0 || strings.IndexFunc(value, func(r rune) bool { return r < '0' || r > '9' }) != -1 {
+					valid = false
+				} else {
+					options.index = index
+				}
 			}
 		default:
 			valid = false
 		}
 	}
 	if options.help {
-		valid = valid && sources == 0 && !seen["--software-release"] && !seen["--text"]
+		valid = valid && sources == 0 && !seen["--software-release"] && !seen["--text"] && !seen["--profile-index"]
 	} else {
 		valid = valid && sources == 1
 	}
 	if !valid {
-		return options, &reportError{"ERR_CLI_USAGE", "usage", "Invalid command arguments.", "Use validate --help and supply exactly one input source."}
+		return options, &reportError{"ERR_CLI_USAGE", "usage", "Invalid command arguments.", "Use --help for this command and supply exactly one input source."}
 	}
 	return options, nil
 }
 
-func runValidate(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	options, failure := parseValidateArgs(args)
+func runExport(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	command := args[0]
+	options, failure := parseExportArgs(command, args[1:])
 	if failure != nil {
-		return writeReport(operationReport{SchemaVersion: 1, Command: "validate", Error: failure}, options.json, stdout, stderr)
+		return writeReport(operationReport{SchemaVersion: 1, Command: command, Error: failure}, options.json, stdout, stderr)
 	}
 	if options.help {
-		if _, err := fmt.Fprintln(stdout, validateHelp); err != nil {
+		help := validateHelp
+		if command == "import" {
+			help = importHelp
+		}
+		if _, err := fmt.Fprintln(stdout, help); err != nil {
 			return 1
 		}
 		return 0
 	}
 	result, failure := validateSource(options, stdin)
-	return writeReport(operationReport{SchemaVersion: 1, Command: "validate", OK: failure == nil, Result: result, Error: failure}, options.json, stdout, stderr)
+	// Selection is invocation-local and only sees a fully normalized export.
+	if failure == nil && command == "import" {
+		switch {
+		case len(result.Profiles) == 0 || options.index > len(result.Profiles):
+			failure = &reportError{"ERR_PROFILE_NOT_FOUND", "selection", "No profile exists at the requested position.", "Repeat import with --profile-index N and supply the input again; choose an index from a nonempty profile listing."}
+		case options.index == 0 && len(result.Profiles) > 1:
+			failure = &reportError{"ERR_PROFILE_SELECTION_REQUIRED", "selection", "An explicit profile selection is required.", "Repeat import with --profile-index N and supply the input again."}
+		default:
+			index := options.index
+			if index == 0 {
+				index = 1
+			}
+			result.SelectedProfileIndex = &index
+		}
+	}
+	return writeReport(operationReport{SchemaVersion: 1, Command: command, OK: failure == nil, Result: result, Error: failure}, options.json, stdout, stderr)
 }
 
-func validateSource(options validateOptions, stdin io.Reader) (*profileReport, *reportError) {
+func validateSource(options exportOptions, stdin io.Reader) (*profileReport, *reportError) {
 	var document profiledecode.Document
 	var err error
 	switch {

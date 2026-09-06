@@ -13,8 +13,8 @@ func main() {
 }
 
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	if len(args) > 0 && args[0] == "validate" {
-		return runValidate(args[1:], stdin, stdout, stderr)
+	if len(args) > 0 && (args[0] == "validate" || args[0] == "import") {
+		return runExport(args, stdin, stdout, stderr)
 	}
 
 	if len(args) == 1 && args[0] == "version" {
@@ -25,7 +25,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	if len(args) == 1 && args[0] == "--help" {
-		if _, err := fmt.Fprintln(stdout, "Usage: azerlay <command>\n\nCommands:\n  version  Print version information\n  validate Validate a profile export without saving state\n\n"+validateHelp); err != nil {
+		if _, err := fmt.Fprintln(stdout, "Usage: azerlay <command>\n\nCommands:\n  version  Print version information\n  validate Validate a profile export without saving state\n  import   Select a profile for this invocation without saving state\n\n"+validateHelp+"\n\n"+importHelp); err != nil {
 			return 1
 		}
 		return 0
