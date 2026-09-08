@@ -6,6 +6,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
@@ -280,6 +281,290 @@ func TestCLIInputForms(t *testing.T) {
 }
 
 const cliPrivateResult = `{"root_kind":"single","export_version":{"present":true,"value":"ALLOWED_VERSION\n\u001b"},"profiles":[{"index":1,"name":"ALLOWED_NAME\n\u001b","input_count":1}],"selected_profile_index":null,"warnings":[{"code":"WARN_IMPORT_UNKNOWN_BINDINGS","profile_index":1,"count":3}]}`
+
+const cliPersistedResult = `{"root_kind":"bundle","export_version":{"present":true,"value":1e+09},"profiles":[{"index":1,"name":"Primary","input_count":2},{"index":2,"name":null,"input_count":1}],"selected_profile_index":null,"warnings":[{"code":"WARN_IMPORT_UNKNOWN_BINDINGS","profile_index":1,"count":2},{"code":"WARN_IMPORT_UNKNOWN_BINDINGS","profile_index":2,"count":3}]}`
+
+// Seed through the real file route, then remove that route before any restart.
+func cliSaveBundle(t *testing.T, root string, input []byte) string {
+	t.Helper()
+	path := filepath.Join(root, "PRIVATE_PATH")
+	cliWrite(t, path, input, 0o400)
+	got := invokeCLI(t, cliEnvironment(root), nil, "import", "--json", "--software-release", "2.0.2", "--profile-index", "2", path)
+	checkCLIStatus(t, got, 0, true)
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	return fmt.Sprintf("%x", sha256.Sum256(input))
+}
+
+type cliStoredIndex struct {
+	Sources  []json.RawMessage `json:"sources"`
+	Selected json.RawMessage   `json:"selected"`
+}
+
+func cliIndex(t *testing.T, app string) cliStoredIndex {
+	t.Helper()
+	var index cliStoredIndex
+	if err := json.Unmarshal(cliRead(t, filepath.Join(app, "cache/source-index.json")), &index); err != nil {
+		t.Fatal(err)
+	}
+	return index
+}
+
+func TestCLIPersistedSelectionRestart(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct{ name, input, result string }{
+		{"duplicate_ids", string(cliRead(t, "../../internal/profileadapter/testdata/bundle.input.json")), cliPersistedResult},
+		{"unsafe_and_missing_ids", `{"profiles":[{"id":"../PRIVATE_ID","name":"first","inputs":[]},{"id":"../PRIVATE_ID","name":null,"inputs":[]},{"inputs":[]}]}`, `{"root_kind":"bundle","export_version":{"present":false,"value":null},"profiles":[{"index":1,"name":"first","input_count":0},{"index":2,"name":null,"input_count":0},{"index":3,"name":null,"input_count":0}],"selected_profile_index":null,"warnings":[]}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Given: an explicit second ordinal and no remaining input file.
+			root := t.TempDir()
+			hash := cliSaveBundle(t, root, []byte(tc.input))
+			app := filepath.Join(root, "XDG_DATA_HOME/azerlay")
+			before := cliTree(t, root)
+			// When: a separate process reads the committed selection.
+			got := invokeCLI(t, cliEnvironment(root), nil, "profiles", "show", "--json")
+			// Then: literal ordinal two survives, without ID-derived paths or writes.
+			checkCLIStatus(t, got, 0, true)
+			assertJSONEqual(t, got.stdout, cliSuccess("profiles show", cliSelected(tc.result, 2)))
+			wantSelection := fmt.Sprintf(`{"source_hash":%q,"profile_index":2}`, hash)
+			if !reflect.DeepEqual(parsedJSON(t, string(cliIndex(t, app).Selected)), parsedJSON(t, wantSelection)) {
+				t.Fatalf("persisted selection differs from %s", wantSelection)
+			}
+			if !bytes.Equal(cliRead(t, filepath.Join(app, "sources", hash+".azeron")), []byte(tc.input)) {
+				t.Fatal("stored original differs from exact input bytes")
+			}
+			count := 2
+			if tc.name == "unsafe_and_missing_ids" {
+				count = 3
+			}
+			wantPaths := []string{".", "cache", "cache/import.lock", "cache/source-index.json", "sources", "sources/" + hash + ".azeron", "profiles", "profiles/" + hash, "profiles/" + hash + "/bundle.json"}
+			for n := 1; n <= count; n++ {
+				wantPaths = append(wantPaths, fmt.Sprintf("profiles/%s/p%d.json", hash, n))
+			}
+			tree := cliTree(t, app)
+			for _, path := range wantPaths {
+				state, exists := tree[path]
+				if !exists || state.Mode.IsDir() && state.Mode.Perm() != 0o700 || !state.Mode.IsDir() && state.Mode != 0o600 {
+					t.Fatalf("missing or unsafe generated path %s: %+v", path, state)
+				}
+			}
+			if len(tree) != len(wantPaths) || !reflect.DeepEqual(before, cliTree(t, root)) {
+				t.Fatal("unexpected ID-derived paths or show changed the saved tree")
+			}
+		})
+	}
+}
+
+func TestCLIDuplicateStorage(t *testing.T) {
+	t.Parallel()
+	for _, route := range []string{"file", "stdin", "text", "byte_different"} {
+		t.Run(route, func(t *testing.T) {
+			// Given: first file provenance and a fixed historical timestamp.
+			root := t.TempDir()
+			input := cliRead(t, "../../internal/profileadapter/testdata/bundle.input.json")
+			hash := cliSaveBundle(t, root, input)
+			app := filepath.Join(root, "XDG_DATA_HOME/azerlay")
+			indexPath := filepath.Join(app, "cache/source-index.json")
+			var metadata struct {
+				ImportedAt string `json:"imported_at"`
+			}
+			first := cliIndex(t, app)
+			if len(first.Sources) != 1 {
+				t.Fatalf("first import catalog entries=%d want=1", len(first.Sources))
+			}
+			if err := json.Unmarshal(first.Sources[0], &metadata); err != nil {
+				t.Fatal(err)
+			}
+			cliWrite(t, indexPath, bytes.Replace(cliRead(t, indexPath), []byte(metadata.ImportedAt), []byte("2000-01-01T00:00:00Z"), 1), 0o600)
+			first = cliIndex(t, app)
+			wantMetadata := fmt.Sprintf(`{"source_hash":%q,"software_release":"2.0.2","source_scope":"azeron-software-export","input_kind":"reader","origin":{"kind":"file","path":%q},"imported_at":"2000-01-01T00:00:00Z","decoder_version":"1","normalizer_version":"1","model_schema_version":1,"profile_count":2,"export_version":"1e+09"}`, hash, filepath.Join(root, "PRIVATE_PATH"))
+			if !reflect.DeepEqual(parsedJSON(t, string(first.Sources[0])), parsedJSON(t, wantMetadata)) {
+				t.Fatalf("first metadata differs from known file attribution: %s", first.Sources[0])
+			}
+			before := cliTree(t, app)
+			args := []string{"import", "--json", "--software-release", "2.0.2", "--profile-index", "1"}
+			var stdin []byte
+			switch route {
+			case "file":
+				path := filepath.Join(root, "second-file")
+				cliWrite(t, path, input, 0o400)
+				args = append(args, path)
+			case "stdin":
+				stdin, args = input, append(args, "-")
+			case "text":
+				args = append(args, "--text", string(input))
+			case "byte_different":
+				input = append(input, '\n')
+				args = append(args, "--text", string(input))
+			default:
+				t.Fatal("unhandled input route")
+			}
+			// When: an admitted cross-route import explicitly changes selection.
+			got := invokeCLI(t, cliEnvironment(root), stdin, args...)
+			if route == "file" {
+				if err := os.Remove(filepath.Join(root, "second-file")); err != nil {
+					t.Fatal(err)
+				}
+			}
+			// Then: exact-byte identity, first metadata and immutable artifacts survive.
+			checkCLIStatus(t, got, 0, true)
+			assertJSONEqual(t, got.stdout, cliSuccess("import", cliSelected(cliPersistedResult, 1)))
+			after := cliTree(t, app)
+			index := cliIndex(t, app)
+			wantCount := 1
+			selectedHash := hash
+			if route == "byte_different" {
+				wantCount = 2
+				selectedHash = fmt.Sprintf("%x", sha256.Sum256(input))
+				if !bytes.Equal(cliRead(t, filepath.Join(app, "sources", selectedHash+".azeron")), input) {
+					t.Fatal("byte-different original was not retained separately")
+				}
+			} else if len(after) != len(before) {
+				t.Fatal("identical bytes created duplicate storage artifacts")
+			}
+			if len(index.Sources) != wantCount || !bytes.Equal(index.Sources[0], first.Sources[0]) {
+				t.Fatalf("dedup changed catalog count or first provenance: before=%s after=%s", first.Sources, index.Sources)
+			}
+			for path, state := range before {
+				if path != "cache/source-index.json" && !reflect.DeepEqual(state, after[path]) {
+					t.Fatalf("duplicate rewrote original/cache bytes or mode: %s", path)
+				}
+			}
+			wantSelection := fmt.Sprintf(`{"source_hash":%q,"profile_index":1}`, selectedHash)
+			if !reflect.DeepEqual(parsedJSON(t, string(index.Selected)), parsedJSON(t, wantSelection)) {
+				t.Fatalf("duplicate did not commit changed selection: got=%s want=%s", index.Selected, wantSelection)
+			}
+			beforeShow := cliTree(t, root)
+			show := invokeCLI(t, cliEnvironment(root), nil, "profiles", "show", "--json")
+			checkCLIStatus(t, show, 0, true)
+			assertJSONEqual(t, show.stdout, cliSuccess("profiles show", cliSelected(cliPersistedResult, 1)))
+			if !reflect.DeepEqual(beforeShow, cliTree(t, root)) {
+				t.Fatal("duplicate selection show wrote to HOME/XDG")
+			}
+		})
+	}
+}
+
+func TestCLICacheRecoveryNoWrite(t *testing.T) {
+	t.Parallel()
+	for _, member := range []string{"bundle.json", "p2.json"} {
+		for _, damage := range []string{"missing", "corrupt", "incompatible"} {
+			t.Run(member+"/"+damage, func(t *testing.T) {
+				// Given: committed original, deleted input, and one damaged derived member.
+				root := t.TempDir()
+				hash := cliSaveBundle(t, root, cliRead(t, "../../internal/profileadapter/testdata/bundle.input.json"))
+				path := filepath.Join(root, "XDG_DATA_HOME/azerlay/profiles", hash, member)
+				switch damage {
+				case "missing":
+					if err := os.Remove(path); err != nil {
+						t.Fatal(err)
+					}
+				case "corrupt":
+					cliWrite(t, path, []byte("{"), 0o600)
+				case "incompatible":
+					cliWrite(t, path, bytes.Replace(cliRead(t, path), []byte(`"schema_version":1`), []byte(`"schema_version":999`), 1), 0o600)
+				default:
+					t.Fatal("unhandled cache damage")
+				}
+				before := cliTree(t, root)
+				// When: a new process reconstructs from the saved original.
+				got := invokeCLI(t, cliEnvironment(root), nil, "profiles", "show", "--json")
+				// Then: the whole literal projection returns; damage is not repaired.
+				checkCLIStatus(t, got, 0, true)
+				assertJSONEqual(t, got.stdout, cliSuccess("profiles show", cliSelected(cliPersistedResult, 2)))
+				if !reflect.DeepEqual(before, cliTree(t, root)) {
+					t.Fatal("cache recovery wrote to HOME/XDG instead of remaining in memory")
+				}
+			})
+		}
+	}
+}
+
+func TestCLIStorageFailureNoAdoption(t *testing.T) {
+	t.Parallel()
+	for _, damage := range []string{"index", "original", "unsafe_mode", "blocked_store"} {
+		for _, command := range []string{"show", "import"} {
+			t.Run(damage+"/"+command, func(t *testing.T) {
+				// Given: a committed second selection or an obstructed fresh store.
+				root := t.TempDir()
+				app := filepath.Join(root, "XDG_DATA_HOME/azerlay")
+				input := cliRead(t, "../../internal/profileadapter/testdata/bundle.input.json")
+				if damage == "blocked_store" {
+					if err := os.Mkdir(filepath.Dir(app), 0o700); err != nil {
+						t.Fatal(err)
+					}
+					cliWrite(t, app, []byte("PRIVATE_FIELD"), 0o600)
+				} else {
+					hash := cliSaveBundle(t, root, input)
+					switch damage {
+					case "index":
+						cliWrite(t, filepath.Join(app, "cache/source-index.json"), []byte(`{"PRIVATE_FIELD":`), 0o600)
+					case "original":
+						cliWrite(t, filepath.Join(app, "sources", hash+".azeron"), []byte("PRIVATE_FIELD"), 0o600)
+					case "unsafe_mode":
+						if err := os.Chmod(app, 0o755); err != nil {
+							t.Fatal(err)
+						}
+					default:
+						t.Fatal("unhandled store damage")
+					}
+				}
+				args := []string{"profiles", "show", "--json"}
+				operation := "profiles show"
+				if command == "import" {
+					operation = "import"
+					args = []string{"import", "--json", "--software-release", "2.0.2", "--profile-index", "1", "--text", string(input)}
+				}
+				before := cliTree(t, root)
+				// When: reading or attempting changed selection through refused storage.
+				got := invokeCLI(t, cliEnvironment(root), nil, args...)
+				// Then: no success DTO, disclosure, repair, catalog reset or adoption.
+				checkCLIFailure(t, got, 1, operation, "ERR_PROFILE_STORAGE", "storage", "null")
+				checkCLIPrivate(t, got)
+				if !reflect.DeepEqual(before, cliTree(t, root)) {
+					t.Fatal("storage failure changed prior catalog/selection or adopted artifacts")
+				}
+			})
+		}
+	}
+}
+
+func TestCLIStoredDataPrivacy(t *testing.T) {
+	t.Parallel()
+	for _, jsonMode := range []bool{true, false} {
+		t.Run(fmt.Sprintf("json=%t", jsonMode), func(t *testing.T) {
+			// Given: private fields persisted through a private original file path.
+			root := t.TempDir()
+			env := cliEnvironment(root)
+			path := filepath.Join(root, "PRIVATE_PATH")
+			cliWrite(t, path, cliRead(t, "testdata/cli/private-fields.json"), 0o400)
+			checkCLIStatus(t, invokeCLI(t, env, nil, "import", "--json", "--software-release", "2.0.2", path), 0, true)
+			if err := os.Remove(path); err != nil {
+				t.Fatal(err)
+			}
+			before := cliTree(t, root)
+			args := []string{"profiles", "show"}
+			if jsonMode {
+				args = append(args, "--json")
+			}
+			// When: a new process projects stored private data to either public surface.
+			got := invokeCLI(t, env, nil, args...)
+			// Then: every permitted machine field has its literal value; no private DTO.
+			checkCLIStatus(t, got, 0, true)
+			if jsonMode {
+				assertJSONEqual(t, got.stdout, cliSuccess("profiles show", cliSelected(cliPrivateResult, 1)))
+			} else {
+				checkCLIHuman(t, got.stdout, cliSelected(cliPrivateResult, 1))
+			}
+			checkCLIPrivate(t, got)
+			if !reflect.DeepEqual(before, cliTree(t, root)) {
+				t.Fatal("private stored-data display wrote to HOME/XDG")
+			}
+		})
+	}
+}
 
 func checkCLIPrivate(t *testing.T, got cliOutput) {
 	t.Helper()
