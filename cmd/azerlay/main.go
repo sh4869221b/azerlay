@@ -16,6 +16,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) > 0 && (args[0] == "validate" || args[0] == "import") {
 		return runExport(args, stdin, stdout, stderr)
 	}
+	if len(args) > 0 && args[0] == "profiles" {
+		return runProfiles(args[1:], stdout, stderr)
+	}
 
 	if len(args) == 1 && args[0] == "version" {
 		if _, err := fmt.Fprintf(stdout, "azerlay %s\n", version); err != nil {
@@ -25,7 +28,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	if len(args) == 1 && args[0] == "--help" {
-		if _, err := fmt.Fprintln(stdout, "Usage: azerlay <command>\n\nCommands:\n  version  Print version information\n  validate Validate a profile export without saving state\n  import   Select a profile for this invocation without saving state\n\n"+validateHelp+"\n\n"+importHelp); err != nil {
+		if _, err := fmt.Fprintln(stdout, "Usage: azerlay <command>\n\nCommands:\n  version  Print version information\n  validate Validate a profile export without saving state\n  import   Save an export and profile selection\n  profiles Show the saved profile selection\n\n"+validateHelp+"\n\n"+importHelp+"\n\n"+profilesHelp); err != nil {
 			return 1
 		}
 		return 0

@@ -1,5 +1,8 @@
 package main
 
+// allow: SIZE_OK - Existing binary regression suite; task 5 may only adapt
+// successful-import expectations. Task 6 owns additions, not a suite split.
+
 import (
 	"bytes"
 	"context"
@@ -430,7 +433,20 @@ func TestCLINoPersistence(t *testing.T) {
 						args = append(args, "--json")
 					}
 					got := invokeCLI(t, env, nil, args...)
-					if after := cliTree(t, root); !reflect.DeepEqual(before, after) {
+					after := cliTree(t, root)
+					if tc.command == "import" && tc.status == 0 {
+						// Only successful imports may add app-owned data. Preserve the
+						// source, existing ancestors and every unrelated HOME/XDG entry.
+						for path := range after {
+							if path == "XDG_DATA_HOME/azerlay" || strings.HasPrefix(path, "XDG_DATA_HOME/azerlay/") {
+								delete(after, path)
+							}
+						}
+						if !populated {
+							delete(after, "XDG_DATA_HOME")
+						}
+					}
+					if !reflect.DeepEqual(before, after) {
 						t.Fatalf("CLI changed source/HOME/XDG bytes, entries or modes (json=%t): before=%v after=%v", jsonMode, before, after)
 					}
 					checkCLIStatus(t, got, tc.status, jsonMode)
