@@ -98,7 +98,7 @@ func writeReport(report operationReport, jsonMode bool, stdout, stderr io.Writer
 		return status
 	}
 	if report.Result != nil {
-		if _, err := io.WriteString(stdout, renderTextReport(report.Result)); err != nil {
+		if _, err := io.WriteString(stdout, renderTextReport(report)); err != nil {
 			return 1
 		}
 	}
@@ -110,7 +110,8 @@ func writeReport(report operationReport, jsonMode bool, stdout, stderr io.Writer
 	return status
 }
 
-func renderTextReport(result *profileReport) string {
+func renderTextReport(report operationReport) string {
+	result := report.Result
 	var text strings.Builder
 	version := "<missing>"
 	if result.ExportVersion.Present {
@@ -134,6 +135,10 @@ func renderTextReport(result *profileReport) string {
 	for _, warning := range result.Warnings {
 		fmt.Fprintf(&text, "%s: profile %d, %d Unknown outcomes\n", warning.Code, warning.ProfileIndex, warning.Count)
 	}
-	text.WriteString("No state was saved.\n")
+	if report.Command == "import" && report.OK {
+		text.WriteString("Export and selection were saved.\n")
+	} else {
+		text.WriteString("No state was saved.\n")
+	}
 	return text.String()
 }

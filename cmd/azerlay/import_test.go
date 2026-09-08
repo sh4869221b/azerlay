@@ -14,7 +14,6 @@ import (
 const fixtureText = `{"id":"fixture","inputs":[]}`
 
 func TestImportSelection(t *testing.T) {
-	t.Parallel()
 	// Given: duplicate names and IDs must retain their original positions.
 	bundle := `{"profiles":[{"id":"same","name":"same","inputs":[]},{"id":"same","name":"same","inputs":[{}]}]}`
 	for _, tc := range []struct {
@@ -33,6 +32,7 @@ func TestImportSelection(t *testing.T) {
 		{"empty explicit", `{"profiles":[]}`, "1", 1, 0, 0, "ERR_PROFILE_NOT_FOUND"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			isolateCLI(t)
 			args := []string{"import", "--json", "--software-release", "2.0.2", "--text", tc.text}
 			if tc.index != "" {
 				args = append(args, "--profile-index="+tc.index)

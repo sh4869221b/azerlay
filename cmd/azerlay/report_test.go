@@ -53,7 +53,6 @@ func TestImportArgumentErrors(t *testing.T) {
 }
 
 func TestImportOutputFailures(t *testing.T) {
-	t.Parallel()
 	for _, args := range [][]string{
 		{"--help"}, {"--json"}, {"--json", "--text", "{"},
 		{"--software-release", "2.0.2", "--text", fixtureText},
@@ -61,6 +60,7 @@ func TestImportOutputFailures(t *testing.T) {
 		{"--software-release", "2.0.2", "--text", `{"profiles":[{"inputs":[]},{"inputs":[]}]}`},
 	} {
 		t.Run(strings.Join(args, "/"), func(t *testing.T) {
+			isolateCLI(t)
 			// Given: the actual output sink refuses its first write.
 			writer := &refusingWriter{}
 			var stderr bytes.Buffer
@@ -72,6 +72,21 @@ func TestImportOutputFailures(t *testing.T) {
 			}
 		})
 	}
+}
+
+const savedBundleResult = `{"root_kind":"bundle","export_version":{"present":true,"value":1e+09},"profiles":[{"index":1,"name":"Primary","input_count":2},{"index":2,"name":null,"input_count":1}],"selected_profile_index":null,"warnings":[{"code":"WARN_IMPORT_UNKNOWN_BINDINGS","profile_index":1,"count":2},{"code":"WARN_IMPORT_UNKNOWN_BINDINGS","profile_index":2,"count":3}]}`
+
+func TestValidateBundleJSONBaseline(t *testing.T) {
+	// Given: storage resolution would fail; validation still has its schema-1 output.
+	t.Setenv("HOME", "")
+	t.Setenv("XDG_DATA_HOME", "relative")
+	// When
+	status, stdout, stderr := validateForTest([]string{"--json", "--software-release", "2.0.2", "../../internal/profileadapter/testdata/bundle.input.json"}, &observedReader{})
+	// Then: compare all fields against the characterized pre-persistence binary.
+	if status != 0 || stderr != "" {
+		t.Fatalf("status=%d stderr=%q", status, stderr)
+	}
+	assertJSONEqual(t, stdout, cliSuccess("validate", savedBundleResult))
 }
 
 func parsedJSON(t *testing.T, text string) any {

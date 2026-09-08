@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/sh4869221b/azerlay/internal/profileadapter"
 	"github.com/sh4869221b/azerlay/internal/profiledecode"
 	"github.com/sh4869221b/azerlay/internal/profileraw"
+	"github.com/sh4869221b/azerlay/internal/profilesource"
 )
 
 const validateHelp = `Usage: azerlay validate [--json] [--software-release RELEASE] {FILE|-|--text PAYLOAD}
@@ -28,11 +31,11 @@ const importHelp = `Usage: azerlay import [--json] [--software-release RELEASE] 
 Options:
   --json                      Print schema-versioned JSON
   --software-release RELEASE  Attribute the exact Azeron Software release
-  --profile-index N           Select a one-based profile index for this invocation
+  --profile-index N           Save a one-based profile selection
   --text PAYLOAD              Read literal export text instead of a file
   --help                      Print this help without reading input
 
-Use - for stdin; input is required. No state is saved.`
+Use - for stdin; input is required. Successful import saves the export and selection.`
 
 type exportOptions struct {
 	json, help bool
@@ -129,54 +132,79 @@ func runExport(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 		return 0
 	}
-	result, failure := validateSource(options, stdin)
-	// Selection is invocation-local and only sees a fully normalized export.
-	if failure == nil && command == "import" {
+	prepared, origin, err := prepareSource(options, stdin)
+	if err != nil {
+		return writeReport(operationReport{SchemaVersion: 1, Command: command, Error: preparationFailure(err)}, options.json, stdout, stderr)
+	}
+	bundle := prepared.Bundle()
+	result := projectReport(bundle)
+	// Selection only sees the complete normalized export; Prepared stays intact.
+	if command == "import" {
 		switch {
-		case len(result.Profiles) == 0 || options.index > len(result.Profiles):
+		case len(bundle.Profiles) == 0 || options.index > len(bundle.Profiles):
 			failure = &reportError{"ERR_PROFILE_NOT_FOUND", "selection", "No profile exists at the requested position.", "Repeat import with --profile-index N and supply the input again; choose an index from a nonempty profile listing."}
-		case options.index == 0 && len(result.Profiles) > 1:
+		case options.index == 0 && len(bundle.Profiles) > 1:
 			failure = &reportError{"ERR_PROFILE_SELECTION_REQUIRED", "selection", "An explicit profile selection is required.", "Repeat import with --profile-index N and supply the input again."}
 		default:
 			index := options.index
 			if index == 0 {
 				index = 1
 			}
+			dataHome, err := profilesource.ResolveDataHome()
+			if err == nil {
+				_, err = profilesource.NewImportedSource(dataHome).Import(context.Background(), prepared, index, origin)
+			}
+			if err != nil {
+				return writeReport(operationReport{SchemaVersion: 1, Command: command, Error: storageFailure(err)}, options.json, stdout, stderr)
+			}
+			// Publication precedes output. Delivery failure must not undo the commit.
 			result.SelectedProfileIndex = &index
 		}
 	}
 	return writeReport(operationReport{SchemaVersion: 1, Command: command, OK: failure == nil, Result: result, Error: failure}, options.json, stdout, stderr)
 }
 
-func validateSource(options exportOptions, stdin io.Reader) (*profileReport, *reportError) {
-	var document profiledecode.Document
-	var err error
+func prepareSource(options exportOptions, stdin io.Reader) (prepared profilesource.Prepared, origin profilesource.Origin, err error) {
+	source := profile.SourceMetadata{SoftwareRelease: options.release, SourceScope: "azeron-software-export"}
 	switch {
 	case options.text != nil:
-		document, err = profiledecode.DecodeText(*options.text)
+		prepared, err = profilesource.PrepareText(*options.text, source)
+		return prepared, profilesource.Origin{Kind: "text"}, err
 	case options.source == "-":
-		document, err = profiledecode.DecodeReader(stdin)
+		prepared, err = profilesource.PrepareReader(stdin, source)
+		return prepared, profilesource.Origin{Kind: "stdin"}, err
 	default:
-		document, err = profiledecode.DecodeFile(options.source)
+		origin = profilesource.Origin{Kind: "file", Path: &options.source}
+		file, openErr := os.Open(options.source)
+		if openErr != nil {
+			return profilesource.Prepared{}, origin, errors.Join(&profiledecode.DecodeError{Code: profiledecode.ERR_IMPORT_ENCODING}, openErr)
+		}
+		defer func() {
+			if closeErr := file.Close(); closeErr != nil {
+				prepared = profilesource.Prepared{}
+				// Decode errors still win; a close failure precedes raw/normalize
+				// reporting, matching the former DecodeFile boundary ordering.
+				err = errors.Join(err, &profiledecode.DecodeError{Code: profiledecode.ERR_IMPORT_ENCODING}, closeErr)
+			}
+		}()
+		prepared, err = profilesource.PrepareReader(file, source)
+		return prepared, origin, err
 	}
+}
+
+func preparationFailure(err error) *reportError {
 	// These boundaries guarantee their respective typed errors. Project only
 	// the stable code, never the underlying reader/file cause or source text.
-	if err != nil {
-		var failure *profiledecode.DecodeError
-		errors.As(err, &failure)
-		return nil, &reportError{string(failure.Code), "decode", "The export could not be decoded.", "Supply a complete export in a supported input format."}
+	var decode *profiledecode.DecodeError
+	var raw *profileraw.ParseError
+	var normalize *profileadapter.NormalizeError
+	switch {
+	case errors.As(err, &decode):
+		return &reportError{string(decode.Code), "decode", "The export could not be decoded.", "Supply a complete export in a supported input format."}
+	case errors.As(err, &raw):
+		return &reportError{string(raw.Code), "raw", "The export structure is invalid.", "Supply a structurally valid software export within the documented limits."}
+	default:
+		errors.As(err, &normalize)
+		return &reportError{string(normalize.Code), "normalize", "The export could not be normalized.", "Attribute a supported exact software release and use an export within the documented semantic limits."}
 	}
-	raw, err := profileraw.Parse(document)
-	if err != nil {
-		var failure *profileraw.ParseError
-		errors.As(err, &failure)
-		return nil, &reportError{string(failure.Code), "raw", "The export structure is invalid.", "Supply a structurally valid software export within the documented limits."}
-	}
-	bundle, err := profileadapter.Normalize(raw, profile.SourceMetadata{SoftwareRelease: options.release, SourceScope: "azeron-software-export"})
-	if err != nil {
-		var failure *profileadapter.NormalizeError
-		errors.As(err, &failure)
-		return nil, &reportError{string(failure.Code), "normalize", "The export could not be normalized.", "Attribute a supported exact software release and use an export within the documented semantic limits."}
-	}
-	return projectReport(bundle), nil
 }
