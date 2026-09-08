@@ -121,3 +121,62 @@ func (s *ImportedSource) event(event publicationEvent) {
 		s.hook(event)
 	}
 }
+
+var _ ProfileSource = (*ImportedSource)(nil)
+
+// ID identifies the imported provider, independently of its storage location.
+func (s *ImportedSource) ID() SourceID { return "imported" }
+
+// Discover returns owned descriptors in first-commit order, never orphan files.
+func (s *ImportedSource) Discover(ctx context.Context) ([]SourceDescriptor, error) {
+	root, index, err := s.snapshot(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if root != nil {
+		defer root.Close()
+	}
+	result := make([]SourceDescriptor, 0, len(index.Sources))
+	for _, source := range index.Sources {
+		// decodeIndex has already validated the timestamp and allocated provenance.
+		imported, err := time.Parse(time.RFC3339Nano, source.ImportedAt)
+		if err != nil {
+			return nil, &Error{Code: ERR_PROFILE_STORAGE, Cause: err}
+		}
+		result = append(result, SourceDescriptor{Ref: SourceRef{Hash: source.SourceHash}, Source: profile.SourceMetadata{SoftwareRelease: source.SoftwareRelease, SourceScope: source.SourceScope}, Origin: Origin(source.Origin), ImportedAt: imported, ProfileCount: source.ProfileCount})
+	}
+	return result, nil
+}
+
+// Selected returns the committed one-based ordinal without choosing a fallback.
+func (s *ImportedSource) Selected(ctx context.Context) (Selection, error) {
+	root, index, err := s.snapshot(ctx)
+	if err != nil {
+		return Selection{}, err
+	}
+	if root != nil {
+		defer root.Close()
+	}
+	if index.Selected == nil {
+		return Selection{}, &Error{Code: ERR_PROFILE_NOT_FOUND}
+	}
+	return Selection{Source: SourceRef{Hash: index.Selected.SourceHash}, ProfileIndex: index.Selected.ProfileIndex}, nil
+}
+
+// Watch validates committed membership. Hash-addressed sources are immutable,
+// so the returned channel is already closed and no watcher is started.
+func (s *ImportedSource) Watch(ctx context.Context, ref SourceRef) (<-chan SourceChange, error) {
+	root, index, err := s.snapshot(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if root != nil {
+		defer root.Close()
+	}
+	if _, err := indexedSource(index, ref); err != nil {
+		return nil, err
+	}
+	changes := make(chan SourceChange)
+	close(changes)
+	return changes, nil
+}
