@@ -262,7 +262,10 @@ func TestStorageCodecRejectsInvalid(t *testing.T) {
 				case "trailing":
 					input = append(input, suffix...)
 				case "duplicate":
-					input = append(input[:len(input)-1], (suffix + "}")...)
+					input = append(input[:len(input)-1], suffix...)
+					if !json.Valid(input) {
+						t.Fatal("duplicate-key fixture must be syntactically valid JSON")
+					}
 				}
 				// When
 				err := artifact.decode(input)
