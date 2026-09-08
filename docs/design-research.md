@@ -835,10 +835,17 @@ type ProfileSource interface {
 ### 10.2 ImportedSource
 
 - ユーザーが明示的に渡したエクスポートを処理する。
-- 元データをSHA-256名で保存する。
-- 正規化結果をキャッシュする。
-- 元データと正規化データのschema versionを記録する。
-- 同じhashは重複保存しない。
+- 元データの正確なbytesをSHA-256名で保存する。hashはAzeron IDではない。
+- opaque raw referenceを含む完全な正規化bundleとsource順の`pN.json` cacheを
+  保存する。`pN`はone-based ordinalであり、Azeron IDではない。
+- indexはcatalogとselected source/ordinalのauthorityである。初回importの
+  provenance、時刻、decoder/normalizer revision、raw export versionを保持し、
+  cache envelopeは現在のinterpretation revisionを持つ。parserまたはadapterの
+  semantic変更時は該当revisionをbumpする。
+- 同一bytesは入力経路に関係なくdeduplicateし、初回metadataを保持する。
+- cacheが欠落、破損、または旧revisionなら、保存済みoriginalからmemory上で
+  復元する。Discover、Load、showを含むread時にwriteやrepair、再selectionは行わない。
+  indexまたはoriginalが破損している場合はstorage errorとする。
 
 ### 10.3 AzeronLocalSource
 
@@ -879,17 +886,22 @@ explicit selected source
 
 ```text
 $XDG_DATA_HOME/azerlay/
-├── sources/
-│   └── <sha256>.azeron
-├── profiles/
-│   └── <source-sha256>/
-│       ├── bundle.json
-│       └── <profile-id>.json
+├── sources/<sha256>.azeron
+├── profiles/<sha256>/
+│   ├── bundle.json
+│   └── p1.json ... pN.json
 └── cache/
-    └── source-index.json
+    ├── source-index.json
+    └── import.lock
 ```
 
-原本は0600、ディレクトリは0700を基本とする。
+`XDG_DATA_HOME`がunset、empty、relativeの場合は`$HOME/.local/share`を使う。
+application-owned directoryは0700、original、cache、index、lockを含むfileは
+0600とする。inputとselectionを完全にvalidateした後に保存を開始し、indexを最後に
+publishする。これにより通常の失敗は前のcatalogとselectionを保つ。commit後のoutput
+failureは保存をrollbackしない。この保証はprocess-level atomic visibilityであり、
+power loss後の全directory entryのdurabilityは保証しない。中断後のprivate orphanは
+indexから参照されず、Discoverは無視する。
 
 ---
 
@@ -1348,7 +1360,7 @@ azerlay import <file|->
 azerlay validate <file|->
 azerlay profiles list
 azerlay profiles select <id|name>
-azerlay profiles show [id]
+azerlay profiles show [--json]
 azerlay devices list
 azerlay devices inspect [path]
 azerlay show
@@ -1375,23 +1387,17 @@ azerlay run [--config PATH] [--foreground]
 ### 17.3 `import`
 
 ```text
-azerlay import FILE
-azerlay import -
-azerlay import --text '<payload>'
+azerlay import [--json] [--software-release RELEASE] [--profile-index N] {FILE|-|--text PAYLOAD}
+azerlay validate [--json] [--software-release RELEASE] {FILE|-|--text PAYLOAD}
+azerlay profiles show [--json]
 ```
 
-出力例:
-
-```text
-Imported source: sha256:...
-Export version: 1.5.5
-Profiles: 1
-  1. Dune Awakening (41 inputs)
-Selected: Dune Awakening
-Warnings: 2
-```
-
-複数プロファイル時に非対話環境で選択指定がない場合、勝手に1つ選ばず、一覧と選択方法を返す。TTYでは選択UIを提供してもよい。
+current admissionはexactly Software 2.0.2である。`validate`はread-onlyで、
+`import`は成功時にoriginalとselectionを保存する。複数profileではone-based
+`--profile-index N`が必要であり、inputを再度渡す。`profiles show`はinputなしで
+保存済みselectionを表示し、cache recoveryもmemory内だけで行う。storage failureは
+`ERR_PROFILE_STORAGE`/`storage`、selectionなしは`ERR_PROFILE_NOT_FOUND`/`selection`、
+showの不正なsyntaxは`ERR_CLI_USAGE`/`usage`である。
 
 ### 17.4 `doctor`
 

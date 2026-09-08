@@ -316,9 +316,9 @@ It isn't full original Issue #42 support for legacy formats, analog, turbo, or
 executable and matchable macros, and it doesn't satisfy product acceptance
 AC-003.
 
-## CLI import and validation
+## CLI import, validation, and saved profiles
 
-The production CLI accepts these read-only forms:
+The production CLI accepts these forms:
 
 ```text
 azerlay validate [--json] [--software-release RELEASE] {FILE|-|--text PAYLOAD}
@@ -331,10 +331,59 @@ attributes the export with the exact `--software-release` value and its fixed
 That release attribution is separate from the raw root export `version`, which
 the report preserves as metadata and doesn't use to infer support.
 
-`validate` lists every fully normalized profile, including an empty list.
-`import` selects the sole profile when there is one. With multiple profiles,
-repeat the command with one-based `--profile-index N` and supply the input
-again. Selection is limited to that invocation and neither command saves state.
+`validate` lists every fully normalized profile, including an empty list, and
+never saves state. `import` selects the sole profile when there is one. With
+multiple profiles, repeat the command with one-based `--profile-index N` and
+supply the input again. The ordinal is source order, not an Azeron ID. Input,
+normalization, and selection are fully validated before import creates storage.
+A successful import saves the exact received input, complete normalized bundle,
+per-profile caches with their opaque raw references, and selected source and
+ordinal before it reports success.
+
+Saved state is displayed with this separate, input-free command:
+
+```text
+azerlay profiles show [--json]
+```
+
+It accepts no release, input, ID, or selector arguments. The command reads the
+committed catalog and selected ordinal, then loads the complete saved bundle.
+`Discover`, `Selected`, `Load`, and `profiles show` never create directories,
+locks, repairs, or selection changes. A missing, malformed, or incompatible
+derived cache is rebuilt only in memory from the committed original and its
+saved attribution. A missing or hash-mismatched original, corrupt index, or
+failed reconstruction is `ERR_PROFILE_STORAGE`; it never yields a partial
+result or reselects another source.
+
+The store is `$XDG_DATA_HOME/azerlay`, or `$HOME/.local/share/azerlay` when
+`XDG_DATA_HOME` is unset, empty, or relative. Its application-owned directories
+are `0700`; every file is `0600`:
+
+```text
+<data-home>/azerlay/
+  sources/<sha256>.azeron
+  profiles/<sha256>/bundle.json
+  profiles/<sha256>/p1.json ... pN.json
+  cache/source-index.json
+  cache/import.lock
+```
+
+`<sha256>` is the lowercase SHA-256 of exact received bytes before decoding or
+normalization. `pN` is a one-based source ordinal, not an Azeron ID. The index
+is the authoritative ordered catalog and selection. It records first-import
+provenance, time, decoder and normalizer interpretation revisions, model schema,
+profile count, and raw export-version token. Identical bytes from file, stdin,
+or text input deduplicate to one source while preserving that first metadata;
+byte-different inputs do not deduplicate. Cache envelopes describe the current
+interpretation revisions, so parser or adapter semantic changes must bump the
+relevant revision.
+
+Import serializes writers with the private lock and publishes the index last.
+Before that publication, a failure keeps the prior catalog and selection.
+After it, an output-delivery failure doesn't roll back the saved import. This is
+process-level atomic committed visibility, not a machine-power-loss durability
+guarantee. Interruption can leave private unreferenced files, which discovery
+ignores.
 
 With `--json`, each operation writes one schema version 1 object. A successful
 result has `schema_version`, `command`, `ok`, and a `result` containing root
@@ -342,6 +391,9 @@ kind, export version presence and value, ordered one-based profile rows,
 selected profile index, and warnings. Failures set `ok` false and provide an
 `error` with stable `code` and `stage`. Success exits 0, operation failures
 including selection failures exit 1, and invalid command arguments exit 2.
+Saved-store failures use `ERR_PROFILE_STORAGE` and stage `storage`; no saved
+selection uses `ERR_PROFILE_NOT_FOUND` and stage `selection`; invalid `profiles
+show` syntax uses `ERR_CLI_USAGE` and stage `usage`.
 
 Unknown binding outcomes are successful normalization. Each affected profile
 has an ordered `WARN_IMPORT_UNKNOWN_BINDINGS` warning with its one-based index
@@ -379,6 +431,8 @@ This boundary stops at owned JSON and provisional classification.
 - Issue #42 owns adapter admission, semantic interpretation, and enforcement of
   the 1,000-step macro ceiling before interpretation.
 - Issue #43 owns the production `import` and `validate` CLI surface.
+- Issue #21 owns saved imported originals, selected-profile recovery, and
+  `profiles show`; it doesn't add broader format admission.
 
 The decoder doesn't persist imports, expose private exports, define raw model
 fields, convert bindings, or provide production CLI usage. Export contents are
