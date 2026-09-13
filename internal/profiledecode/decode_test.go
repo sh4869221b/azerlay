@@ -97,7 +97,7 @@ func TestDecodeRejectsMalformedAndOverLimitInput(t *testing.T) {
 	binary.LittleEndian.PutUint64(wrongKnownSize[5:13], uint64(len("partial output must not be adopted")+1))
 	overCompressed := append([]byte(nil), completeLZMA...)
 	overCompressed = append(overCompressed, make([]byte, maxCompressedSize+1-len(overCompressed))...)
-	overOutput := mustCompressLZMARepeated(t, maxOutputSize+1, false)
+	overOutput := readLZMABoundaryFixture(t, "zeros-64mib-plus-one.lzma")
 	invalidUTF8 := encodeLZMATestText(mustCompressLZMA(t, msgpackString(t, 0xd9, []byte{0xff}), false))
 	malformedEnvelopeJSON := encodeSyntheticEnvelopeText(t, msgpackString(t, 0xd9, []byte(`{"profiles":`)))
 	trailingEnvelopeJSON := encodeSyntheticEnvelopeText(t, msgpackString(t, 0xd9, []byte(`{"profiles":[]} true`)))

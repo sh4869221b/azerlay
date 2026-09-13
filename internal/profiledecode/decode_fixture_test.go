@@ -2,12 +2,32 @@ package profiledecode
 
 import (
 	"encoding/base64"
+	"encoding/binary"
 	"errors"
 	"io"
+	"math"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 )
+
+func readLZMABoundaryFixture(t *testing.T, name string) []byte {
+	t.Helper()
+
+	compressed, err := os.ReadFile(filepath.Join("testdata", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(compressed) < 13 {
+		t.Fatalf("fixture %q has a short LZMA header", name)
+	}
+	if binary.LittleEndian.Uint64(compressed[5:13]) != math.MaxUint64 {
+		t.Fatalf("fixture %q must declare unknown output size", name)
+	}
+	return compressed
+}
 
 type failingReader struct {
 	cause error
