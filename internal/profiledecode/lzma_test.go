@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/binary"
-	"io"
 	"testing"
 
 	"github.com/ulikunitz/xz/lzma"
@@ -43,7 +42,7 @@ func TestDecodeLZMA_WhenCompleteUnknownSize_ReturnsEveryByte(t *testing.T) {
 }
 
 func TestDecodeLZMA_WhenComplete_AcceptsExactOutputLimit(t *testing.T) {
-	compressed := mustCompressLZMARepeated(t, maxOutputSize, false)
+	compressed := readLZMABoundaryFixture(t, "zeros-64mib.lzma")
 
 	got, err := decodeLZMA(compressed)
 
@@ -157,7 +156,7 @@ func TestDecodeLZMA_WhenLimitExceeded_RejectsBeforeAdoption(t *testing.T) {
 	binary.LittleEndian.PutUint64(overKnownSize[5:13], uint64(maxOutputSize)+1)
 	overCompressed := append([]byte(nil), complete...)
 	overCompressed = append(overCompressed, make([]byte, maxCompressedSize+1-len(overCompressed))...)
-	overOutput := mustCompressLZMARepeated(t, maxOutputSize+1, false)
+	overOutput := readLZMABoundaryFixture(t, "zeros-64mib-plus-one.lzma")
 	tests := []struct {
 		name       string
 		compressed []byte
@@ -235,32 +234,4 @@ func mustCompressLZMA(t *testing.T, payload []byte, knownSize bool) []byte {
 		t.Fatalf("Close() error = %v", err)
 	}
 	return destination.Bytes()
-}
-
-func mustCompressLZMARepeated(t *testing.T, size int, knownSize bool) []byte {
-	t.Helper()
-
-	var destination bytes.Buffer
-	config := lzma.WriterConfig{DictCap: lzma.MinDictCap, SizeInHeader: knownSize, EOSMarker: true}
-	if knownSize {
-		config.Size = int64(size)
-	}
-	writer, err := config.NewWriter(&destination)
-	if err != nil {
-		t.Fatalf("NewWriter() error = %v", err)
-	}
-	if _, err := io.CopyN(writer, zeroReader{}, int64(size)); err != nil {
-		t.Fatalf("CopyN() error = %v", err)
-	}
-	if err := writer.Close(); err != nil {
-		t.Fatalf("Close() error = %v", err)
-	}
-	return destination.Bytes()
-}
-
-type zeroReader struct{}
-
-func (zeroReader) Read(destination []byte) (int, error) {
-	clear(destination)
-	return len(destination), nil
 }
