@@ -3,6 +3,13 @@ module github.com/sh4869221b/azerlay
 go 1.27.0
 
 require (
+	github.com/fswatcher/fswatcher v0.1.0
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/ulikunitz/xz v0.5.16
+)
+
+require (
+	github.com/ebitengine/purego v0.10.0 // indirect
+	golang.org/x/sys v0.44.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 )
