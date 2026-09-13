@@ -9,6 +9,9 @@ exports. A successful `import` saves the exact export and a one-based selected
 profile ordinal; `profiles show` reads that saved selection in a later process.
 Device and overlay functionality is not implemented yet.
 
+An internal configuration package loads, validates, and watches TOML settings
+with last-good reload preservation. It is not connected to the CLI yet.
+
 The initial supported target is Linux/Wayland on x86-64 with Azeron Cyborg II,
 Niri or Hyprland, and a Bodycam game profile.
 
@@ -78,6 +81,7 @@ content. The raw export version is reported metadata. It isn't the
 - [System design and research](docs/design-research.md)
 - [Architecture principles](docs/architecture.md)
 - [Security principles](docs/security.md)
+- [Configuration schema and reload behavior](docs/config.md)
 - [GitHub roadmap](https://github.com/sh4869221b/azerlay/milestone/1)
 
 ## License
