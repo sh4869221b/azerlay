@@ -46,7 +46,10 @@ type configLoader func(context.Context) (Config, []Warning, error)
 func newManager(ctx context.Context, load configLoader, events <-chan managerEvent) (*Manager, <-chan error) {
 	m := &Manager{changes: make(chan struct{}, 1), done: make(chan struct{})}
 	ready := make(chan error, 1)
-	go m.run(ctx, load, events, ready)
+	go func() {
+		m.run(ctx, load, events, ready)
+		close(m.done)
+	}()
 	return m, ready
 }
 
@@ -95,7 +98,6 @@ func (m *Manager) run(ctx context.Context, load configLoader, events <-chan mana
 		<-workerDone
 		close(ready)
 		close(m.changes)
-		close(m.done)
 	}()
 	state := Snapshot{Status: Status{RequestGeneration: 1}}
 	pending, eligible, active := true, true, false
