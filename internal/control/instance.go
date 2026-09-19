@@ -53,6 +53,10 @@ func acquireInstance(ctx context.Context, runtime string, timeout time.Duration)
 			return nil, nil, transportError(ctx, err)
 		}
 		status, _, err := instanceStatus(ctx, path, timeout)
+		var failure *Error
+		if errors.As(err, &failure) && failure.Code == ERR_CONTROL_PERMISSION {
+			err = NewError(ERR_CONTROL_UNAVAILABLE)
+		}
 		return nil, status, err
 	}
 	if ctx.Err() != nil {

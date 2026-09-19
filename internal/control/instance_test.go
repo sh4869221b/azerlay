@@ -88,6 +88,41 @@ func TestInstanceDuplicate(t *testing.T) {
 	}
 }
 
+func TestInstanceContendedStarting(t *testing.T) {
+	t.Parallel()
+	runtime := socketRuntime(t)
+	instanceOwner(t, runtime)
+	server, err := start(t.Context(), socketController(t), runtime, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { server.Close() })
+	path := filepath.Join(runtime, "azerlay/control.sock")
+	if err := os.Chmod(path, 0660); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.Lstat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner, status, err := acquireInstance(t.Context(), runtime, time.Second)
+	requireControlError(t, err, ERR_CONTROL_UNAVAILABLE)
+	if owner != nil || status != nil {
+		t.Fatal("contender acquired a starting instance")
+	}
+	after, err := os.Lstat(path)
+	if err != nil || !os.SameFile(before, after) || after.Mode() != before.Mode() {
+		t.Fatalf("contender changed starting socket: %v", err)
+	}
+	if err := os.Chmod(path, 0600); err != nil {
+		t.Fatal(err)
+	}
+	owner, status, err = acquireInstance(t.Context(), runtime, time.Second)
+	if err != nil || owner != nil || status == nil {
+		t.Fatalf("ready duplicate = %v, %v, %v", owner, status, err)
+	}
+}
+
 func TestInstanceStale(t *testing.T) {
 	t.Parallel()
 	runtime := socketRuntime(t)
