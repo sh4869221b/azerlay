@@ -117,7 +117,9 @@ func awaitSnapshot(t *testing.T, ctx context.Context, m *Manager, match func(Sna
 func TestConfigReload(t *testing.T) {
 	t.Parallel()
 	m, events, loads, ctx, _ := startTestManager(t, candidate{config: configNamed("A")})
-	sendManagerEvent(t, ctx, events, managerEvent{kind: requestReload})
+	if generation, err := m.RequestReload(ctx); err != nil || generation != 2 {
+		t.Fatalf("reload acceptance: generation=%d err=%v", generation, err)
+	}
 	completeLoad(t, ctx, nextLoad(t, ctx, loads), candidate{err: &Error{Code: ERR_CONFIG_INVALID, Stage: "decode", Reason: "invalid TOML or field type", Cause: errors.New("private TOML secret")}})
 	s := awaitSnapshot(t, ctx, m, func(s Snapshot) bool { return s.Status.ConfigFailure.Code != "" })
 	if s.Config.Profile.SelectedID != "A" || s.Status.ConfigGeneration != 1 || s.Status.RequestGeneration != 2 || s.Status.ConfigFailure.Stage != "decode" {
@@ -128,12 +130,97 @@ func TestConfigReload(t *testing.T) {
 	}
 	watch := Diagnostic{Code: ERR_CONFIG_INVALID, Stage: "watch", Reason: "watch failed"}
 	sendManagerEvent(t, ctx, events, managerEvent{kind: reportWatchFailure, failure: watch})
-	sendManagerEvent(t, ctx, events, managerEvent{kind: requestReload})
+	if generation, err := m.RequestReload(ctx); err != nil || generation != 3 {
+		t.Fatalf("recovery acceptance: generation=%d err=%v", generation, err)
+	}
 	completeLoad(t, ctx, nextLoad(t, ctx, loads), candidate{config: configNamed("C")})
 	s = awaitSnapshot(t, ctx, m, func(s Snapshot) bool { return s.Status.ConfigGeneration == 3 })
 	if s.Config.Profile.SelectedID != "C" || s.Status.ConfigFailure != (Diagnostic{}) || s.Status.WatchFailure != watch {
 		t.Fatalf("recovery state: %+v", s)
 	}
+}
+
+func TestConfigManualReload(t *testing.T) {
+	t.Run("acceptance-and-coalescing", func(t *testing.T) {
+		t.Parallel()
+		for _, stale := range []candidate{{config: configNamed("obsolete")}, {err: &Error{Code: ERR_CONFIG_INVALID, Stage: "decode", Reason: "invalid TOML or field type"}}} {
+			t.Run(fmt.Sprint(stale.err != nil), func(t *testing.T) {
+				m, events, loads, ctx, _ := startTestManager(t, candidate{config: configNamed("A")})
+				generation, err := m.RequestReload(ctx)
+				if err != nil || generation != 2 {
+					t.Fatalf("acceptance: generation=%d err=%v", generation, err)
+				}
+				active := nextLoad(t, ctx, loads)
+				sendManagerEvent(t, ctx, events, managerEvent{kind: observeReload})
+				for want := uint64(4); want <= 6; want++ {
+					generation, err = m.RequestReload(ctx)
+					if err != nil || generation != want {
+						t.Fatalf("pending acceptance: generation=%d want=%d err=%v", generation, want, err)
+					}
+				}
+				completeLoad(t, ctx, active, stale)
+				latest := nextLoad(t, ctx, loads)
+				if s := m.Snapshot(); s.Status.ConfigGeneration != 1 || s.Config.Profile.SelectedID != "A" || s.Status.ConfigFailure != (Diagnostic{}) {
+					t.Fatalf("stale result published: %+v", s)
+				}
+				completeLoad(t, ctx, latest, candidate{config: configNamed("latest")})
+				s := awaitSnapshot(t, ctx, m, func(s Snapshot) bool { return s.Status.ConfigGeneration == generation })
+				if s.Config.Profile.SelectedID != "latest" {
+					t.Fatal("latest manual reload did not publish")
+				}
+			})
+		}
+	})
+	t.Run("real-file-and-watch", func(t *testing.T) {
+		t.Parallel()
+		path, m, ctx, _ := watchFixture(t)
+		generation, err := m.RequestReload(ctx)
+		if err != nil || generation != 2 {
+			t.Fatalf("real-file acceptance: generation=%d err=%v", generation, err)
+		}
+		awaitSnapshot(t, ctx, m, func(s Snapshot) bool { return s.Status.ConfigGeneration == generation })
+		writeWatchConfig(t, path, "watched")
+		awaitWatchName(t, ctx, m, "watched")
+	})
+	t.Run("cancelled-and-stopped", func(t *testing.T) {
+		t.Parallel()
+		m, _, loads, ctx, cancel := startTestManager(t, candidate{config: configNamed("A")})
+		requestCtx, cancelRequest := context.WithCancel(ctx)
+		cancelRequest()
+		if generation, err := m.RequestReload(requestCtx); generation != 0 || !errors.Is(err, context.Canceled) {
+			t.Fatalf("cancelled acceptance: generation=%d err=%v", generation, err)
+		}
+		if generation, err := m.RequestReload(ctx); err != nil || generation != 2 {
+			t.Fatalf("cancelled request changed generation: generation=%d err=%v", generation, err)
+		}
+		nextLoad(t, ctx, loads)
+		cancel()
+		waitWatchDone(t, m.Done())
+		if generation, err := m.RequestReload(t.Context()); generation != 0 || !errors.Is(err, context.Canceled) {
+			t.Fatalf("stopped acceptance: generation=%d err=%v", generation, err)
+		}
+	})
+	t.Run("concurrent-cancellation", func(t *testing.T) {
+		t.Parallel()
+		m, _, _, ctx, cancel := startTestManager(t, candidate{config: configNamed("A")})
+		requestCtx, cancelRequest := context.WithCancel(ctx)
+		var requests sync.WaitGroup
+		for range 32 {
+			requests.Go(func() {
+				generation, err := m.RequestReload(requestCtx)
+				if err != nil && !errors.Is(err, context.Canceled) || err == nil && generation < 2 {
+					t.Errorf("racing acceptance: generation=%d err=%v", generation, err)
+				}
+			})
+		}
+		cancelRequest()
+		requests.Wait()
+		if _, err := m.RequestReload(ctx); err != nil {
+			t.Fatalf("cancelled caller blocked manager: %v", err)
+		}
+		cancel()
+		waitWatchDone(t, m.Done())
+	})
 }
 
 func TestConfigStaleReload(t *testing.T) {

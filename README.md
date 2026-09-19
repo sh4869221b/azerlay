@@ -10,7 +10,12 @@ profile ordinal; `profiles show` reads that saved selection in a later process.
 Device and overlay functionality is not implemented yet.
 
 An internal configuration package loads, validates, and watches TOML settings
-with last-good reload preservation. It is not connected to the CLI yet.
+with last-good reload preservation. A same-user control socket and CLI can
+change requested visibility, request configuration reloads, select an active
+profile for the session, report status, and stop the control server.
+The server currently starts through an internal API used by integration tests;
+public `run`/startup, duplicate-instance handling, and stale-socket recovery
+remain [issue #25](https://github.com/sh4869221b/azerlay/issues/25).
 
 The initial supported target is Linux/Wayland on x86-64 with Azeron Cyborg II,
 Niri or Hyprland, and a Bodycam game profile.
@@ -76,12 +81,41 @@ include IDs, labels, bindings, macros, unknown fields, or other private export
 content. The raw export version is reported metadata. It isn't the
 `--software-release` attribution and doesn't establish Software support.
 
+## Control CLI
+
+These commands require an already running control server:
+
+```sh
+azerlay show
+azerlay hide
+azerlay toggle
+azerlay reload --json
+azerlay status --json
+azerlay profiles select -- "Bodycam"
+azerlay quit
+```
+
+Every control command supports `--json` and `--help`; help does not connect.
+`show`, `hide`, and `toggle` change requested visibility only: there is no
+renderer yet. Status reports device, input, and rendering capabilities as
+unavailable. A successful status response can still describe degraded state.
+
+`reload` acknowledges acceptance; inspect `status` for the eventual configuration
+result. `profiles select` requires an exact, unique imported profile ID or name.
+Its session-only selection survives configuration reloads and leaves persisted
+selection unchanged; `profiles show` continues to show the saved selection.
+The next controller initialization uses configuration and saved selection again.
+
+See the [control protocol](docs/control-protocol.md) for socket permissions,
+framing, status fields, errors, and lifecycle boundaries.
+
 ## Project documents
 
 - [System design and research](docs/design-research.md)
 - [Architecture principles](docs/architecture.md)
 - [Security principles](docs/security.md)
 - [Configuration schema and reload behavior](docs/config.md)
+- [Control protocol and CLI](docs/control-protocol.md)
 - [GitHub roadmap](https://github.com/sh4869221b/azerlay/milestone/1)
 
 ## License

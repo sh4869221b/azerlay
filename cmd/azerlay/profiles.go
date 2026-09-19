@@ -17,7 +17,8 @@ Options:
   --json  Print schema-versioned JSON
   --help  Print this help without accessing storage
 
-No state is saved. Missing or incompatible caches are recovered in memory.`
+No state is saved. Missing or incompatible caches are recovered in memory.
+Use azerlay profiles select --help to change the active session selection.`
 
 func runProfiles(jsonMode, help bool, stdout, stderr io.Writer) int {
 	report := operationReport{SchemaVersion: 1, Command: "profiles show"}

@@ -22,6 +22,8 @@ type Snapshot struct {
 }
 
 type Manager struct {
+	ctx      context.Context
+	events   chan<- managerEvent
 	mu       sync.Mutex
 	snapshot Snapshot
 	changes  chan struct{}
@@ -38,13 +40,15 @@ const (
 )
 
 type managerEvent struct {
-	kind    managerEventKind
-	failure Diagnostic
+	kind     managerEventKind
+	failure  Diagnostic
+	ctx      context.Context
+	accepted chan<- uint64
 }
 type configLoader func(context.Context) (Config, []Warning, error)
 
-func newManager(ctx context.Context, load configLoader, events <-chan managerEvent) (*Manager, <-chan error) {
-	m := &Manager{changes: make(chan struct{}, 1), done: make(chan struct{})}
+func newManager(ctx context.Context, load configLoader, events chan managerEvent) (*Manager, <-chan error) {
+	m := &Manager{ctx: ctx, events: events, changes: make(chan struct{}, 1), done: make(chan struct{})}
 	ready := make(chan error, 1)
 	go func() {
 		m.run(ctx, load, events, ready)
@@ -62,6 +66,35 @@ func (m *Manager) Snapshot() Snapshot {
 }
 func (m *Manager) Changes() <-chan struct{} { return m.changes }
 func (m *Manager) Done() <-chan struct{}    { return m.done }
+
+// RequestReload returns the accepted generation without waiting for its load.
+// Cancellation racing acceptance does not undo the accepted request.
+func (m *Manager) RequestReload(ctx context.Context) (uint64, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	accepted := make(chan uint64, 1)
+	event := managerEvent{kind: requestReload, ctx: ctx, accepted: accepted}
+	select {
+	case m.events <- event:
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	case <-m.ctx.Done():
+		return 0, m.ctx.Err()
+	case <-m.done:
+		return 0, context.Canceled
+	}
+	select {
+	case generation := <-accepted:
+		return generation, nil
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	case <-m.ctx.Done():
+		return 0, m.ctx.Err()
+	case <-m.done:
+		return 0, context.Canceled
+	}
+}
 
 type loadResult struct {
 	generation uint64
@@ -125,7 +158,7 @@ func (m *Manager) run(ctx context.Context, load configLoader, events <-chan mana
 				events = nil
 				continue
 			}
-			if ctx.Err() != nil {
+			if ctx.Err() != nil || event.ctx != nil && event.ctx.Err() != nil {
 				continue
 			}
 			switch event.kind {
@@ -139,6 +172,9 @@ func (m *Manager) run(ctx context.Context, load configLoader, events <-chan mana
 				state.Status.WatchFailure = event.failure
 			}
 			m.publish(state)
+			if event.accepted != nil {
+				event.accepted <- state.Status.RequestGeneration
+			}
 		case result := <-results:
 			active = false
 			if ctx.Err() != nil || result.generation != state.Status.RequestGeneration {

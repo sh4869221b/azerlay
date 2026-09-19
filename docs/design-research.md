@@ -1438,6 +1438,7 @@ Hyprland/Niriのキーバインドやスクリプトから、動作中Azerlayを
 ### 18.2 プロトコル
 
 Unix Domain Socket上のJSON Lines、protocol version 1。
+実装済みの契約とCLIの提供範囲は[control-protocol.md](control-protocol.md)を参照。
 
 Request例:
 
@@ -1448,14 +1449,14 @@ Request例:
 Response例:
 
 ```json
-{"version":1,"id":"42","ok":true,"result":{"visible":false}}
+{"version":1,"id":"42","ok":true,"result":{"visible":false},"error":null}
 ```
 
 ### 18.3 セキュリティ
 
 - socket mode 0600
 - runtime directory mode 0700
-- peer credentialを取得可能なら同一UIDを検証
+- LinuxのSO_PEERCREDで双方の同一UIDを必須検証
 - request最大64 KiB
 - 1接続あたりtimeout
 - 任意ファイル読込やshell実行メソッドを公開しない

@@ -1,9 +1,11 @@
 # Configuration
 
 `internal/config` loads and validates schema-versioned TOML settings and watches
-for changes. It is an internal Go package; the CLI does not consume these settings
-or provide `run`, `reload`, or `status` commands. Accepted device, input, profile,
-and overlay values describe configuration, not implemented runtime backends.
+for changes. The internal control server uses an initialized configuration
+manager; CLI `reload` and `status` communicate with that server. Public `run`
+and startup remain issue #25. Accepted device, input, and overlay values describe
+configuration, not implemented runtime backends. See the
+[control protocol](control-protocol.md) for the runtime contract.
 
 ## File location
 
@@ -66,7 +68,20 @@ must match the listed spelling exactly.
 | `profile.watch` | `true` | Future profile-source watch setting; boolean. |
 
 The loader does not resolve `selected_id` through the saved import catalog or
-change the saved selection. `profile.watch = false` does not disable
+change the saved selection. On controller initialization, `source = "auto"` or
+`"imported"` uses saved imports. A nonempty `selected_id` must match exactly one
+normalized profile ID across those sources. When `selected_id` is empty, the
+controller uses the saved source and one-based profile ordinal. Missing,
+ambiguous, or corrupt data
+leaves no active profile and is reported as degraded status. `source = "local"`
+is unavailable and never falls back to imported profiles.
+
+`profiles select` changes only the active session selection. Neither explicit
+nor watcher-driven configuration reload changes that selection or its initial
+source policy. Changed profile settings take effect on the next controller
+initialization; a controller initialized with `source = "local"` requires a
+restart before imported selection becomes available. `profiles show` continues
+to read the saved selection. `profile.watch = false` does not disable
 configuration watching.
 
 ### Overlay
@@ -122,6 +137,14 @@ Relevant events debounce for 200 ms after the latest event. Events received
 during loading request another current load. There is at most one active load
 and one latest pending request. Configuration watching operates independently
 of `profile.watch`.
+
+`Manager.RequestReload(ctx)` enters the same reload event loop and returns the
+request generation once accepted, before parsing completes. CLI `reload`
+reports this acceptance as `{accepted:true,request_generation:N}`. Use
+`status.last_reload` (inside the JSON report's `result`) to inspect request and
+committed configuration generations and failures. A retained failure can belong
+to an earlier attempt while another request is pending; acceptance is not proof
+of successful application.
 
 Each reload validates a complete candidate before publishing it atomically with
 its warnings. A missing or invalid file retains the last good configuration and
