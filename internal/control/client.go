@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"os"
+	"syscall"
 	"time"
 )
 
@@ -17,24 +18,31 @@ func Call(ctx context.Context, method Method, params Params) (Response, error) {
 }
 
 func call(ctx context.Context, runtime string, method Method, params Params, timeout time.Duration) (Response, error) {
+	path, err := socketPath(runtime, false)
+	if err != nil {
+		return Response{}, err
+	}
+	response, _, err := callPath(ctx, path, method, params, timeout)
+	return response, err
+}
+
+// The boolean identifies dial-time refusal only; later exchange failures cannot
+// establish that a socket is stale.
+func callPath(ctx context.Context, path string, method Method, params Params, timeout time.Duration) (Response, bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	request := Request{Version: ProtocolVersion, ID: "1", Method: method, Params: params}
 	data, err := EncodeRequest(request)
 	if err != nil {
-		return Response{}, err
-	}
-	path, err := socketPath(runtime, false)
-	if err != nil {
-		return Response{}, err
+		return Response{}, false, err
 	}
 	if err := privatePath(path, os.ModeSocket|0600); err != nil {
-		return Response{}, transportError(ctx, err)
+		return Response{}, false, transportError(ctx, err)
 	}
 	var dialer net.Dialer
 	connection, err := dialer.DialContext(ctx, "unix", path)
 	if err != nil {
-		return Response{}, transportError(ctx, err)
+		return Response{}, ctx.Err() == nil && errors.Is(err, syscall.ECONNREFUSED), transportError(ctx, err)
 	}
 	conn := connection.(*net.UnixConn)
 	defer conn.Close()
@@ -42,19 +50,19 @@ func call(ctx context.Context, runtime string, method Method, params Params, tim
 	defer stop()
 	deadline, _ := ctx.Deadline()
 	if err := conn.SetDeadline(deadline); err != nil {
-		return Response{}, transportError(ctx, err)
+		return Response{}, false, transportError(ctx, err)
 	}
 	if err := checkPeer(conn); err != nil {
-		return Response{}, err
+		return Response{}, false, err
 	}
 	if _, err := conn.Write(data); err != nil {
-		return Response{}, transportError(ctx, err)
+		return Response{}, false, transportError(ctx, err)
 	}
 	response, err := ReadResponse(conn, request)
 	if err != nil {
-		return Response{}, transportError(ctx, err)
+		return Response{}, false, transportError(ctx, err)
 	}
-	return response, nil
+	return response, false, nil
 }
 
 func transportError(ctx context.Context, err error) *Error {

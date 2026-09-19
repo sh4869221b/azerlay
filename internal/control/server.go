@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// Server owns only its listener, accepted connections, and created socket.
+// Server owns its transport and joins optional config cleanup before removing its socket.
 type Server struct {
 	cancel   context.CancelFunc
 	done     chan struct{}
@@ -27,6 +27,13 @@ func start(ctx context.Context, controller *Controller, runtime string, timeout 
 	path, err := socketPath(runtime, true)
 	if err != nil {
 		return nil, err
+	}
+	return startPath(ctx, controller, path, timeout, nil)
+}
+
+func startPath(ctx context.Context, controller *Controller, path string, timeout time.Duration, stopConfig func()) (*Server, error) {
+	if ctx.Err() != nil {
+		return nil, transportError(ctx, ctx.Err())
 	}
 	if _, err := os.Lstat(path); !errors.Is(err, os.ErrNotExist) {
 		return nil, NewError(ERR_CONTROL_UNAVAILABLE)
@@ -70,6 +77,9 @@ func start(ctx context.Context, controller *Controller, runtime string, timeout 
 		listener.Close()
 		<-accepted
 		handlers.Wait()
+		if stopConfig != nil {
+			stopConfig()
+		}
 		server.closeErr = removeOwnedSocket(path, created)
 		close(server.done)
 	}()

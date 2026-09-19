@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"slices"
 
 	"github.com/urfave/cli/v3"
@@ -13,6 +14,7 @@ import (
 var version = "dev"
 
 func main() {
+	runtime.LockOSThread()
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }
 
@@ -40,7 +42,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	root := command("azerlay", func(cmd *cli.Command) int {
 		if len(args) == 1 && args[0] == "--help" && cmd.IsSet("help") {
-			if _, err := fmt.Fprintln(stdout, "Usage: azerlay <command>\n\nCommands:\n  version  Print version information\n  validate Validate a profile export without saving state\n  import   Save an export and profile selection\n  profiles Show saved or select active profiles\n  show     Request overlay visibility\n  hide     Request overlay hidden\n  toggle   Toggle requested visibility\n  reload   Request configuration reload\n  status   Show running instance status\n  quit     Stop the running control server\n\n"+validateHelp+"\n\n"+importHelp+"\n\n"+profilesHelp); err != nil {
+			if _, err := fmt.Fprintln(stdout, "Usage: azerlay <command>\n\nCommands:\n  version  Print version information\n  validate Validate a profile export without saving state\n  import   Save an export and profile selection\n  profiles Show saved or select active profiles\n  run      Run the application in foreground\n  show     Request overlay visibility\n  hide     Request overlay hidden\n  toggle   Toggle requested visibility\n  reload   Request configuration reload\n  status   Show running instance status\n  quit     Stop the running application\n\n"+validateHelp+"\n\n"+importHelp+"\n\n"+profilesHelp+"\n\n"+runHelp); err != nil {
 				return 1
 			}
 			return 0
@@ -60,6 +62,21 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 0
 	})}
 	prepareArgs := make(map[*cli.Command]func([]string) ([]string, bool))
+	foreground := command("run", func(cmd *cli.Command) int {
+		return runApplication(cmd, stdout, stderr)
+	})
+	foreground.Flags = []cli.Flag{
+		&cli.StringFlag{Name: "config", Local: true},
+		&cli.BoolFlag{Name: "foreground", Local: true},
+		&helpFlag{BoolFlag: cli.BoolFlag{Name: "help", Local: true}},
+	}
+	prepareArgs[foreground] = func(original []string) ([]string, bool) {
+		usage = func() int {
+			return writeRunFailure(&reportError{"ERR_CLI_USAGE", "usage", "Invalid command arguments.", "Use run --help for usage."}, stdout, stderr)
+		}
+		return normalizeRunArgs(original)
+	}
+	root.Commands = append(root.Commands, foreground)
 	for _, name := range []string{"validate", "import"} {
 		leaf := command(name, func(cmd *cli.Command) int {
 			options, valid := exportCommandOptions(cmd)

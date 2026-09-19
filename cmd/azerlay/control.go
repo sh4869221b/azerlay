@@ -60,7 +60,7 @@ func runControl(cmd *cli.Command, stdout, stderr io.Writer) int {
 			detail = "Accept a configuration reload request. Check status for the eventual result."
 		}
 		if cmd.Name == "quit" {
-			detail = "Stop the running control server after acknowledging the request."
+			detail = "Stop the running application after acknowledging the request."
 		}
 		if cmd.Name == "status" {
 			detail = "Show active runtime state and unavailable capabilities."

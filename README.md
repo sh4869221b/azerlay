@@ -12,10 +12,9 @@ Device and overlay functionality is not implemented yet.
 An internal configuration package loads, validates, and watches TOML settings
 with last-good reload preservation. A same-user control socket and CLI can
 change requested visibility, request configuration reloads, select an active
-profile for the session, report status, and stop the control server.
-The server currently starts through an internal API used by integration tests;
-public `run`/startup, duplicate-instance handling, and stale-socket recovery
-remain [issue #25](https://github.com/sh4869221b/azerlay/issues/25).
+profile for the session, report status, and stop the application. `run` starts
+the application in foreground, coordinates duplicate starts, and safely recovers
+stale control sockets.
 
 The initial supported target is Linux/Wayland on x86-64 with Azeron Cyborg II,
 Niri or Hyprland, and a Bodycam game profile.
@@ -81,7 +80,43 @@ include IDs, labels, bindings, macros, unknown fields, or other private export
 content. The raw export version is reported metadata. It isn't the
 `--software-release` attribution and doesn't establish Software support.
 
-## Control CLI
+## Run and control CLI
+
+Create a configuration file, for example `config.toml`, containing:
+
+```toml
+schema_version = 1
+```
+
+Start in a Wayland session with a valid `XDG_RUNTIME_DIR`:
+
+```sh
+azerlay run --config config.toml --foreground
+```
+
+Foreground execution is the default; omitting `--foreground` has the same effect.
+Without `--config`, the [default configuration path](docs/config.md#file-location)
+is used. Missing or invalid configuration is fatal; Azerlay does not create it.
+Startup requires nonempty `WAYLAND_DISPLAY`; this checks the environment only,
+not compositor connectivity or Layer Shell support.
+
+`run` prints initial text status and stays running. With no saved profile, status
+has `active_profile:null` and degraded reasons, and startup prints guidance to
+import a supported profile and use `status` and `profiles select`. No device or
+renderer backend is available yet. A second `run` against a responsive instance
+prints its status and exits 0 without loading the second invocation's config.
+
+From another terminal, inspect status and stop the application:
+
+```sh
+azerlay status --json
+azerlay quit
+```
+
+`quit`, SIGINT, and SIGTERM stop the foreground process with exit 0 after cleanup.
+Startup, runtime cleanup, or output failures exit 1; invalid arguments exit 2.
+`run` supports `--config PATH` (also `--config=PATH`), `--foreground`, and
+`--help`, but not `--json`.
 
 These commands require an already running control server:
 

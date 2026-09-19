@@ -1,17 +1,18 @@
 # Configuration
 
 `internal/config` loads and validates schema-versioned TOML settings and watches
-for changes. The internal control server uses an initialized configuration
-manager; CLI `reload` and `status` communicate with that server. Public `run`
-and startup remain issue #25. Accepted device, input, and overlay values describe
-configuration, not implemented runtime backends. See the
+for changes. `azerlay run [--config PATH] [--foreground]` starts the configuration
+manager and control server; CLI `reload` and `status` communicate with that
+server. Accepted device, input, and overlay values describe configuration, not
+implemented runtime backends. See the
 [control protocol](control-protocol.md) for the runtime contract.
 
 ## File location
 
-`ResolvePath`, `Load`, and `Start` accept an explicit path. A nonempty path takes
-precedence and is cleaned and resolved to an absolute path; relative paths use
-the current working directory. `Start` resolves the location once.
+`run --config PATH` and the internal `ResolvePath`, `Load`, and `Start` APIs
+accept an explicit path. A nonempty path takes precedence and is cleaned and
+resolved to an absolute path; relative paths use the current working directory.
+`Start` resolves the location once.
 
 Without an explicit path, the location is `$XDG_CONFIG_HOME/azerlay/config.toml`
 when `XDG_CONFIG_HOME` is absolute. If it is unset, empty, or relative, the
@@ -23,7 +24,9 @@ A missing file or ancestor returns `ERR_CONFIG_NOT_FOUND`, for both explicit
 and default paths. This includes a missing parent encountered while preparing
 the initial watch. Other read or watch setup failures return
 `ERR_CONFIG_INVALID`. An initial failure returns no usable manager and closes
-any resources opened for it.
+any resources opened for it. Starting a new `run` instance requires a valid file;
+a missing saved profile is allowed and reported in status. A duplicate `run`
+that receives an existing instance's status exits without loading configuration.
 
 ## Schema and defaults
 

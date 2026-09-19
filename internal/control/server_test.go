@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -298,5 +299,143 @@ func TestControlShutdownPreservesReplacement(t *testing.T) {
 	data, err := os.ReadFile(path)
 	if err != nil || string(data) != "replacement" {
 		t.Fatalf("replacement removed: %q %v", data, err)
+	}
+}
+
+func TestControlShutdownManaged(t *testing.T) {
+	t.Parallel()
+	for _, cause := range []string{"cancel", "close", "quit"} {
+		t.Run(cause, func(t *testing.T) {
+			t.Parallel()
+			runtime := socketRuntime(t)
+			owner := instanceOwner(t, runtime)
+			controller := socketController(t)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			entered, release := make(chan struct{}), make(chan struct{})
+			releaseConfig := sync.OnceFunc(func() { close(release) })
+			var calls atomic.Int32
+			server, err := owner.Start(ctx, controller, func() {
+				if calls.Add(1) == 1 {
+					close(entered)
+				}
+				select {
+				case <-release:
+				case <-time.After(3 * time.Second):
+					t.Error("config cleanup was not released")
+				}
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() {
+				releaseConfig()
+				if err := server.Close(); err != nil {
+					t.Error(err)
+				}
+			})
+			conn := socketConnect(t, runtime)
+			if _, err := io.WriteString(conn, `{"version":1`); err != nil {
+				t.Fatal(err)
+			}
+			if response, err := call(t.Context(), runtime, MethodStatus, Params{}, time.Second); err != nil || !response.OK {
+				t.Fatalf("status: %+v %v", response, err)
+			}
+			closed := make(chan error, 1)
+			switch cause {
+			case "cancel":
+				cancel()
+			case "close":
+				go func() { closed <- server.Close() }()
+			case "quit":
+				response, err := call(t.Context(), runtime, MethodQuit, Params{}, time.Second)
+				if err != nil || !response.OK || !response.Result.(QuitResult).Quitting {
+					t.Fatalf("quit: %+v %v", response, err)
+				}
+			}
+			select {
+			case <-entered:
+			case <-time.After(3 * time.Second):
+				t.Fatal("config cleanup did not start")
+			}
+			if err := privatePath(owner.path, os.ModeSocket|0600); err != nil {
+				t.Fatalf("socket removed before config cleanup: %v", err)
+			}
+			select {
+			case <-server.Done():
+				t.Fatal("Done closed before config cleanup")
+			case err := <-closed:
+				t.Fatalf("Close returned before config cleanup: %v", err)
+			default:
+			}
+			var data [1]byte
+			if n, err := conn.Read(data[:]); n != 0 || err == nil {
+				t.Fatalf("partial connection remains: %d %v", n, err)
+			} else if timeout, ok := err.(net.Error); ok && timeout.Timeout() {
+				t.Fatalf("partial connection was not closed: %v", err)
+			}
+			if _, err := call(t.Context(), runtime, MethodShow, Params{}, time.Second); err == nil {
+				t.Fatal("listener accepted a new request during config cleanup")
+			}
+			if controllerStatus(t, controller).Visible {
+				t.Fatal("request dispatched during config cleanup")
+			}
+			releaseConfig()
+			awaitSocketDone(t, server)
+			if cause == "close" {
+				if err := <-closed; err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := server.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if calls.Load() != 1 {
+				t.Fatalf("config cleanup called %d times", calls.Load())
+			}
+			if _, err := os.Lstat(owner.path); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("socket remains: %v", err)
+			}
+			other, status, err := acquireInstance(t.Context(), runtime, time.Second)
+			if other != nil {
+				other.Close()
+				t.Fatal("server cleanup released instance ownership")
+			}
+			if status != nil || err == nil {
+				t.Fatalf("contending acquisition: %v %v", status, err)
+			}
+		})
+	}
+}
+
+func TestControlShutdownManagedStartupFailure(t *testing.T) {
+	t.Parallel()
+	for _, cause := range []string{"cancel", "occupied"} {
+		t.Run(cause, func(t *testing.T) {
+			t.Parallel()
+			owner := instanceOwner(t, socketRuntime(t))
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if cause == "cancel" {
+				cancel()
+			} else if err := os.WriteFile(owner.path, []byte("replacement"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			var calls atomic.Int32
+			server, err := owner.Start(ctx, socketController(t), func() { calls.Add(1) })
+			if server != nil {
+				server.Close()
+				t.Fatal("startup unexpectedly succeeded")
+			}
+			if err == nil || calls.Load() != 0 {
+				t.Fatalf("startup error = %v; cleanup calls = %d", err, calls.Load())
+			}
+			if cause == "occupied" {
+				data, err := os.ReadFile(owner.path)
+				if err != nil || string(data) != "replacement" {
+					t.Fatalf("occupied path changed: %q %v", data, err)
+				}
+			}
+		})
 	}
 }
