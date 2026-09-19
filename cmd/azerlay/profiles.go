@@ -19,32 +19,9 @@ Options:
 
 No state is saved. Missing or incompatible caches are recovered in memory.`
 
-func runProfiles(args []string, stdout, stderr io.Writer) int {
-	jsonMode, help := false, false
-	valid := len(args) > 0 && args[0] == "show"
-	for i, arg := range args {
-		if i == 0 && arg == "show" {
-			continue
-		}
-		switch arg {
-		case "--json":
-			valid = valid && !jsonMode
-			jsonMode = true
-		case "--help":
-			valid = valid && !help
-			help = true
-		default:
-			valid = false
-		}
-	}
-	// The group help is the same minimal surface as show help.
-	if len(args) == 1 && args[0] == "--help" {
-		valid = true
-	}
+func runProfiles(jsonMode, help bool, stdout, stderr io.Writer) int {
 	report := operationReport{SchemaVersion: 1, Command: "profiles show"}
 	switch {
-	case !valid:
-		report.Error = &reportError{"ERR_CLI_USAGE", "usage", "Invalid command arguments.", "Use profiles show --help; no input, release or selector is accepted."}
 	case help:
 		if _, err := fmt.Fprintln(stdout, profilesHelp); err != nil {
 			return 1

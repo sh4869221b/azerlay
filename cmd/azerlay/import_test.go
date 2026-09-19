@@ -102,7 +102,7 @@ func validateForTest(args []string, stdin io.Reader) (int, string, string) {
 func TestValidateInputRoutesAndAdmission(t *testing.T) {
 	t.Parallel()
 	// Given: real sources and exact attributed releases.
-	file := filepath.Join(t.TempDir(), "export.json")
+	file := filepath.Join(t.TempDir(), " export.json ")
 	if err := os.WriteFile(file, []byte(fixtureText), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -116,6 +116,11 @@ func TestValidateInputRoutesAndAdmission(t *testing.T) {
 		{"text", []string{"--software-release", "2.0.2", "--text", fixtureText}, "", 0, "", ""},
 		{"file flags after source", []string{file, "--software-release=2.0.2"}, "", 0, "", ""},
 		{"stdin", []string{"--software-release", "2.0.2", "-"}, fixtureText, 0, "", ""},
+		{"stdin flags after source", []string{"-", "--software-release", "2.0.2"}, fixtureText, 0, "", ""},
+		{"release trailing space", []string{"--software-release", "2.0.2 ", "--text", fixtureText}, "", 1, "ERR_IMPORT_UNSUPPORTED_VERSION", "normalize"},
+		{"release equals trailing space", []string{"--software-release=2.0.2 ", "--text", fixtureText}, "", 1, "ERR_IMPORT_UNSUPPORTED_VERSION", "normalize"},
+		{"text whitespace", []string{"--software-release", "2.0.2", "--text", " " + fixtureText + " "}, "", 0, "", ""},
+		{"text equals whitespace", []string{"--software-release", "2.0.2", "--text= " + fixtureText + " "}, "", 0, "", ""},
 		{"text equals", []string{"--software-release=2.0.2", "--text=" + fixtureText}, "", 0, "", ""},
 		{"missing attribution", []string{"--text", fixtureText}, "", 1, "ERR_IMPORT_UNSUPPORTED_VERSION", "normalize"},
 		{"release untrimmed", []string{"--software-release", " 2.0.2", "--text", fixtureText}, "", 1, "ERR_IMPORT_UNSUPPORTED_VERSION", "normalize"},
@@ -160,7 +165,7 @@ func TestValidateArgumentErrors(t *testing.T) {
 		{"--software-release", "2.0.2", "--software-release=2.0.2", "-"},
 		{"--profile-index", "1", "-"}, {"--source-scope", "PRIVATE_SCOPE", "-"},
 		{"--PRIVATE_FLAG", "-"}, {"--json=true", "-"}, {"--help=true"},
-		{"--text", "PRIVATE_TEXT", "PRIVATE_SOURCE"},
+		{"--text", "PRIVATE_TEXT", "PRIVATE_SOURCE"}, {"-json", "-"}, {"--json ", "-"},
 	} {
 		t.Run(strings.Join(args, "/"), func(t *testing.T) {
 			reader := &observedReader{}

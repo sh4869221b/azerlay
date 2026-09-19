@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/urfave/cli/v3"
+
 	"github.com/sh4869221b/azerlay/internal/profile"
 	"github.com/sh4869221b/azerlay/internal/profileadapter"
 	"github.com/sh4869221b/azerlay/internal/profiledecode"
@@ -45,83 +47,30 @@ type exportOptions struct {
 	index      int // Zero means no selector; explicit indices are positive.
 }
 
-func parseExportArgs(command string, args []string) (exportOptions, *reportError) {
-	var options exportOptions
-	seen := make(map[string]bool)
-	sources := 0
-	valid, flags := true, true
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		if flags && arg == "--" {
-			flags = false
-			continue
+func exportCommandOptions(cmd *cli.Command) (exportOptions, bool) {
+	options := exportOptions{json: cmd.Bool("json"), help: cmd.IsSet("help"), release: cmd.String("software-release"), source: cmd.Args().First()}
+	sources := cmd.Args().Len()
+	if cmd.IsSet("text") {
+		text := cmd.String("text")
+		options.text = &text
+		sources++
+	}
+	if cmd.IsSet("profile-index") {
+		value := cmd.String("profile-index")
+		index, err := strconv.Atoi(value)
+		if err != nil || index <= 0 || strings.IndexFunc(value, func(r rune) bool { return r < '0' || r > '9' }) != -1 {
+			return options, false
 		}
-		if !flags || arg == "-" || !strings.HasPrefix(arg, "-") {
-			sources++
-			options.source = arg
-			continue
-		}
-		name, value, equals := strings.Cut(arg, "=")
-		if seen[name] {
-			valid = false
-		}
-		seen[name] = true
-		switch name {
-		case "--json", "--help":
-			if equals {
-				valid = false
-				continue
-			}
-			if name == "--json" {
-				options.json = true
-			} else {
-				options.help = true
-			}
-		case "--text", "--software-release", "--profile-index":
-			// Even rejected import-only values consume their literal next token.
-			if !equals {
-				if i+1 == len(args) {
-					valid = false
-					continue
-				}
-				i++
-				value = args[i]
-			}
-			switch name {
-			case "--text":
-				sources++
-				options.text = &value
-			case "--software-release":
-				options.release = value
-			case "--profile-index":
-				index, err := strconv.Atoi(value)
-				if command != "import" || err != nil || index <= 0 || strings.IndexFunc(value, func(r rune) bool { return r < '0' || r > '9' }) != -1 {
-					valid = false
-				} else {
-					options.index = index
-				}
-			}
-		default:
-			valid = false
-		}
+		options.index = index
 	}
 	if options.help {
-		valid = valid && sources == 0 && !seen["--software-release"] && !seen["--text"] && !seen["--profile-index"]
-	} else {
-		valid = valid && sources == 1
+		return options, sources == 0 && !cmd.IsSet("software-release") && !cmd.IsSet("profile-index")
 	}
-	if !valid {
-		return options, &reportError{"ERR_CLI_USAGE", "usage", "Invalid command arguments.", "Use --help for this command and supply exactly one input source."}
-	}
-	return options, nil
+	return options, sources == 1
 }
 
-func runExport(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	command := args[0]
-	options, failure := parseExportArgs(command, args[1:])
-	if failure != nil {
-		return writeReport(operationReport{SchemaVersion: 1, Command: command, Error: failure}, options.json, stdout, stderr)
-	}
+func runExport(command string, options exportOptions, stdin io.Reader, stdout, stderr io.Writer) int {
+	var failure *reportError
 	if options.help {
 		help := validateHelp
 		if command == "import" {
