@@ -110,6 +110,13 @@ func removeStaleSocket(path string, created os.FileInfo) error {
 	return nil
 }
 
+// Start starts one server at the acquired path. The caller must keep ownership
+// until Server.Done closes; stopConfig must join config cleanup without waiting
+// for Server.Done. On startup failure, the caller remains responsible for cleanup.
+func (i *Instance) Start(ctx context.Context, controller *Controller, stopConfig func()) (*Server, error) {
+	return startPath(ctx, controller, i.path, connectionTimeout, stopConfig)
+}
+
 // Close releases ownership but retains the stable lock file for future owners.
 func (i *Instance) Close() error {
 	i.close.Do(func() {
