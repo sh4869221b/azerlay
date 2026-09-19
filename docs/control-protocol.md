@@ -1,10 +1,10 @@
 # Control protocol
 
 `internal/control` provides a Linux Unix stream socket server and client. The
-CLI can control a server started through the internal API, as integration tests
-do. There is no public `run` command yet. Application startup, Wayland checks,
-duplicate-instance handling, and stale-socket recovery remain
-[issue #25](https://github.com/sh4869221b/azerlay/issues/25).
+CLI controls the application started by `azerlay run`, which runs in foreground
+with or without `--foreground`. Startup requires nonempty `WAYLAND_DISPLAY`;
+an absent value fails with `ERR_RUNTIME_WAYLAND` at the `runtime` stage. This is
+an environment check, not compositor connectivity or Layer Shell validation.
 
 ## Transport and security
 
@@ -17,6 +17,19 @@ reject symlinks at the checked paths. Both client and server require Linux
 `SO_PEERCRED` to identify the peer as the same effective UID; failure to obtain
 credentials also rejects the connection. The client checks socket ownership,
 type, and mode before connecting.
+
+`run` holds an exclusive OS lock on the same-user, mode `0600` regular file
+`$XDG_RUNTIME_DIR/azerlay/instance.lock` through startup and cleanup. The empty
+lock file and private application directory remain after the lock is released;
+the lock file is retained so subsequent starts use the same inode. A duplicate
+`run` prints a responsive instance's text status and exits 0 without loading its
+own configuration. If an owner is still starting and cannot answer, the second
+invocation fails safely instead of starting another instance.
+
+Only the exclusive owner may reclaim a stale socket: it must be a same-user,
+mode `0600` socket whose connection attempt is refused, with unchanged file
+identity and permissions immediately before removal. Live endpoints, timeouts,
+malformed responses, unsafe paths, and replacements do not authorize removal.
 
 Messages are UTF-8 JSON followed by LF, with at most 65,536 bytes before LF.
 Each connection processes exactly one request and one response, then closes;
@@ -79,12 +92,18 @@ the same manager.
 
 `quit` attempts its response before stopping the control server, even if writing
 that response fails. Context cancellation and `Server.Close()` also stop
-accepting, unblock connections, and join server goroutines before `Done()`
-closes. Close is idempotent. Cleanup removes only the socket created by this
-server; it does not remove a replacement at the same path. Existing sockets
-prevent startup and are not reclaimed. The caller owns the configuration
-manager and future application resources; control-server shutdown does not
-claim those resources have stopped.
+accepting, unblock connections, and join server goroutines. Close is idempotent.
+For `run`, quit, SIGINT, and SIGTERM stop control acceptance and join handlers,
+then cancel and join the configuration manager and watcher, remove the owned
+socket, and finally release the instance lock. `Server.Done()` closes after
+configuration cleanup and socket removal; the caller then releases the lock.
+Startup and output failures also clean up resources acquired by that invocation.
+Cleanup never removes a replacement at the socket path.
+
+Standalone `control.Start` callers still own their configuration manager and
+other application resources. That API rejects occupied socket paths and does
+not acquire the instance lock or reclaim stale sockets; its shutdown joins only
+the control server before removing its owned socket and closing `Done()`.
 
 ## Active selection
 
