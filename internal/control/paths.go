@@ -35,6 +35,10 @@ func privatePath(path string, mode os.FileMode) error {
 	if err != nil {
 		return err
 	}
+	return privateInfo(info, mode)
+}
+
+func privateInfo(info os.FileInfo, mode os.FileMode) error {
 	stat, ok := info.Sys().(*syscall.Stat_t)
 	if info.Mode() != mode || !ok || !sameUID(stat.Uid) {
 		return NewError(ERR_CONTROL_PERMISSION)
