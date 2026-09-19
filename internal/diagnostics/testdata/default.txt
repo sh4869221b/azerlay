@@ -1,0 +1,5 @@
+Doctor diagnostics (exit 2)
+[error] session ERR_SESSION_WAYLAND_REQUIRED: Wayland environment is unavailable.
+  Remediation: Run from a Wayland session.
+[ok] configuration OK_CONFIGURATION: Configuration loaded.
+  Target: "/synthetic/config\n\x1b.toml"
