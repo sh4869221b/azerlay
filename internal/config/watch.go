@@ -67,7 +67,7 @@ func attachConfigWatch(ctx context.Context, w *fswatcher.Watcher, watch configWa
 		defer w.Close()
 		watch.run(ctx, events)
 	}()
-	m := &Manager{changes: make(chan struct{}, 1), done: make(chan struct{})}
+	m := &Manager{ctx: ctx, events: events, changes: make(chan struct{}, 1), done: make(chan struct{})}
 	ready := make(chan error, 1)
 	go func() {
 		m.run(ctx, load, events, ready)
