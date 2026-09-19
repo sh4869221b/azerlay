@@ -40,7 +40,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	root := command("azerlay", func(cmd *cli.Command) int {
 		if len(args) == 1 && args[0] == "--help" && cmd.IsSet("help") {
-			if _, err := fmt.Fprintln(stdout, "Usage: azerlay <command>\n\nCommands:\n  version  Print version information\n  validate Validate a profile export without saving state\n  import   Save an export and profile selection\n  profiles Show the saved profile selection\n\n"+validateHelp+"\n\n"+importHelp+"\n\n"+profilesHelp); err != nil {
+			if _, err := fmt.Fprintln(stdout, "Usage: azerlay <command>\n\nCommands:\n  version  Print version information\n  validate Validate a profile export without saving state\n  import   Save an export and profile selection\n  profiles Show saved or select active profiles\n  show     Request overlay visibility\n  hide     Request overlay hidden\n  toggle   Toggle requested visibility\n  reload   Request configuration reload\n  status   Show running instance status\n  quit     Stop the running control server\n\n"+validateHelp+"\n\n"+importHelp+"\n\n"+profilesHelp); err != nil {
 				return 1
 			}
 			return 0
@@ -87,12 +87,34 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 		root.Commands = append(root.Commands, leaf)
 	}
+	addControl := func(name string) *cli.Command {
+		leaf := command(name, func(cmd *cli.Command) int {
+			return runControl(cmd, stdout, stderr)
+		})
+		leaf.Flags = []cli.Flag{
+			&cli.BoolFlag{Name: "json", Local: true},
+			&helpFlag{BoolFlag: cli.BoolFlag{Name: "help", Local: true}},
+		}
+		prepareArgs[leaf] = func(original []string) ([]string, bool) {
+			normalized, jsonMode, valid := normalizeControlArgs(original, name == "select")
+			usage = func() int {
+				failure := &reportError{"ERR_CLI_USAGE", "usage", "Invalid command arguments.", "Use --help for this command."}
+				return writeControlReport(controlReport{SchemaVersion: 1, Command: controlCommandName(name), Error: failure}, jsonMode, stdout, stderr)
+			}
+			return normalized, valid
+		}
+		return leaf
+	}
+	for _, name := range []string{"show", "hide", "toggle", "reload", "status", "quit"} {
+		root.Commands = append(root.Commands, addControl(name))
+	}
+	selectProfile := addControl("select")
 	profilesAction := func(cmd *cli.Command) int {
 		return runProfiles(cmd.Bool("json"), cmd.IsSet("help"), cmd.Writer, cmd.ErrWriter)
 	}
 	profiles := command("profiles", profilesAction)
 	show := command("show", profilesAction)
-	profiles.Commands = []*cli.Command{show}
+	profiles.Commands = []*cli.Command{show, selectProfile}
 	for _, node := range []*cli.Command{profiles, show} {
 		node.Flags = []cli.Flag{
 			&cli.BoolFlag{Name: "json", Local: true},
@@ -100,6 +122,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 	}
 	prepareArgs[profiles] = func(original []string) ([]string, bool) {
+		if len(original) > 0 && original[0] == "select" {
+			normalized, valid := prepareArgs[selectProfile](original[1:])
+			return append([]string{"select"}, normalized...), valid
+		}
 		usage = func() int {
 			failure := &reportError{"ERR_CLI_USAGE", "usage", "Invalid command arguments.", "Use profiles show --help; no input, release or selector is accepted."}
 			// Unlike exports, even a terminated or otherwise invalid --json counts.
