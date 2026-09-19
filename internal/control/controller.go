@@ -29,22 +29,11 @@ func NewController(ctx context.Context, manager *config.Manager, source *profile
 	c := &Controller{manager: manager, source: source, started: time.Now(), generation: 1}
 	settings := manager.Snapshot().Config.Profile
 	c.imported = settings.Source != "local"
-	if !c.imported {
-		c.selectionFailure = NewError(ERR_PROFILE_SOURCE_UNAVAILABLE)
-	} else if settings.SelectedID != "" {
-		c.active, c.selectionFailure = c.resolve(ctx, settings.SelectedID, true)
+	selected, p, err := ResolveConfiguredProfile(ctx, source, settings)
+	if err != nil {
+		c.selectionFailure = selectionError(err)
 	} else {
-		selected, err := source.Selected(ctx)
-		if err != nil {
-			c.selectionFailure = selectionError(err)
-		} else {
-			bundle, err := source.Load(ctx, selected.Source)
-			if err != nil {
-				c.selectionFailure = selectionError(err)
-			} else {
-				c.active = &activeSelection{selection: selected, profile: bundle.Profiles[selected.ProfileIndex-1]}
-			}
-		}
+		c.active = &activeSelection{selection: selected, profile: p}
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
