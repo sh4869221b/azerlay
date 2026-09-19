@@ -1,0 +1,15 @@
+Doctor diagnostics (exit 2)
+[error] session ERR_SESSION_WAYLAND_REQUIRED: Wayland environment is unavailable.
+  Remediation: Run from a Wayland session.
+[ok] configuration OK_CONFIGURATION: Configuration loaded.
+  Target: "/synthetic/config\n\x1b.toml"
+Profile details: source ordinal 2
+  Input 1: "CHOSEN_LABEL\n\x1b"
+    single: keyboard
+      Action: keyboard KEY_U; modifiers: [KEY_LEFTCTRL]
+      Trigger delay (ms): 120
+      Trigger interval (ms): 40
+      Release behavior: "regular"
+  Input 2: <unlabeled>
+    long: unknown
+      Unknown reason: "unmapped_binding"

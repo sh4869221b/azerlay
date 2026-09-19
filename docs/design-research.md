@@ -1401,7 +1401,17 @@ showの不正なsyntaxは`ERR_CLI_USAGE`/`usage`である。
 
 ### 17.4 `doctor`
 
-検査カテゴリ:
+```text
+azerlay doctor [--config PATH] [--json] [--include-bindings] [--help]
+```
+
+`--config=PATH`も受け付ける。位置引数、重複flag、空のconfig値、未知のflag、
+boolean flagの`=value`形式は拒否する。有効なsyntaxの`--help`は検査せず終了0。
+設定とprofileは次回起動時の選択を読み取りで診断し、稼働中processは不要である。
+live socketは別に検査し、session-onlyのprofile選択で設定済み選択を置き換えない。
+
+通常のreportは次の全カテゴリをこの順序で含み、同カテゴリ内は検査の追加順を保つ。
+独立した検査は失敗後も続行する。
 
 ```text
 session
@@ -1416,12 +1426,66 @@ evdev-capabilities
 control-socket
 ```
 
-終了コード:
+| severity | 終了コード |
+| --- | --- |
+| `ok` | `0` |
+| `warning` | `1` |
+| `error` | `2` |
+| `internal_error` | `3` |
 
-- `0`: 問題なし
-- `1`: 警告あり、実行可能
-- `2`: 実行不能
-- `3`: 内部エラー
+reportの終了コードは最大severityから決める。現在のbuildではlibraries、layer-shell、
+monitor、device-discovery、permissionsのdevice/udev検査、evdev-capabilitiesが未実装で、
+`WARN_CHECK_NOT_IMPLEMENTED`になる。他の問題がない環境でも終了1であり、終了0や
+overlayの動作可能性を保証しない。sessionの成功は`WAYLAND_DISPLAY`が非空という
+environment確認だけで、compositor接続を検証しない。
+
+主要な診断codeと分類:
+
+| 状態 | code / severity |
+| --- | --- |
+| Wayland環境なし | `ERR_SESSION_WAYLAND_REQUIRED` / error |
+| 設定なし・無効 | `ERR_CONFIG_NOT_FOUND`・`ERR_CONFIG_INVALID` / error |
+| 設定の未知key | `WARN_CONFIG_UNKNOWN_KEY` / warning（key名や値を出さず集約） |
+| 設定失敗によるprofile検査不可 | `WARN_CHECK_SKIPPED` / warning |
+| profile未選択・不一致・曖昧 | `ERR_PROFILE_NOT_FOUND`・`ERR_PROFILE_AMBIGUOUS` / warning |
+| local source未実装 | `ERR_PROFILE_SOURCE_UNAVAILABLE` / warning（#22待ち、fallbackなし） |
+| profile storage不正・読み取り不可 | `ERR_PROFILE_STORAGE` / error |
+| 設定・store・socketの権限拒否 | `ERR_DIAGNOSTIC_PERMISSION` / error（permissionsカテゴリ） |
+| socket未起動・dial時の接続拒否 | `WARN_CONTROL_NOT_RUNNING`・`WARN_CONTROL_STALE` / warning |
+| runtime・socketの安全性または通信失敗 | 対応する`ERR_CONTROL_*` / error |
+| 未知のlive degraded code | `WARN_CONTROL_DEGRADED` / warning |
+| 構文エラー | `ERR_CLI_USAGE` / error（commandカテゴリ1件だけ） |
+| 内部診断エラー | `ERR_DOCTOR_INTERNAL` / internal_error |
+
+成功codeは`OK_SESSION_ENVIRONMENT`、`OK_CONFIGURATION`、`OK_PROFILE_SOURCE`、
+`OK_CONTROL_SOCKET`。socket成功もconnectivityだけを表し、live degraded reasonsを
+省略しない。既知のdevice/input/renderer、profile、configのcodeだけを固定文言へ写像し、
+同じlive reason codeを重複表示しない。liveのconfig failureとprofile storage failureはerror、
+その他の既知degraded状態はwarningとする。remoteのreason/name/source_refや
+underlying errorはそのまま出力しない。timeoutや不正応答はstaleと判定しない。
+
+`--json`は改行終端のobjectをstdoutへ1件出す。トップレベルは`schema_version: 1`、
+`command: "doctor"`、`exit_code`、`checks`で、既存control reportの`ok`/`result`/`error`
+envelopeは使わない。各checkは`category`、`code`、`summary`、`target`、`remediation`、
+`severity`を持つ。`target`は常に存在するstringまたはnullで、他はstringである。
+non-okの結果には固定の修正手順を含める。targetのpathは表示を許可しており、
+匿名化出力ではない。textではpathやlabelをquoteして制御文字をescapeする。
+
+`profile_details`は、その呼び出しの`--include-bindings`があり、設定済みprofileの
+解決が成功した場合だけ付ける。永続設定`diagnostics.include_bindings`では許可しない。
+内容はone-basedの`profile_index`とsource順の`controls`。各controlはone-basedの
+`input_index`、stringまたはnullの`label`、`bindings`を持つ。bindingのfieldは
+`trigger`、`kind`、`actions`（各actionの`kind`、`code`、`modifiers`）、
+`trigger_delay_ms`、`trigger_interval_ms`、`release_behavior`、`unknown_reason`。
+未設定のtiming/release/reasonはnullで、unknown/macroは固定の正規化済みreasonに留める。
+raw export・raw field・macro内容・profile ID/name・storage hash・source-origin path・
+event streamはflag付きでも出さず、非選択profileのcontrolも含めない。
+
+text診断はstdout、text構文エラーはstderrへ出す。JSONは構文エラーも上記の専用reportで、
+出力成功時のstderrは空。書き込み失敗は終了3とし、途中まで出たJSONへ別objectを追加しない。
+設定・保存データ・稼働状態を変更せず、directory/lock作成、socket削除、自動修復も行わない。
+例えば設定なしの`azerlay doctor --json`は`ERR_CONFIG_NOT_FOUND`で終了2となり、
+`schema_version = 1`を含む有効な設定の作成を案内する。
 
 ### 17.5 機械可読出力
 

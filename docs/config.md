@@ -115,7 +115,12 @@ configuration watching.
 | Key | Default | Meaning and accepted values |
 | --- | --- | --- |
 | `diagnostics.log_level` | `"info"` | Log level; `"error"`, `"warn"`, `"info"`, `"debug"`, or `"trace"`. |
-| `diagnostics.include_bindings` | `false` | Binding-diagnostics setting; boolean. |
+| `diagnostics.include_bindings` | `false` | Binding-diagnostics setting; boolean. Does not enable disclosure in `doctor`. |
+
+`doctor` requires `--include-bindings` on each invocation before displaying the
+selected profile's labels and normalized bindings. The stored setting alone
+never opts the command into disclosure. Raw exports and macros remain excluded
+even with that flag.
 
 Unknown keys produce `WARN_CONFIG_UNKNOWN_KEY` warnings with line, column, and
 key segments when the rest of the file is valid. They do not bypass schema or

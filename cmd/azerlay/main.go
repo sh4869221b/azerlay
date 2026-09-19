@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"runtime"
 	"slices"
+	"syscall"
 
 	"github.com/urfave/cli/v3"
 )
@@ -19,6 +21,11 @@ func main() {
 }
 
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if len(args) != 0 && args[0] == "doctor" {
+		pipeSignals := make(chan os.Signal, 1)
+		signal.Notify(pipeSignals, syscall.SIGPIPE)
+		defer signal.Stop(pipeSignals)
+	}
 	rootUsage := func() int {
 		if _, err := fmt.Fprintln(stderr, "invalid command; use --help for usage"); err != nil {
 			return 1
@@ -42,7 +49,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	root := command("azerlay", func(cmd *cli.Command) int {
 		if len(args) == 1 && args[0] == "--help" && cmd.IsSet("help") {
-			if _, err := fmt.Fprintln(stdout, "Usage: azerlay <command>\n\nCommands:\n  version  Print version information\n  validate Validate a profile export without saving state\n  import   Save an export and profile selection\n  profiles Show saved or select active profiles\n  run      Run the application in foreground\n  show     Request overlay visibility\n  hide     Request overlay hidden\n  toggle   Toggle requested visibility\n  reload   Request configuration reload\n  status   Show running instance status\n  quit     Stop the running application\n\n"+validateHelp+"\n\n"+importHelp+"\n\n"+profilesHelp+"\n\n"+runHelp); err != nil {
+			if _, err := fmt.Fprintln(stdout, "Usage: azerlay <command>\n\nCommands:\n  version  Print version information\n  validate Validate a profile export without saving state\n  import   Save an export and profile selection\n  profiles Show saved or select active profiles\n  run      Run the application in foreground\n  doctor   Diagnose configuration and runtime without changes\n  show     Request overlay visibility\n  hide     Request overlay hidden\n  toggle   Toggle requested visibility\n  reload   Request configuration reload\n  status   Show running instance status\n  quit     Stop the running application\n\n"+validateHelp+"\n\n"+importHelp+"\n\n"+profilesHelp+"\n\n"+runHelp+"\n\n"+doctorHelp); err != nil {
 				return 1
 			}
 			return 0
@@ -62,6 +69,21 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 0
 	})}
 	prepareArgs := make(map[*cli.Command]func([]string) ([]string, bool))
+	doctor := command("doctor", func(cmd *cli.Command) int {
+		return runDoctor(cmd, stdout)
+	})
+	doctor.Flags = []cli.Flag{
+		&cli.StringFlag{Name: "config", Local: true},
+		&cli.BoolFlag{Name: "json", Local: true},
+		&cli.BoolFlag{Name: "include-bindings", Local: true},
+		&helpFlag{BoolFlag: cli.BoolFlag{Name: "help", Local: true}},
+	}
+	prepareArgs[doctor] = func(original []string) ([]string, bool) {
+		normalized, jsonMode, valid := normalizeDoctorArgs(original)
+		usage = func() int { return writeDoctorUsage(jsonMode, stdout, stderr) }
+		return normalized, valid
+	}
+	root.Commands = append(root.Commands, doctor)
 	foreground := command("run", func(cmd *cli.Command) int {
 		return runApplication(cmd, stdout, stderr)
 	})

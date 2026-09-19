@@ -15,6 +15,8 @@ change requested visibility, request configuration reloads, select an active
 profile for the session, report status, and stop the application. `run` starts
 the application in foreground, coordinates duplicate starts, and safely recovers
 stale control sockets.
+`doctor` reads configuration, the next-start profile selection, and live socket
+status without changing state; unavailable backend checks remain warnings.
 
 The initial supported target is Linux/Wayland on x86-64 with Azeron Cyborg II,
 Niri or Hyprland, and a Bodycam game profile.
@@ -143,6 +145,47 @@ The next controller initialization uses configuration and saved selection again.
 
 See the [control protocol](docs/control-protocol.md) for socket permissions,
 framing, status fields, errors, and lifecycle boundaries.
+
+## Doctor CLI
+
+```sh
+azerlay doctor
+azerlay doctor --config config.toml --json
+azerlay doctor --include-bindings --json
+azerlay doctor --help
+```
+
+`--config=PATH` is also accepted. No positional arguments are allowed, and help
+performs no checks. The configuration and imported profile are those that would
+be used at the next start; a running process is optional. Live socket status is
+reported separately, and a session-only profile selection does not replace the
+configured profile in the report.
+
+Text reports go to stdout; text syntax errors go to stderr. `--json` returns one
+newline-terminated schema-versioned object, including for syntax errors, with
+no stderr output when writing succeeds. See the
+[doctor output contract](docs/design-research.md#174-doctor) for fields and codes.
+
+| Exit | Meaning |
+| --- | --- |
+| `0` | No findings. |
+| `1` | Warnings, including checks that are not implemented. |
+| `2` | Diagnostic errors or invalid command arguments. |
+| `3` | Internal diagnostic or output failure. |
+
+A healthy current installation still returns `1`: library, Layer Shell, monitor,
+device discovery, device/udev permissions, and evdev capability checks are not
+implemented. The session check examines `WAYLAND_DISPLAY` only, not compositor
+connectivity. If the default configuration is absent, `azerlay doctor --json`
+returns `2` with `ERR_CONFIG_NOT_FOUND`; create a valid configuration containing
+`schema_version = 1` before retrying.
+
+Reports may include target paths. Labels and normalized bindings require this
+invocation's `--include-bindings`; the persistent `diagnostics.include_bindings`
+setting does not enable disclosure. Even with that flag, reports omit raw
+exports, macros, profile IDs/names, storage hashes, and source-origin paths.
+Doctor never repairs configuration or storage, creates a runtime lock, removes
+a stale socket, or changes running visibility or selection.
 
 ## Project documents
 

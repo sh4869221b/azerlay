@@ -8,14 +8,11 @@ import (
 )
 
 func socketPath(runtime string, create bool) (string, error) {
-	if !filepath.IsAbs(runtime) {
-		return "", NewError(ERR_CONTROL_RUNTIME)
+	path, err := runtimeSocketPath(runtime)
+	if err != nil {
+		return "", err
 	}
-	runtime = filepath.Clean(runtime)
-	if err := privatePath(runtime, os.ModeDir|0700); err != nil {
-		return "", NewError(ERR_CONTROL_RUNTIME)
-	}
-	app := filepath.Join(runtime, "azerlay")
+	app := filepath.Dir(path)
 	if create {
 		if err := os.Mkdir(app, 0700); err != nil && !errors.Is(err, os.ErrExist) {
 			return "", NewError(ERR_CONTROL_RUNTIME)
@@ -27,7 +24,18 @@ func socketPath(runtime string, create bool) (string, error) {
 		}
 		return "", NewError(ERR_CONTROL_RUNTIME)
 	}
-	return filepath.Join(app, "control.sock"), nil
+	return path, nil
+}
+
+func runtimeSocketPath(runtime string) (string, error) {
+	if !filepath.IsAbs(runtime) {
+		return "", NewError(ERR_CONTROL_RUNTIME)
+	}
+	runtime = filepath.Clean(runtime)
+	if err := privatePath(runtime, os.ModeDir|0700); err != nil {
+		return "", NewError(ERR_CONTROL_RUNTIME)
+	}
+	return filepath.Join(runtime, "azerlay", "control.sock"), nil
 }
 
 func privatePath(path string, mode os.FileMode) error {
