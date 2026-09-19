@@ -80,6 +80,7 @@ func TestProfilesGrammarBeforeStorage(t *testing.T) {
 		{"show", "--json"}, {"show", "--json=true"}, {"show", "--help=true"},
 		{"show", "--help", "--help"}, {"show", "--help", "PRIVATE_PATH"},
 		{"show", "--"}, {"list"}, {"--json", "show"},
+		{"--help"}, {" show", "--help"}, {"show ", "--help"}, {"show", "-json"},
 	} {
 		t.Run(strings.Join(args, "/"), func(t *testing.T) {
 			reader := &observedReader{}
@@ -161,19 +162,20 @@ func TestRun_WhenHelpRequested(t *testing.T) {
 func TestRun_WhenCommandIsUnknown(t *testing.T) {
 	t.Parallel()
 
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-
-	exitCode := run([]string{"unknown"}, &observedReader{}, &stdout, &stderr)
-
-	if exitCode != 2 {
-		t.Fatalf("exit code = %d, want 2", exitCode)
-	}
-	if stdout.Len() != 0 {
-		t.Fatalf("stdout = %q, want empty", stdout.String())
-	}
-	if stderr.Len() == 0 {
-		t.Fatal("stderr is empty")
+	for _, args := range [][]string{
+		{}, {"unknown"}, {"unknown", "--json"}, {"help"}, {"-h"}, {"--version"},
+		{"--generate-shell-completion"}, {"version", "--help"}, {"version", "extra"},
+		{"--help", "version"}, {"--help=true"}, {" version"}, {"version "},
+		{" validate", "--help"}, {"profiles ", "show", "--json"},
+	} {
+		t.Run(strings.Join(args, "/"), func(t *testing.T) {
+			reader := &observedReader{}
+			var stdout, stderr bytes.Buffer
+			status := run(args, reader, &stdout, &stderr)
+			if status != 2 || stdout.Len() != 0 || stderr.String() != "invalid command; use --help for usage\n" || reader.reads != 0 {
+				t.Fatalf("status=%d reads=%d stdout=%q stderr=%q", status, reader.reads, &stdout, &stderr)
+			}
+		})
 	}
 }
 
