@@ -1,5 +1,11 @@
 package control
 
+import (
+	"time"
+
+	"github.com/sh4869221b/azerlay/internal/config"
+)
+
 type ProfileStatus struct {
 	Source       string  `json:"source"`
 	SourceRef    string  `json:"source_ref"`
@@ -35,4 +41,41 @@ type Status struct {
 	LastReload      ReloadStatus   `json:"last_reload"`
 	Generation      uint64         `json:"generation"`
 	DegradedReasons []Diagnostic   `json:"degraded_reasons"`
+}
+
+func (c *Controller) status() Status {
+	reload := c.manager.Snapshot().Status
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	s := Status{
+		SchemaVersion: 1, UptimeSeconds: time.Since(c.started).Seconds(),
+		Visible: c.visible, Generation: c.generation, EventNodes: []string{},
+		LastReload: ReloadStatus{RequestGeneration: reload.RequestGeneration, ConfigGeneration: reload.ConfigGeneration,
+			ConfigFailure: projectDiagnostic(reload.ConfigFailure), WatchFailure: projectDiagnostic(reload.WatchFailure)},
+		DegradedReasons: []Diagnostic{
+			{Code: "DEVICE_UNAVAILABLE", Stage: "device", Reason: "Device connection is unavailable."},
+			{Code: "INPUT_METRICS_UNAVAILABLE", Stage: "input", Reason: "Input metrics are unavailable."},
+			{Code: "RENDERER_UNAVAILABLE", Stage: "renderer", Reason: "Overlay renderer is unavailable."},
+		},
+	}
+	if c.active != nil {
+		active := c.active.status()
+		s.ActiveProfile = &active
+	}
+	if c.selectionFailure != nil {
+		s.DegradedReasons = append(s.DegradedReasons, Diagnostic{Code: c.selectionFailure.Code, Stage: c.selectionFailure.Stage, Reason: c.selectionFailure.Summary})
+	}
+	for _, failure := range []*Diagnostic{s.LastReload.ConfigFailure, s.LastReload.WatchFailure} {
+		if failure != nil {
+			s.DegradedReasons = append(s.DegradedReasons, *failure)
+		}
+	}
+	return s
+}
+
+func projectDiagnostic(d config.Diagnostic) *Diagnostic {
+	if d.Code == "" {
+		return nil
+	}
+	return &Diagnostic{Code: d.Code, Stage: d.Stage, Reason: d.Reason}
 }
