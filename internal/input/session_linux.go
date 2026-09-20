@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/sh4869221b/azerlay/internal/device"
@@ -22,9 +23,10 @@ type Session struct {
 }
 
 type sessionOps struct {
-	open  func(device.Group) ([]device.OpenedNode, error)
-	clock func(*os.File) error
-	axes  func(*os.File, []int) (map[uint16]AxisInfo, error)
+	open    func(device.Group) ([]device.OpenedNode, error)
+	clock   func(*os.File) error
+	axes    func(*os.File, []int) (map[uint16]AxisInfo, error)
+	recover func(context.Context, device.OpenedNode) (recoveryState, time.Duration, error)
 	// observe runs on the reducer after each event, including unreported events.
 	// It is private so tests can acknowledge processing without polling Latest.
 	observe func(int, Event, *Snapshot)
@@ -71,10 +73,16 @@ func startSession(ctx context.Context, group device.Group, generations Generatio
 	reducer.latest.axisInfo = axisInfo
 	session.latest.Store(reducer.snapshot())
 	events := make(chan nodeEvent)
+	if ops.recover == nil {
+		ops.recover = recoverNode
+	}
 	var readers sync.WaitGroup
 	for index, node := range nodes {
 		readers.Go(func() {
-			if err := readEvents(ctx, node.File, index, events); err != nil {
+			reader := eventReader{source: node.File, node: index, output: events,
+				recover: func(ctx context.Context) (recoveryState, time.Duration, error) { return ops.recover(ctx, node) },
+			}
+			if err := reader.read(ctx); err != nil {
 				select {
 				case events <- nodeEvent{node: index, err: err}:
 				case <-ctx.Done():
@@ -104,7 +112,13 @@ func startSession(ctx context.Context, group device.Group, generations Generatio
 					session.err = received.err
 					return
 				}
-				snapshot, err := reducer.apply(received.node, received.event)
+				var snapshot *Snapshot
+				var err error
+				if received.replacement != nil {
+					snapshot = reducer.replace(received.node, *received.replacement, received.event.Timestamp)
+				} else {
+					snapshot, err = reducer.apply(received.node, received.event)
+				}
 				if err != nil {
 					session.err = err
 					return

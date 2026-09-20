@@ -126,7 +126,6 @@ func TestSessionFatalInvalidation(t *testing.T) {
 		code        string
 		closeWriter bool
 	}{
-		{"dropped", nativeEvents(Event{Type: EV_SYN, Code: SYN_DROPPED}, Event{Type: EV_SYN, Code: SYN_REPORT}), ERR_INPUT_DROPPED, false},
 		{"invalid-key", nativeEvents(Event{Type: EV_KEY, Value: 3}), ERR_INPUT_EVENT, false},
 		{"truncated", []byte{1, 2, 3}, ERR_INPUT_READ, true},
 		{"eof", nil, ERR_INPUT_READ, true},
