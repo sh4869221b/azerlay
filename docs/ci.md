@@ -58,10 +58,16 @@ The container matrix uses `ubuntu:24.04` and `archlinux:base`. Ubuntu installs
 These dependencies are installed before checkout and Go setup. Each image runs:
 
 ```sh
+git config --global --add safe.directory "$GITHUB_WORKSPACE"
 go version
 go build -o /tmp/azerlay ./cmd/azerlay
 /tmp/azerlay version
 ```
+
+The checkout action's safe-directory setting lives in a temporary Git config
+that is removed after checkout. Container users can differ from the mounted
+workspace's owner, so the build step trusts only that workspace in its own
+global Git config. This preserves normal Go VCS metadata during compilation.
 
 Go caching is disabled in these jobs to avoid sharing native build caches
 across distributions. Matrix fail-fast is disabled so both results remain
