@@ -46,8 +46,10 @@ Layer Shell boundary.
 read-only descriptors to `internal/input.Start`. Matching uses fresh metadata
 and the retained descriptor's identity; a caller-provided admission value does
 not bypass verification. A qualifying partial group is allowed. Startup sets
-each descriptor's event clock to `CLOCK_MONOTONIC` before starting readers; any
-open or clock failure closes the acquired descriptors.
+each descriptor's event clock to `CLOCK_MONOTONIC` and reads `EVIOCGABS` for
+its advertised ABS codes before starting readers. Minimum, maximum, flat, and
+fuzz come from the retained verified descriptor; an open, clock, or axis-query
+failure closes the acquired descriptors.
 
 Each node has one reader, feeding one reducer through a cancellation-aware
 unbuffered channel. The reader preserves that node's event order. Cross-node
@@ -62,7 +64,8 @@ from known releases or zeroes. No initial-state capture is performed. REL deltas
 accumulate within the reporting frame, with legacy and high-resolution wheel
 codes kept separate. `MSC_SCAN` stays in that frame's compact event list and is
 not a physical-control identity. Transitions, REL deltas, and frame events do
-not persist into later reports. Axis normalization belongs to later processing.
+not persist into later reports. Axis metadata is copied once into immutable
+session storage; it does not establish an initial raw-axis observation.
 
 `Session.Latest` reads an atomic pointer and returns an independently owned
 scalar header over immutable storage; collection accessors return copies.
@@ -80,6 +83,37 @@ incremented once, and generations preserved. `Done` closes only after this
 work finishes; `Close` is idempotent and waits for it. There is no resync or
 reconnect. This package is not yet wired into `run`, controller, or GTK; its
 pipeline tests use synthetic OS pipes and do not establish live-device acceptance.
+
+### Axis normalization and stick projection
+
+`Snapshot.NormalizedAbsolute` retains the raw signed value and exposes known
+and valid flags separately. `NormalizeAxis` widens values to `float64` before
+subtraction. With center `(minimum+maximum)/2`, each side uses its own span.
+Values within the inclusive center +/- flat region map to zero; values outside
+it use `(raw-center-flat)/(maximum-center-flat)` on the positive side and
+`(raw-center+flat)/(center-minimum-flat)` on the negative side, clamped to
+`[-1,1]`. Raw values are never clamped. Equal/reversed bounds, negative flat or
+fuzz, or flat reaching either span are invalid. Fuzz remains metadata because
+the kernel already filters it. Unobserved raw values or absent capabilities
+do not become a guessed neutral value.
+
+`ProjectStick` consumes a normalized `StickBinding` and an immutable snapshot
+without parsing or I/O. The confirmed export determines Keyboard or Xbox mode;
+the caller selects the control and explicit input sources. Xbox selects two
+distinct axes on one node, never combines nodes, and requires both axes known
+and valid. Eligible nodes can advertise identical ABS codes, so there is no
+first-match selection. Keyboard uses the binding's canonical W/D/S/A directions
+and explicit nodes per direction. Each segment keeps its own known/down flags;
+the vector is known only after all four keys have been observed.
+
+Coordinates are +X right and +Y down, a display convention rather than inferred
+physical orientation. Direction is the unit vector, and intensity is the vector
+length capped at one. Keyboard opposites cancel while pressed segments remain
+visible; diagonals have unit direction and full intensity. Results preserve
+mode, connection, sequence, and generations. Pending frames cannot affect them,
+retained snapshots remain unchanged, and disconnected snapshots expose no live
+known state. Unknown bindings are not sticks. Rendering and runtime device
+wiring remain separate from this implemented library projection.
 
 ## Repository growth
 

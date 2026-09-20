@@ -148,8 +148,8 @@ discriminant, participate in the following closed predicates.
 
 Both modes require trusted source metadata `2.0.2` / `azeron-software-export`,
 string `subType:"11"`, and an `analogSettings` object. The neutral context
-requires numeric zero for `angle`, `lowerLimit`, and `upperLimit`, and JSON
-boolean `false` for `isRightAnalog`, `invertXAxis`, `invertYAxis`,
+requires literal JSON number token `0` for `angle`, `lowerLimit`, and `upperLimit`,
+and JSON boolean `false` for `isRightAnalog`, `invertXAxis`, `invertYAxis`,
 `isCombinedAnalog`, `isEightDirectionalTrigger`, `isHoldTrigger`,
 `isAnalogSmoothing`, and `isAngleLock`. The primary input requires JSON
 boolean `false` for `isHold`, `isTurbo`, and `isToggleOnHold`, string array

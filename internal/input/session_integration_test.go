@@ -28,11 +28,25 @@ type integrationSession struct {
 
 func newIntegrationSession(t *testing.T, count int, generations Generations) integrationSession {
 	t.Helper()
+	return newIntegrationSessionWithAxes(t, count, generations, nil)
+}
+
+func newIntegrationSessionWithAxes(t *testing.T, count int, generations Generations, axes map[uint16]AxisInfo) integrationSession {
+	t.Helper()
 	nodes, writers := pipeNodes(t, count)
+	for i := range nodes {
+		codes := make([]int, 0, len(axes))
+		for code := range axes {
+			codes = append(codes, int(code))
+		}
+		slices.Sort(codes)
+		nodes[i].Node.Capabilities = map[string][]int{"abs": codes}
+	}
 	observed := make(chan integrationObservation, 1024)
 	session, err := startSession(context.Background(), device.Group{}, generations, sessionOps{
 		open:  func(device.Group) ([]device.OpenedNode, error) { return nodes, nil },
 		clock: func(*os.File) error { return nil },
+		axes:  func(*os.File, []int) (map[uint16]AxisInfo, error) { return axes, nil },
 		observe: func(node int, event Event, snapshot *Snapshot) {
 			observed <- integrationObservation{node, event, snapshot}
 		},
