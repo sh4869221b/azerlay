@@ -192,6 +192,7 @@ a stale socket, or changes running visibility or selection.
 - [System design and research](docs/design-research.md)
 - [Architecture principles](docs/architecture.md)
 - [Security principles](docs/security.md)
+- [CI and synthetic fixture policy](docs/ci.md)
 - [Configuration schema and reload behavior](docs/config.md)
 - [Control protocol and CLI](docs/control-protocol.md)
 - [GitHub roadmap](https://github.com/sh4869221b/azerlay/milestone/1)
