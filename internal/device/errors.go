@@ -60,3 +60,7 @@ func boundaryDiagnostic(err error, stage string, target *string) Diagnostic {
 	}
 	return diagnostic(code, stage, target)
 }
+
+func ReconnectDiagnostic(err error) Diagnostic {
+	return boundaryDiagnostic(err, "reconnect", nil)
+}
