@@ -8,8 +8,12 @@ Bootstrap phase. The CLI can validate and save Azeron Software 2.0.2 profile
 exports. A successful `import` saves the exact export and a one-based selected
 profile ordinal; `profiles show` reads that saved selection in a later process.
 `devices list` and `devices inspect` discover the researched Cyborg II signature
-and report access diagnostics without reading input events. Runtime input and
-overlay functionality are not implemented yet.
+and report access diagnostics without reading input events. An internal input
+package reads selected, verified nodes and publishes immutable raw input
+snapshots at node-local `SYN_REPORT` boundaries. It is not connected to `run` or
+GTK yet; axis normalization, input recovery, and overlay functionality remain
+unimplemented. Reader/reducer integration is tested with synthetic OS pipes,
+not live Cyborg II input.
 
 An internal configuration package loads, validates, and watches TOML settings
 with last-good reload preservation. A same-user control socket and CLI can
