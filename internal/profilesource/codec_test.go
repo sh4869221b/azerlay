@@ -183,7 +183,7 @@ func TestStorageCodecRejectsInvalid(t *testing.T) {
 	}
 	for _, change := range []storageMutation{
 		{"schema_version", `999`}, {"source_hash", `"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"`},
-		{"decoder_version", `"2"`}, {"normalizer_version", `"2"`}, {"model_schema_version", `2`},
+		{"decoder_version", `"2"`}, {"normalizer_version", `"old"`}, {"model_schema_version", `2`},
 		{"bundle/schema_version", `2`}, {"bundle/source/software_release", `"9.9.9"`}, {"bundle/source/source_scope", `"other"`},
 		{"bundle/root_kind", `"single"`}, {"bundle/root_kind", `"other"`}, {"bundle/raw", `null`}, {"bundle/profiles", `[]`},
 		{"bundle/raw/version", `null`}, {"bundle/raw/unknown", `{"bad":null}`},
@@ -220,7 +220,7 @@ func TestStorageCodecRejectsInvalid(t *testing.T) {
 		})
 	}
 	for _, change := range []storageMutation{
-		{"schema_version", `999`}, {"source_hash", `"../bad"`}, {"decoder_version", `"2"`}, {"normalizer_version", `"2"`}, {"model_schema_version", `2`},
+		{"schema_version", `999`}, {"source_hash", `"../bad"`}, {"decoder_version", `"2"`}, {"normalizer_version", `"old"`}, {"model_schema_version", `2`},
 		{"profile_index", `0`}, {"profile_index", `2`}, {"profile_index", `3`}, {"profile", `null`},
 		{"profile/controls/0/raw/profile_index", `1`},
 	} {
@@ -404,7 +404,7 @@ func TestCacheSetRejectsStaleState(t *testing.T) {
 			case "different raw token":
 				readers[1] = bytes.NewReader(mutateStorage(t, second, storageMutation{"profile/raw/id", `"null"`}))
 			case "stale revision":
-				readers[1] = bytes.NewReader(mutateStorage(t, second, storageMutation{"normalizer_version", `"2"`}))
+				readers[1] = bytes.NewReader(mutateStorage(t, second, storageMutation{"normalizer_version", `"old"`}))
 			case "invalid requested ordinal":
 				readers = append(readers, bytes.NewReader(second))
 			}

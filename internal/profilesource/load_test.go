@@ -72,7 +72,7 @@ func TestImportedLoadCacheMiss(t *testing.T) {
 						t.Fatal(err)
 					}
 				case "stale":
-					data := bytes.ReplaceAll(storeBytes(t, path), []byte(`"normalizer_version":"1"`), []byte(`"normalizer_version":"old"`))
+					data := mutateStorage(t, storeBytes(t, path), storageMutation{"normalizer_version", `"old"`})
 					writeLoadFile(t, path, data)
 				case "mismatched model":
 					data := storeBytes(t, path)
