@@ -34,8 +34,9 @@ stale control sockets.
 `doctor` reads configuration, the next-start profile selection, and live socket
 status without changing state; unavailable backend checks remain warnings.
 
-The initial supported target is Linux/Wayland on x86-64 with Azeron Cyborg II,
-Niri or Hyprland, and a Bodycam game profile.
+The initial supported target is Linux/Wayland on x86-64 with left-hand Azeron
+Cyborg II, Niri or Hyprland, and a Bodycam game profile. Right-hand Cyborg II
+support is deferred beyond v1.
 
 ## Development
 

@@ -16,7 +16,7 @@
 | 製品名 | **Azerlay** |
 | GitHubリポジトリ | **`azerlay`** |
 | 製品形態 | Linux/Wayland専用、単一プロセス・単一バイナリのAzeron入力オーバーレイ |
-| 初期正式対応機器 | Azeron Cyborg II 左手用・右手用 |
+| 初期正式対応機器 | Azeron Cyborg II 左手用（v1）。右手用はv1後の対応へ延期 |
 | 初期正式対応Compositor | Niri、Hyprland |
 | 初期ゲームプロファイル | Bodycam |
 | 実装言語 | Go 1.27.x |
@@ -215,7 +215,7 @@ Azeron Cyborg II
 | Display server | Wayland |
 | Compositor | Niri、Hyprland |
 | 入力API | Linux evdev |
-| 対象機器 | Azeron Cyborg II 左手用・右手用 |
+| 対象機器 | Azeron Cyborg II 左手用（v1）。右手用はv1後の対応へ延期 |
 | CPU architecture | x86_64 |
 | UI toolkit | GTK4 |
 | Layer protocol | `zwlr_layer_shell_v1` |
@@ -385,7 +385,7 @@ Azeronを外すと「Disconnected」を表示し、読取goroutineを終了す�
 | FR-076 | 左上・上・右上・左・中央・右・左下・下・右下のanchorと、X/Y marginを設定できること。 |
 | FR-077 | scale、opacity、font scale、背景表示、プロファイル名表示を設定できること。 |
 | FR-078 | 高DPIおよびfractional scaling環境で物理サイズ・文字が破綻しないこと。 |
-| FR-079 | Cyborg II左手用・右手用の独自模式図を表示すること。 |
+| FR-079 | v1ではCyborg II左手用の独自模式図を表示すること。右手用はv1後の対応へ延期する。 |
 | FR-080 | 各Physical Controlにアクションラベル、実際の割当、トリガー種別を表示できること。 |
 | FR-081 | 押下中、解放遷移、長押し成立、ダブルタップ、マクロ実行候補、未割当、未知割当、曖昧性を視覚的に区別すること。 |
 | FR-082 | アナログスティックを中心点、ベクトル、入力量、デッドゾーンで表示すること。WASDモードでは方向セグメントを表示すること。 |
@@ -1886,7 +1886,7 @@ azerlay/
 ├── assets/
 │   ├── layouts/
 │   │   ├── cyborg-ii-left.json
-│   │   └── cyborg-ii-right.json
+│   │   └── cyborg-ii-right.json  # v1後の対応。v1の必須assetではない
 │   ├── games/
 │   │   ├── bodycam.ja-JP.toml
 │   │   └── bodycam.en-US.toml
@@ -2282,7 +2282,7 @@ fuzz testでpanic、無制限メモリ確保、部分保存が発生しない。
 | ID | 調査内容 | 目的 | 阻害範囲 |
 |---|---|---|---|
 | R-001 | Azeron `types`値、legacy `keyValues/metaValues`、modern symbolic nameの完全対応表 | Canonical Bindingへ正確に変換 | インポート全体 |
-| R-002 | Cyborg IIの`input ID`/pin→物理位置対応、左手・右手・改版差 | 正しい模式図ハイライト | Cyborg II正式対応 |
+| R-002 | Cyborg II左手用の`input ID`/pin→物理位置対応と改版差（v1）。右手用はv1後の対応へ延期 | 正しい模式図ハイライト | Cyborg II左手用のv1正式対応。右手用はv1を阻害しない |
 | R-003 | Linux版Azeron Software 2.xのローカル保存パス、形式、locking | LocalSource実装 | ローカル自動読取 |
 | R-004 | active profile、favorite、software/on-board状態の保存方法 | 自動選択 | プロファイル自動追従 |
 | R-005 | Cyborg II各改版のVID/PID、USB interface、event node topology（[観測済み署名の決定](decisions/device-identity.md)あり、他の改版・左右・動作モードは未検証） | udevとDeviceGroup | 未観測範囲の自動検出・権限、配布時のACL検証 |

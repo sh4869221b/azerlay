@@ -53,6 +53,10 @@ must match the listed spelling exactly.
 | `device.serial` | `""` | Device serial identifier; an opaque string. |
 | `device.auto_reconnect` | `true` | Automatic reconnect setting; boolean. |
 
+Both `device.hand` values are accepted configuration, not a hardware-support
+claim. Formal v1 support is left-hand Cyborg II only; right-hand support is
+deferred beyond v1.
+
 ### Input
 
 | Key | Default | Meaning and accepted values |
