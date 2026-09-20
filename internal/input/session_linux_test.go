@@ -64,6 +64,23 @@ func TestSessionClockFailureRollback(t *testing.T) {
 	assertFilesClosed(t, nodes)
 }
 
+func TestSessionAxisReadFailureRollback(t *testing.T) {
+	nodes, _ := pipeNodes(t, 3)
+	nodes[1].Node.Capabilities = map[string][]int{"abs": {0}}
+	session, err := startSession(context.Background(), device.Group{}, Generations{}, sessionOps{
+		open:  func(device.Group) ([]device.OpenedNode, error) { return nodes, nil },
+		clock: func(*os.File) error { return nil },
+		axes:  readAxisInfo,
+	})
+	if session != nil {
+		t.Cleanup(func() { _ = session.Close() })
+	}
+	if session != nil || err == nil || err.Error() != ERR_INPUT_READ {
+		t.Fatalf("ABS ioctl on pipe: session=%v, error=%v", session, err)
+	}
+	assertFilesClosed(t, nodes)
+}
+
 func TestSessionIdleCancellationAndIdempotentClose(t *testing.T) {
 	nodes, _ := pipeNodes(t, 2)
 	ctx, cancel := context.WithCancel(context.Background())

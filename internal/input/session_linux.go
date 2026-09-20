@@ -2,6 +2,7 @@ package input
 
 import (
 	"context"
+	"maps"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -23,15 +24,16 @@ type Session struct {
 type sessionOps struct {
 	open  func(device.Group) ([]device.OpenedNode, error)
 	clock func(*os.File) error
+	axes  func(*os.File, []int) (map[uint16]AxisInfo, error)
 	// observe runs on the reducer after each event, including unreported events.
 	// It is private so tests can acknowledge processing without polling Latest.
 	observe func(int, Event, *Snapshot)
 }
 
 // Start revalidates and opens only the selected group. Ownership transfers to
-// the session only after every descriptor's monotonic clock is configured.
+// the session only after every descriptor's clock and axis metadata are ready.
 func Start(ctx context.Context, group device.Group, generations Generations) (*Session, error) {
-	return startSession(ctx, group, generations, sessionOps{open: device.OpenGroup, clock: setMonotonicClock})
+	return startSession(ctx, group, generations, sessionOps{open: device.OpenGroup, clock: setMonotonicClock, axes: readAxisInfo})
 }
 
 func startSession(ctx context.Context, group device.Group, generations Generations, ops sessionOps) (*Session, error) {
@@ -48,15 +50,25 @@ func startSession(ctx context.Context, group device.Group, generations Generatio
 		}
 		return first
 	}
-	for _, node := range nodes {
+	axisInfo := make([]map[uint16]AxisInfo, len(nodes))
+	for index, node := range nodes {
 		if err := ops.clock(node.File); err != nil {
 			_ = closeFiles()
 			return nil, &InputError{Code: ERR_INPUT_READ}
+		}
+		if codes := node.Node.Capabilities["abs"]; len(codes) > 0 {
+			info, err := ops.axes(node.File, codes)
+			if err != nil {
+				_ = closeFiles()
+				return nil, &InputError{Code: ERR_INPUT_READ}
+			}
+			axisInfo[index] = maps.Clone(info)
 		}
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	session := &Session{cancel: cancel, done: make(chan struct{})}
 	reducer := newReducer(len(nodes), generations)
+	reducer.latest.axisInfo = axisInfo
 	session.latest.Store(reducer.snapshot())
 	events := make(chan nodeEvent)
 	var readers sync.WaitGroup

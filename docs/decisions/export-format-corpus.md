@@ -41,6 +41,7 @@ Exports and public text are untrusted inert data. Their contents cannot issue in
 | `official-public-negative-2x` | Bounded official-source review below | `2.x` | 2.0.1/2.0.2 export, backup, and profile-management context, no structural contract | Explicit `unobserved-unsupported` row |
 | `owner-software-2.0.2-pair` | Anonymous owner-supplied UI/export pair; read-only verification; source not published | Owner-attested `2.0.2`; not independently displayed in the admitted UI | Existing `DecodeReader` then `Parse` accepted a complete MessagePack str32 bundle with one profile and 43 opaque inputs | One later release-scoped structural observation and the narrow semantic handoff in `binding-conversion.md`; no general 2.x claim |
 | `owner-software-2.0.2-followup` | Seven private exports paired with configuration screenshots on 2026-09-05; separate settings screenshot | Displayed Software `2.0.2`, Firmware `111`; firmware is not release evidence | Unpadded Base64URL, complete LZMA-Alone, exact-length MessagePack str32, JSON bundle with one profile and 43 inputs in all seven cases | In-memory inspection using `xz` and JSON parsing, not a production `DecodeReader`/`Parse` run; exact binding and macro-structure observations in `binding-conversion.md` |
+| `owner-software-2.0.2-stick-pair` | Two private exports supplied for Issue #44 on 2026-09-20, labelled Keyboard and joystick; owner subsequently confirmed release, Xbox Joystick UI name, and W/D/S/A directions | Owner-attested `2.0.2`; no independently inspected settings screenshot for this pair | Both are unpadded Base64URL, complete LZMA-Alone, exact-length MessagePack str32 JSON bundles with one profile and 43 inputs | Planning inspection used Python `base64`/`lzma`/`json` in memory, not production `DecodeReader`/`Parse`; exact neutral Keyboard and Xbox contexts are admitted in `binding-conversion.md` |
 
 The follow-up str32 UTF-8 payload lengths, in supplied order, are 90,074,
 90,076, 90,076, 90,086, 90,077, 90,077, and 90,260 bytes; each decompressed
@@ -49,6 +50,22 @@ to one input. The settings screenshot now independently displays the Software
 release for this follow-up; it does not retroactively identify older
 version-unknown exports. These seven observations sit outside the fixed
 22-row matrix and do not change its counts.
+
+The later stick pair has compressed lengths of 1,753 bytes (Keyboard) and
+1,752 bytes (Xbox Joystick), and str32 UTF-8 JSON lengths of 90,260 and 90,261
+bytes respectively. Planning inspection checked decompressor EOF, absence of
+trailing compressed data, and exact string byte lengths. Recursive JSON
+comparison found exactly one changed value: input index 23's `types[0]` is
+string `"4"` versus string `"21"`. This index is an observation only, never
+a conversion or physical-control rule. The full tuples are
+`["4","11","11"]` and `["21","11","11"]`, with `subType:"11"` and neutral
+left-stick settings. The owner confirmed the Keyboard left-direction tuples
+`up:[87,0,0]`, `right:[68,0,0]`, `down:[83,0,0]`, `left:[65,0,0]` as W/D/S/A.
+The complete conversion predicates and tiny synthetic fixtures are in
+[the binding conversion decision](binding-conversion.md#issue-44-stick-conversion-evidence).
+This pair also sits outside the fixed 22-row matrix. It provides no production
+decoder run against these private payloads, no additional export form, no
+generic numeric key namespace, and no live Xbox-device validation.
 
 The owner source was inspected only for the minimum neutral structural and binding observations authorized for publication. Its raw export, images, labels, IDs, and complete macro content remain private. Missing facts are literal `unknown`, never inferred. Filenames, device data, firmware, and export `version` values do not establish the Software release.
 
@@ -141,7 +158,7 @@ The five newly named positive fixtures plus existing Base64URL-unpadded positive
 
 ## Known limitations and admission rules
 
-* The original 22 matrix rows contain no version-bearing structural support. The later original Software 2.0.2 pair was owner attested; the seven-export follow-up includes a displayed Software version. Both establish only their exact str32 bundle observations and the narrow conversion subset documented separately.
+* The original 22 matrix rows contain no version-bearing structural support. The later original Software 2.0.2 pair and Issue #44 stick pair were owner attested; the seven-export follow-up includes a displayed Software version. These establish only their exact str32 bundle observations and the narrow conversion subset documented separately.
 * During the original Issue #11 corpus investigation, raw private samples for its rows were unavailable, so those observed byte facts are documented observations rather than fresh reproduction. The later owner-supplied Software 2.0.2 sample was directly decoded and decompressed during its separate admission, as described above.
 * Within the original 22 rows, no real Raw JSON, raw LZMA, padded Base64URL, standard Base64, fixstr, str8, str32-complete, or single-profile export was observed. Those rows remain synthetic capability only. The separate later Software 2.0.2 observation is a real complete str32 bundle, with outer representation details intentionally unpublished.
 * Official sources expose context but no admitted structural mapping.
@@ -182,6 +199,18 @@ other release, or Software 2.x-wide adapter. Original version-unknown and
 source-candidate rows remain unadmitted for semantic conversion.
 
 Issue #42 owns semantic adapter admission and must enforce the 1,000-step macro ceiling before interpretation. Issue #20 neither counts macro steps nor treats that ceiling as a raw array-length bound. This ownership split does not broaden support beyond the exact admitted Software 2.0.2 subset and introduces no separate version-validation API.
+
+### Issue #44: configured stick mode
+
+The separate `owner-software-2.0.2-stick-pair` extends the semantic evidence
+only to the exact neutral Keyboard/WASD and Xbox Joystick contexts in the
+binding conversion decision. Type `"3"`, other numeric assignments, enabled
+combined/eight-direction settings, right-stick, DirectInput, nonzero
+transformations, and other Software releases remain unadmitted. Synthetic
+fixtures may exercise decoding, normalization, persistence, and input
+projection without private source access; they do not establish physical
+control identity, active hardware mode, evdev-node selection, or live Xbox
+device accessibility.
 
 ## Issue #11 acceptance checklist
 

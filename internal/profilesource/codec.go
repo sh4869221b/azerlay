@@ -20,7 +20,7 @@ const (
 	modelSchemaVersion   = 1
 	// Parser/adapter semantic changes must bump the relevant interpretation revision.
 	decoderVersion    = "1"
-	normalizerVersion = "1"
+	normalizerVersion = "2"
 	maxIndexBytes     = 16 << 20
 	maxCacheBytes     = 512 << 20
 	// These mirror the existing admitted export structural bounds.
@@ -121,10 +121,21 @@ type diskTrigger struct {
 	Trigger           profile.TriggerKind `json:"trigger"`
 	Kind              profile.BindingKind `json:"kind"`
 	Actions           []diskAction        `json:"actions"`
+	Stick             *diskStick          `json:"stick,omitempty"`
 	TriggerDelayMS    *int                `json:"trigger_delay_ms"`
 	TriggerIntervalMS *int                `json:"trigger_interval_ms"`
 	ReleaseBehavior   *string             `json:"release_behavior"`
 	Unknown           *diskUnknown        `json:"unknown"`
+}
+type diskStick struct {
+	Mode               profile.StickMode      `json:"mode"`
+	KeyboardDirections diskKeyboardDirections `json:"keyboard_directions"`
+}
+type diskKeyboardDirections struct {
+	Up    profile.CanonicalCode `json:"up"`
+	Right profile.CanonicalCode `json:"right"`
+	Down  profile.CanonicalCode `json:"down"`
+	Left  profile.CanonicalCode `json:"left"`
 }
 type diskUnknown struct {
 	Reason string `json:"reason"`
@@ -216,7 +227,32 @@ func (v *diskBindingRaw) UnmarshalJSON(b []byte) error {
 }
 func (v *diskTrigger) UnmarshalJSON(b []byte) error {
 	type plain diskTrigger
-	return decodeObject(b, (*plain)(v), "trigger kind actions trigger_delay_ms trigger_interval_ms release_behavior unknown")
+	if err := decodeObject(b, (*plain)(v), "trigger kind actions trigger_delay_ms trigger_interval_ms release_behavior unknown"); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(b, &fields); err != nil {
+		return err
+	}
+	if value, ok := fields["stick"]; ok {
+		return json.Unmarshal(value, &v.Stick)
+	}
+	return nil
+}
+func (v *diskStick) UnmarshalJSON(b []byte) error {
+	type plain diskStick
+	return decodeObject(b, (*plain)(v), "mode keyboard_directions")
+}
+func (v *diskKeyboardDirections) UnmarshalJSON(b []byte) error {
+	var fields map[string]*profile.CanonicalCode
+	if err := decodeObject(b, &fields, "up right down left"); err != nil {
+		return err
+	}
+	if fields["up"] == nil || fields["right"] == nil || fields["down"] == nil || fields["left"] == nil {
+		return errCodecShape
+	}
+	*v = diskKeyboardDirections{Up: *fields["up"], Right: *fields["right"], Down: *fields["down"], Left: *fields["left"]}
+	return nil
 }
 func (v *diskUnknown) UnmarshalJSON(b []byte) error {
 	type plain diskUnknown
@@ -429,6 +465,9 @@ func profileToDisk(value profile.Profile) diskProfile {
 		}
 		for j, binding := range control.Bindings {
 			trigger := diskTrigger{Trigger: binding.Trigger, Kind: binding.Kind, TriggerDelayMS: binding.TriggerDelayMS, TriggerIntervalMS: binding.TriggerIntervalMS, ReleaseBehavior: binding.ReleaseBehavior}
+			if binding.Stick != nil {
+				trigger.Stick = &diskStick{Mode: binding.Stick.Mode, KeyboardDirections: diskKeyboardDirections(binding.Stick.KeyboardDirections)}
+			}
 			if binding.Unknown != nil {
 				trigger.Unknown = &diskUnknown{Reason: binding.Unknown.Reason}
 			}
@@ -456,6 +495,9 @@ func profileFromDisk(value diskProfile) profile.Profile {
 		}
 		for j, binding := range control.Bindings {
 			trigger := profile.TriggerBinding{Trigger: binding.Trigger, Kind: binding.Kind, TriggerDelayMS: binding.TriggerDelayMS, TriggerIntervalMS: binding.TriggerIntervalMS, ReleaseBehavior: binding.ReleaseBehavior}
+			if binding.Stick != nil {
+				trigger.Stick = &profile.StickBinding{Mode: binding.Stick.Mode, KeyboardDirections: profile.KeyboardDirections(binding.Stick.KeyboardDirections)}
+			}
 			if binding.Unknown != nil {
 				trigger.Unknown = &profile.UnknownBinding{Reason: binding.Unknown.Reason}
 			}
@@ -498,7 +540,22 @@ func bundleFromDisk(bundle diskBundle) profile.ProfileBundle {
 	return result
 }
 func validTrigger(binding profile.TriggerBinding) bool {
+	if binding.Kind != profile.BindingStick && binding.Stick != nil {
+		return false
+	}
 	switch binding.Kind {
+	case profile.BindingStick:
+		if binding.Trigger != profile.TriggerSingle || binding.Stick == nil || binding.Actions != nil || binding.Unknown != nil || binding.TriggerDelayMS != nil || binding.TriggerIntervalMS != nil || binding.ReleaseBehavior != nil {
+			return false
+		}
+		switch binding.Stick.Mode {
+		case profile.StickModeKeyboard:
+			return binding.Stick.KeyboardDirections == (profile.KeyboardDirections{Up: profile.KEY_W, Right: profile.KEY_D, Down: profile.KEY_S, Left: profile.KEY_A})
+		case profile.StickModeXbox:
+			return binding.Stick.KeyboardDirections == (profile.KeyboardDirections{})
+		default:
+			return false
+		}
 	case profile.BindingUnknown:
 		return binding.Actions == nil && binding.TriggerDelayMS == nil && binding.TriggerIntervalMS == nil && binding.ReleaseBehavior == nil && binding.Unknown != nil && binding.Unknown.Reason == "unmapped_binding"
 	case profile.BindingKeyboard:

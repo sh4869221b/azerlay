@@ -17,6 +17,8 @@ var recognizedTypeArrays = [][]string{
 	{"11", "11", "1"},
 	{"11", "11", "11"},
 	{"16", "11", "11"},
+	{"4", "11", "11"},
+	{"21", "11", "11"},
 }
 
 func preserveProfile(raw profileraw.RawProfile, rootKind profile.RootKind, profileIndex int) profile.Profile {

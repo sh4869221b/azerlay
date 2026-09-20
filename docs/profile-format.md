@@ -284,6 +284,36 @@ string such as `"500"` remains Unknown. No broad symbolic conversion, Software
 1.x or 2.x mapping, numeric key namespace, numeric-to-Linux equivalence, timing
 range, inactive action, or unassigned meaning is inferred.
 
+### Confirmed stick modes
+
+Software 2.0.2 exports also normalize the owner-confirmed neutral Keyboard/WASD
+and Xbox Joystick shapes into distinct `BindingStick` payloads. Recognition uses
+the source fields, never an input ordinal or a caller mode override:
+
+| Source shape | Normalized primary binding |
+| --- | --- |
+| `types:["4","11","11"]` | Keyboard, with up `KEY_W`, right `KEY_D`, down `KEY_S`, left `KEY_A` |
+| `types:["21","11","11"]` | Xbox, without keyboard direction assignments |
+
+Both require `subType:"11"`, primary `isHold`, `isTurbo`, and `isToggleOnHold`
+false, four string `"0"` key values, and three string `"0"` modifier values.
+`analogSettings` requires exact numeric zero tokens for `angle`, `lowerLimit`,
+and `upperLimit`; `isRightAnalog`, `invertXAxis`, `invertYAxis`,
+`isCombinedAnalog`, `isEightDirectionalTrigger`, `isHoldTrigger`,
+`isAnalogSmoothing`, and `isAngleLock` must all be false. Keyboard additionally
+requires left direction tuples up `[87,0,0]`, right `[68,0,0]`, down `[83,0,0]`,
+and left `[65,0,0]`. Xbox ignores dormant keyboard assignments. This admits
+these confirmed tuples only, not a general numeric key namespace. Equivalent
+number spellings such as `0.0` are not admitted in these exact-token predicates.
+
+The primary slot is single-trigger; long/double remain Unknown. Raw references
+and source order are preserved. Missing or wrong-type predicates, unconfirmed
+assignments, nonzero transformations, right/combined stick settings, and type
+`"3"` remain Unknown. This does not establish DirectInput or broad Software 2.x
+support. Exported configuration also does not identify the active hardware
+profile or input node. The owner attribution and observed limits are recorded
+in [binding-conversion.md](decisions/binding-conversion.md).
+
 ### Errors and macro boundary
 
 `NormalizeError.Error()` returns only its stable code. Unadmitted metadata
@@ -312,7 +342,8 @@ opaque rather than being counted or interpreted.
 
 This is the owner-approved option A foundation: parsed exports can reach an
 ordered, version-independent model while unsupported data remains inspectable.
-It isn't full original Issue #42 support for legacy formats, analog, turbo, or
+It isn't full original Issue #42 support for legacy formats, arbitrary analog
+settings, turbo, or
 executable and matchable macros, and it doesn't satisfy product acceptance
 AC-003.
 
@@ -354,6 +385,12 @@ derived cache is rebuilt only in memory from the committed original and its
 saved attribution. A missing or hash-mismatched original, corrupt index, or
 failed reconstruction is `ERR_PROFILE_STORAGE`; it never yields a partial
 result or reselects another source.
+
+Typed stick mode and direction data survive saving and reloading. Normalizer
+revision 2 invalidates revision-1 caches so saved originals are re-normalized in
+memory, including previously Unknown stick bindings. Storage and model schema
+versions remain 1. A historical index can still use a current compatible cache;
+loading does not rewrite the index, cache, original, or selection.
 
 The store is `$XDG_DATA_HOME/azerlay`, or `$HOME/.local/share/azerlay` when
 `XDG_DATA_HOME` is unset, empty, or relative. Its application-owned directories

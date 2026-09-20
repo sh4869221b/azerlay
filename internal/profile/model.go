@@ -77,6 +77,7 @@ type BindingKind string
 
 const (
 	BindingKeyboard BindingKind = "keyboard"
+	BindingStick    BindingKind = "stick"
 	BindingUnknown  BindingKind = "unknown"
 )
 
@@ -85,10 +86,33 @@ type TriggerBinding struct {
 	Trigger           TriggerKind
 	Kind              BindingKind
 	Actions           []Action
+	Stick             *StickBinding
 	TriggerDelayMS    *int
 	TriggerIntervalMS *int
 	ReleaseBehavior   *string
 	Unknown           *UnknownBinding
+}
+
+// StickMode identifies the configured source stick mode.
+type StickMode string
+
+const (
+	StickModeKeyboard StickMode = "keyboard"
+	StickModeXbox     StickMode = "xbox"
+)
+
+// StickBinding describes a supported neutral left-stick configuration.
+type StickBinding struct {
+	Mode               StickMode
+	KeyboardDirections KeyboardDirections
+}
+
+// KeyboardDirections contains canonical keys only for keyboard stick mode.
+type KeyboardDirections struct {
+	Up    CanonicalCode
+	Right CanonicalCode
+	Down  CanonicalCode
+	Left  CanonicalCode
 }
 
 // UnknownBinding records a stable reason for uninterpreted semantics.
@@ -105,6 +129,10 @@ const ActionKeyboard ActionKind = "keyboard"
 type CanonicalCode string
 
 const (
+	KEY_W        CanonicalCode = "KEY_W"
+	KEY_A        CanonicalCode = "KEY_A"
+	KEY_S        CanonicalCode = "KEY_S"
+	KEY_D        CanonicalCode = "KEY_D"
 	KEY_U        CanonicalCode = "KEY_U"
 	KEY_P        CanonicalCode = "KEY_P"
 	KEY_L        CanonicalCode = "KEY_L"

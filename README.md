@@ -10,10 +10,15 @@ profile ordinal; `profiles show` reads that saved selection in a later process.
 `devices list` and `devices inspect` discover the researched Cyborg II signature
 and report access diagnostics without reading input events. An internal input
 package reads selected, verified nodes and publishes immutable raw input
-snapshots at node-local `SYN_REPORT` boundaries. It is not connected to `run` or
-GTK yet; axis normalization, input recovery, and overlay functionality remain
-unimplemented. Reader/reducer integration is tested with synthetic OS pipes,
-not live Cyborg II input.
+snapshots at node-local `SYN_REPORT` boundaries. It captures kernel axis ranges
+and derives normalized axes, stick direction, and intensity from committed
+snapshots. Confirmed neutral Software 2.0.2 Keyboard/WASD and Xbox Joystick
+exports automatically select distinct normalized stick modes that survive
+save/reload; callers still explicitly select the input nodes. Other stick
+settings remain Unknown. Input processing is not connected to `run` or GTK yet;
+input recovery and overlay functionality remain unimplemented. Export-to-input
+integration is tested with synthetic exports and OS pipes, not live Xbox or
+Cyborg II input.
 
 An internal configuration package loads, validates, and watches TOML settings
 with last-good reload preservation. A same-user control socket and CLI can
