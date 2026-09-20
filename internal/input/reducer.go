@@ -93,7 +93,7 @@ func (r *reducer) commit(node int, report Event) *Snapshot {
 	r.latest = Snapshot{
 		Sequence: r.latest.Sequence + 1, Timestamp: timestamp,
 		Connected: true, Generations: r.latest.Generations,
-		nodes: nodes, reportingNode: node, events: frame, relative: relative,
+		nodes: nodes, axisInfo: r.latest.axisInfo, reportingNode: node, events: frame, relative: relative,
 	}
 	return r.snapshot()
 }
@@ -108,7 +108,7 @@ func (r *reducer) stop() *Snapshot {
 	r.pending = nil
 	r.latest = Snapshot{
 		Sequence: r.latest.Sequence + 1, Timestamp: r.latest.Timestamp,
-		Generations: r.latest.Generations, reportingNode: -1,
+		Generations: r.latest.Generations, axisInfo: r.latest.axisInfo, reportingNode: -1,
 	}
 	return r.snapshot()
 }

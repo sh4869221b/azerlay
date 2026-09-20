@@ -15,6 +15,7 @@ type Snapshot struct {
 	Generations Generations
 
 	nodes         []nodeState
+	axisInfo      []map[uint16]AxisInfo
 	reportingNode int
 	events        []Event
 	relative      map[uint16]int64
@@ -43,6 +44,16 @@ func (s *Snapshot) Absolute(node int, code uint16) (value int32, known bool) {
 	}
 	value, known = s.nodes[node].absolute[code]
 	return value, known
+}
+
+// AxisInfo returns kernel metadata by value. Its presence does not mean an
+// absolute-axis value has been observed.
+func (s *Snapshot) AxisInfo(node int, code uint16) (info AxisInfo, present bool) {
+	if node < 0 || node >= len(s.axisInfo) {
+		return AxisInfo{}, false
+	}
+	info, present = s.axisInfo[node][code]
+	return info, present
 }
 
 // ReportingNode identifies the selected-path index whose SYN_REPORT published
