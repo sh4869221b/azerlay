@@ -1,0 +1,18 @@
+{
+  "id": "synthetic-stick",
+  "inputs": [{
+    "types": ["4", "11", "11"], "subType": "11",
+    "keyValues": ["0", "0", "0", "0"], "metaValues": ["0", "0", "0"],
+    "isHold": false, "isTurbo": false, "isToggleOnHold": false,
+    "analogSettings": {
+      "angle": 0, "lowerLimit": 0, "upperLimit": 0,
+      "isRightAnalog": false, "invertXAxis": false, "invertYAxis": false,
+      "isCombinedAnalog": false, "isEightDirectionalTrigger": false,
+      "isHoldTrigger": false, "isAnalogSmoothing": false, "isAngleLock": false,
+      "analogKeys": {"left": {
+        "up": [87, 0, 0], "right": [68, 0, 0],
+        "down": [83, 0, 0], "left": [65, 0, 0]
+      }}
+    }
+  }]
+}

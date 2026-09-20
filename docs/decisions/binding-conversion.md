@@ -38,6 +38,7 @@ cannot be broader than this exact release and source scope.
 | --- | --- | --- | --- |
 | `owner-software-2.0.2-pair` | Anonymous owner-supplied Software 2.0.2 UI/export pair | Release-scoped root, field, key, timing, and regular-release observations listed here | The export, images, labels, IDs, and complete macro content are private and are not normative dependencies or reproduced artifacts. Release attribution is owner attested, not independently displayed. |
 | `owner-software-2.0.2-followup` | Seven exports paired in message order with seven configuration images on 2026-09-05, plus a settings image displaying Software 2.0.2 | Empty key field, single U/P, left Ctrl+U, long U, double I, and macro structure below | The owner explicitly confirmed left Ctrl. Full exports, images, labels, IDs, and the complete macro sequence remain private. |
+| `owner-software-2.0.2-stick-pair` | Two private exports supplied for Issue #44 on 2026-09-20; owner-confirmed Software 2.0.2, Keyboard versus Xbox Joystick, and up=W/right=D/down=S/left=A | Exact neutral left-stick mode and directional tuples below | Release, UI mode names, and directions are owner attested, not independently inspected settings screenshots. Python inspection did not run production `DecodeReader`/`Parse`. No live Xbox-device or physical-control mapping is established. |
 | `local-linux-uapi` | Local `/usr/include/linux/input-event-codes.h`, inspected 2026-09-05 | `KEY_W` 17, `KEY_U` 22, `KEY_I` 23, `KEY_P` 25, `KEY_LEFTCTRL` 29, `KEY_LEFTSHIFT` 42 | Constants establish Linux names and values, not Azeron numeric namespaces. |
 | `linux-uapi-654ae5d` | [Linux input event codes at commit 654ae5d](https://github.com/torvalds/linux/blob/654ae5d73c05bd2943d65636ce6cd0aa46e62f18/include/uapi/linux/input-event-codes.h) | Canonical names and values `KEY_U` 22, `KEY_P` 25, and `KEY_L` 38 | Linux constants do not prove an Azeron raw mapping by numeric equality. |
 | `linux-events-654ae5d` | [Linux input event semantics at commit 654ae5d](https://github.com/torvalds/linux/blob/654ae5d73c05bd2943d65636ce6cd0aa46e62f18/Documentation/input/event-codes.rst) | The `EV_KEY` keyboard namespace uses `KEY_<name>` | It does not establish source symbols or physical controls. |
@@ -128,6 +129,101 @@ remain unresolved. Preserve unknown semantics and raw content rather than
 executing or guessing them. Repeating observed step shapes in synthetic
 limit fixtures is policy coverage, not evidence of a real 1,000-step export.
 
+## Issue #44 stick conversion evidence
+
+The source is `owner-software-2.0.2-stick-pair`, independently attributed by
+the owner to Software 2.0.2 and the UI modes Keyboard and Xbox Joystick.
+The owner confirmed Keyboard directions up=W, right=D, down=S, left=A.
+The planning inspection used Python `base64`, `lzma`, and `json` in memory;
+it did not run production `profiledecode.DecodeReader` or `profileraw.Parse`
+on this private pair. Structural observations are recorded in the
+[export format corpus](export-format-corpus.md).
+
+Both bundles have one profile and 43 inputs. A recursive JSON comparison
+found exactly one changed value: input index 23's `types[0]` is string `"4"`
+for Keyboard and string `"21"` for Xbox Joystick. This ordinal is observation
+context only; recognition must not depend on input position, ID, pin, or any
+private source content. The complete type arrays, not a standalone numeric
+discriminant, participate in the following closed predicates.
+
+Both modes require trusted source metadata `2.0.2` / `azeron-software-export`,
+string `subType:"11"`, and an `analogSettings` object. The neutral context
+requires numeric zero for `angle`, `lowerLimit`, and `upperLimit`, and JSON
+boolean `false` for `isRightAnalog`, `invertXAxis`, `invertYAxis`,
+`isCombinedAnalog`, `isEightDirectionalTrigger`, `isHoldTrigger`,
+`isAnalogSmoothing`, and `isAngleLock`. The primary input requires JSON
+boolean `false` for `isHold`, `isTurbo`, and `isToggleOnHold`, string array
+`keyValues:["0","0","0","0"]`, and string array
+`metaValues:["0","0","0"]`. Missing, null, or differently typed required
+fields do not satisfy these predicates.
+
+| Complete type context | Owner-confirmed UI meaning | Admitted primary result |
+| --- | --- | --- |
+| `types:["4","11","11"]`, common neutral predicates, and all four exact left-direction tuples below | Keyboard with up=W, right=D, down=S, left=A | Single trigger, kind `stick`, mode `keyboard`, with the four canonical directions; no generic keyboard actions |
+| `types:["21","11","11"]` and common neutral predicates | Xbox Joystick, left stick | Single trigger, kind `stick`, mode `xbox`; no keyboard direction assignments |
+
+| `analogSettings.analogKeys.left` member | Exact JSON numeric tuple | Owner-confirmed key | Canonical direction code |
+| --- | --- | --- | --- |
+| `up` | `[87,0,0]` | W | `KEY_W` |
+| `right` | `[68,0,0]` | D | `KEY_D` |
+| `down` | `[83,0,0]` | S | `KEY_S` |
+| `left` | `[65,0,0]` | A | `KEY_A` |
+
+These tuples establish only the complete Keyboard context above. They do not
+establish arbitrary numeric key conversion, a meaning for the zero slots,
+or an extension to ordinary keyboard `keyValues`. The Xbox export retains
+the same dormant keyboard assignments, but those must not generate keyboard
+directions for Xbox mode. Inactive right/diagonal keys, hold payloads, and
+macro bodies are retained opaquely rather than interpreted. Both exact type
+arrays preserve single/long/double trigger ordering; their unimplemented
+long and double slots remain Unknown.
+
+Type `"3"`, DirectInput, right-stick, combined/eight-direction modes, nonzero
+angle or limits, inversion, other enabled transformations, and unconfirmed
+direction tuples remain unadmitted. An unsupported contextual variant in
+the selected 2.0.2 adapter keeps the entire primary binding Unknown with raw
+data intact. Other releases remain `unsupported_generation`. Xbox identity
+is not generalized to DirectInput. No export field here establishes kernel
+axis codes, signs, ranges, dead-zone units, a selected evdev node, an active
+hardware profile, or successful live Xbox-device operation.
+
+### Minimal synthetic stick fixtures
+
+Use this neutral single-profile JSON as the Keyboard fixture; its profile ID
+is synthetic, and it does not reproduce the private 43-input bundle. Supply
+the trusted release/source metadata separately to the adapter.
+
+```json
+{
+  "id": "synthetic-stick",
+  "inputs": [{
+    "types": ["4", "11", "11"], "subType": "11",
+    "keyValues": ["0", "0", "0", "0"], "metaValues": ["0", "0", "0"],
+    "isHold": false, "isTurbo": false, "isToggleOnHold": false,
+    "analogSettings": {
+      "angle": 0, "lowerLimit": 0, "upperLimit": 0,
+      "isRightAnalog": false, "invertXAxis": false, "invertYAxis": false,
+      "isCombinedAnalog": false, "isEightDirectionalTrigger": false,
+      "isHoldTrigger": false, "isAnalogSmoothing": false, "isAngleLock": false,
+      "analogKeys": {"left": {
+        "up": [87, 0, 0], "right": [68, 0, 0],
+        "down": [83, 0, 0], "left": [65, 0, 0]
+      }}
+    }
+  }]
+}
+```
+
+The Xbox fixture is exactly this JSON with `types` changed to
+`["21","11","11"]`; retain the dormant key tuples to check that they do not
+populate Xbox directions. For each fixture, also wrap the same synthetic
+profile in `{"profiles":[...]}` to exercise the bundle path. Single-profile
+and Raw JSON tests are synthetic protocol coverage, not new observed export
+forms. Expected primary results are the two rows above; relocating or
+duplicating the synthetic input must not alter its interpretation. Changing
+one required predicate to an unadmitted value must preserve an Unknown raw
+binding, rather than produce a partial stick result.
+
 ## Unknown, unsupported, and invalid
 
 Adapter selection and value interpretation are separate decisions:
@@ -165,13 +261,13 @@ about their physical origin, which remains outside Issue #40.
 | Modifiers and `metaValues*` | Exact no-modifier predicates and the single left Ctrl+U row only. Other modifiers, combinations, masks, enums, ordering, and general zero semantics remain unresolved. | `unsupported_generation` |
 | Legacy numeric `keyValues` and `metaValues` | Unknown if encountered in the admitted adapter. No numeric namespace, number/string coercion, or Linux numeric equivalence is established. | `unsupported_generation` |
 | Other keyboard, mouse, and `BTN_*` symbols | Unknown. No additional source symbol or namespace is correlated. | `unsupported_generation` |
-| Single trigger | Exact U, P, and left Ctrl+U rows with regular release; empty-setting observation does not establish a generic unassigned rule. | `unsupported_generation` |
+| Single trigger | Exact U, P, and left Ctrl+U rows with regular release, plus the two exact stick contexts above; empty-setting observation does not establish a generic unassigned rule. | `unsupported_generation` |
 | Long trigger | Exact U rows at 500 ms and 1278 ms with their respective type contexts and regular tuples. Other values or combinations are Unknown. | `unsupported_generation` |
 | Double trigger | Exact ordered P plus L at 150 ms and I at 123 ms, each in its own context. Other values or combinations are Unknown. | `unsupported_generation` |
 | Macro, sequence, macro hold, macro delay, and repeat | The follow-up admits `macro.v:1`, `steps`, Button/Delay shapes, and limited parameter correlations. Full macro semantics remain Unknown. | `unsupported_generation` |
 | Turbo | Unknown except that the complete false/false/false tuple participates in the exact regular long row. Enabled encoding, rate, units, and interactions are unresolved. | `unsupported_generation` |
-| Gamepad | Unknown. No button namespace, raw value, or discriminant meaning is correlated. | `unsupported_generation` |
-| Analog | Unknown. Axis namespace, mode, sign, direction, center, range, dead zone, inversion, rotation, value type, and analog/WASD relationship are unresolved. No `ABS_*` result is inferred. | `unsupported_generation` |
+| Gamepad | Only the exact Xbox Joystick mode context above is admitted. Button namespaces and other gamepad modes remain Unknown. | `unsupported_generation` |
+| Analog and Keyboard stick | Only the exact neutral left-stick Keyboard/WASD and Xbox Joystick contexts above are admitted. Axis namespace, range, sign, nonzero dead-zone/rotation semantics, and live-device mapping remain unresolved. No `ABS_*` result is inferred from the export. | `unsupported_generation` |
 | Defaults and unused slots | No general meaning. The observed `"0"` entries remain parts of exact predicates only. | `unsupported_generation` |
 | Physical controls, pins, device, and firmware | Not decided here. No physical guess is permitted. | Not Issue #40 scope |
 
