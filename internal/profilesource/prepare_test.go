@@ -125,6 +125,9 @@ func TestPrepareFailure(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
+				if reflect.DeepEqual(got, Prepared{}) {
+					t.Fatal("success returned empty Prepared")
+				}
 				// When
 				switch kind {
 				case "text":
