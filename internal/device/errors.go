@@ -12,6 +12,7 @@ const (
 	ERR_DEVICE_DISCONNECTED = "ERR_DEVICE_DISCONNECTED"
 	ERR_DEVICE_UNSUPPORTED  = "ERR_DEVICE_UNSUPPORTED"
 	ERR_DEVICE_METADATA     = "ERR_DEVICE_METADATA"
+	ERR_DEVICE_AMBIGUOUS    = "ERR_DEVICE_AMBIGUOUS"
 	WARN_DEVICE_INCOMPLETE  = "WARN_DEVICE_INCOMPLETE"
 	WARN_DEVICE_ROOT        = "WARN_DEVICE_ROOT"
 )
@@ -38,6 +39,8 @@ func diagnostic(code, stage string, target *string) Diagnostic {
 		d.Summary, d.Remediation = "Device disappeared during discovery.", "Reconnect the device and enumerate it again."
 	case ERR_DEVICE_UNSUPPORTED:
 		d.Summary, d.Remediation = "Device identity or capabilities are unsupported.", "Check the researched Cyborg II identity contract."
+	case ERR_DEVICE_AMBIGUOUS:
+		d.Summary, d.Remediation = "More than one device or selected interface matches.", "Select a unique device and reconnect it."
 	case WARN_DEVICE_INCOMPLETE:
 		d.Severity, d.Summary, d.Remediation = "warning", "Some expected device interfaces are missing or excluded.", "Inspect the device nodes and check connection and unsupported-node diagnostics."
 	case WARN_DEVICE_ROOT:
