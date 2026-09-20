@@ -7,7 +7,9 @@ Wayland-native Azeron profile and live input overlay for Linux.
 Bootstrap phase. The CLI can validate and save Azeron Software 2.0.2 profile
 exports. A successful `import` saves the exact export and a one-based selected
 profile ordinal; `profiles show` reads that saved selection in a later process.
-Device and overlay functionality is not implemented yet.
+`devices list` and `devices inspect` discover the researched Cyborg II signature
+and report access diagnostics without reading input events. Runtime input and
+overlay functionality are not implemented yet.
 
 An internal configuration package loads, validates, and watches TOML settings
 with last-good reload preservation. A same-user control socket and CLI can
@@ -81,6 +83,44 @@ profile name, input count, selection, and Unknown warning counts. They don't
 include IDs, labels, bindings, macros, unknown fields, or other private export
 content. The raw export version is reported metadata. It isn't the
 `--software-release` attribution and doesn't establish Software support.
+
+## Device CLI
+
+```sh
+azerlay devices list
+azerlay devices list --json
+azerlay devices inspect
+azerlay devices inspect /dev/input/eventN --json
+azerlay devices inspect --help
+```
+
+Replace `/dev/input/eventN` with a current path from `devices list`. Event paths
+are temporary locators and can change after reconnecting. Without a path,
+`inspect` includes relevant candidates and excluded siblings; with a path, it
+examines only that node. An explicit path never bypasses device matching.
+
+Support requires the observed USB signature `16d0:12f7:0111` and the interface
+descriptors and minimum capabilities in the
+[device identity decision](docs/decisions/device-identity.md#identity-and-grouping-contract).
+Matching nodes are grouped by their current USB device parent. A qualifying
+subset remains visible when other interfaces are missing, unsupported, or
+unreadable; a complete group means all expected interfaces were admitted, not
+that all are readable. Other releases and Cyborg variants are not qualified.
+
+Exit `0` requires at least one admitted readable node and no error diagnostic;
+exit `1` covers discovery, access, or output failure; invalid arguments exit
+`2`. Warnings alone do not fail an otherwise successful scan. Text results and
+warnings go to stdout, while errors go to stderr. `--json` emits one
+newline-terminated schema-version-1 object on stdout, including for usage
+errors, and retains partial results. See the
+[device CLI contract](docs/design-research.md#1711-devices-implemented) for fields.
+
+List output omits serial and detailed metadata. **Inspect output includes serial
+values when available**, even without a path; review it before sharing. These
+commands do not require a running instance or configuration and do not change
+permissions. Device checks in `doctor` and the runtime device backend remain
+unimplemented. See [device troubleshooting](docs/troubleshooting.md) for stable
+diagnostic codes and the limits of access and uaccess packaging validation.
 
 ## Run and control CLI
 
@@ -173,10 +213,11 @@ no stderr output when writing succeeds. See the
 | `2` | Diagnostic errors or invalid command arguments. |
 | `3` | Internal diagnostic or output failure. |
 
-A healthy current installation still returns `1`: library, Layer Shell, monitor,
-device discovery, device/udev permissions, and evdev capability checks are not
-implemented. The session check examines `WAYLAND_DISPLAY` only, not compositor
-connectivity. If the default configuration is absent, `azerlay doctor --json`
+A healthy current installation still returns `1`: doctor checks for libraries,
+Layer Shell, monitors, device discovery, device/udev permissions, and evdev
+capabilities are not implemented. Use the separate `devices` CLI for discovery
+and access diagnostics. The session check examines `WAYLAND_DISPLAY` only, not
+compositor connectivity. If the default configuration is absent, `azerlay doctor --json`
 returns `2` with `ERR_CONFIG_NOT_FOUND`; create a valid configuration containing
 `schema_version = 1` before retrying.
 
@@ -193,6 +234,7 @@ a stale socket, or changes running visibility or selection.
 - [Architecture principles](docs/architecture.md)
 - [Security principles](docs/security.md)
 - [Cyborg II device identity and permission decision](docs/decisions/device-identity.md)
+- [Device and permission troubleshooting](docs/troubleshooting.md)
 - [CI and synthetic fixture policy](docs/ci.md)
 - [Configuration schema and reload behavior](docs/config.md)
 - [Control protocol and CLI](docs/control-protocol.md)

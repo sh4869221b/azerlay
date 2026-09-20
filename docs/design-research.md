@@ -1374,6 +1374,77 @@ azerlay quit
 azerlay version
 ```
 
+#### 17.1.1 `devices` (implemented)
+
+```text
+azerlay devices --help
+azerlay devices list [--json] [--help]
+azerlay devices inspect [path] [--json] [--help]
+```
+
+These standalone commands collect metadata and probe admitted event nodes
+read-only for access and identification. They do not read input events, change
+permissions, or use configuration, profile storage, or the runtime socket.
+Runtime input and device checks within `doctor` are not implemented.
+Admission and grouping follow the researched `16d0:12f7:0111`
+[identity contract](decisions/device-identity.md#identity-and-grouping-contract);
+no wider variant or release support is implied.
+
+Flags are unique literal booleans: `--json=true`, duplicate flags, flags before
+the subcommand, list positionals, and more than one inspect path are usage
+errors. `--` ends flag parsing; a following path is literal. Valid help returns
+text and exit `0` without discovery, including with `--json`; invalid syntax
+still fails before discovery. For usage errors, a literal `--json` before `--`
+selects JSON even if other arguments are invalid.
+
+List returns admitted nodes and groups plus relevant candidate diagnostics.
+Inspect without a path also shows excluded relevant candidates; explicit
+inspect examines only the supplied node. Relative paths and symlinks must map
+by device number to an existing input event in sysfs. Explicit inspection does
+not bypass admission or open sibling nodes. Paths are transient locators.
+
+| Exit | Meaning |
+| --- | --- |
+| `0` | At least one requested admitted node is readable and no error diagnostic exists. |
+| `1` | No qualifying node, unsupported explicit target, metadata/access/disconnection error, or output failure. Available partial results are retained. |
+| `2` | Invalid command arguments (`ERR_CLI_USAGE`). |
+
+Warnings alone do not fail a qualifying readable subset. Unsupported automatic
+candidates use warning-level `ERR_DEVICE_UNSUPPORTED`; explicit unsupported
+targets use error-level severity. Missing/excluded interfaces produce
+`WARN_DEVICE_INCOMPLETE`. Candidate metadata failures, denied access, and
+disconnections remain errors even when another node is readable. Root adds
+`WARN_DEVICE_ROOT` without changing the exit status: root access does not prove
+ordinary-user access. A successful open does not verify installed least-privilege
+ACLs; see [permission troubleshooting](troubleshooting.md).
+
+Text results and warnings go to stdout, errors to stderr. Device-supplied control
+characters are escaped. JSON is one newline-terminated object on stdout, with
+no stderr when writing succeeds, including usage failures:
+
+```text
+{schema_version: 1, command, ok, result, error}
+```
+
+`command` is `devices list` or `devices inspect` (`devices` for parent usage).
+`ok` corresponds to successful discovery. `result` contains `groups`, `nodes`,
+and `diagnostics` arrays, including empty arrays; it is `null` when usage,
+resolution, or enumeration fails before a result exists. `error` is `null` or
+the first error diagnostic in output order. Diagnostics contain `code`,
+`severity`, `stage`, `summary`, nullable `target`, and `remediation`.
+
+Groups contain `usb_parent`, `complete`, and `event_paths`. Completeness means
+all three expected interfaces were admitted, not that all nodes are readable.
+Node summaries contain `path`, nullable `usb_parent` and `interface`, `roles`,
+`admission` (`admitted`, `unsupported`, `indeterminate`), and `access`
+(`readable`, `denied`, `unavailable`, `not_checked`). Inspect adds `name`,
+`input_id`, `usb_id`, `sysfs_path`, `physical_path`, **`serial`**,
+`interface_descriptor`, and `capabilities`; list omits all these detail fields.
+Inspect may disclose serial even without a path. Unknown optional values are
+`null`. IDs use lowercase fixed-width hexadecimal strings; capabilities use
+sorted numeric code arrays by family. Groups sort by parent path, nodes by
+event number/path, and diagnostics by target then code.
+
 ### 17.2 `run`
 
 ```text
@@ -1549,6 +1620,8 @@ ERR_PROFILE_NOT_FOUND
 ERR_DEVICE_NOT_FOUND
 ERR_DEVICE_PERMISSION
 ERR_DEVICE_DISCONNECTED
+ERR_DEVICE_UNSUPPORTED
+ERR_DEVICE_METADATA
 ERR_LAYER_SHELL_UNAVAILABLE
 ERR_MONITOR_NOT_FOUND
 ERR_INSTANCE_RUNNING
