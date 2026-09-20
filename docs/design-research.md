@@ -983,7 +983,7 @@ Azeron USB device
 SUBSYSTEM=="input", KERNEL=="event*", ATTRS{idVendor}=="<VID>", ATTRS{idProduct}=="<PID>", TAG+="uaccess"
 ```
 
-実際のVID/PID、複数製品ID、interface条件は**要調査・リリース阻害**。汎用的すぎるruleを配布しない。
+観測済みの `16d0:12f7` / USB release `0111` / interface `01/02/03` の識別条件と具体的なrule候補は[device identity decision](decisions/device-identity.md)に記録する。未観測の改版・左右・動作モードへの対応と配布時のseat ACL適用は未検証。汎用的すぎるruleを配布しない。
 
 ### 12.4 安全原則
 
@@ -2212,7 +2212,7 @@ fuzz testでpanic、無制限メモリ確保、部分保存が発生しない。
 | R-002 | Cyborg IIの`input ID`/pin→物理位置対応、左手・右手・改版差 | 正しい模式図ハイライト | Cyborg II正式対応 |
 | R-003 | Linux版Azeron Software 2.xのローカル保存パス、形式、locking | LocalSource実装 | ローカル自動読取 |
 | R-004 | active profile、favorite、software/on-board状態の保存方法 | 自動選択 | プロファイル自動追従 |
-| R-005 | Cyborg II各改版のVID/PID、USB interface、event node topology | udevとDeviceGroup | 自動検出・権限 |
+| R-005 | Cyborg II各改版のVID/PID、USB interface、event node topology（[観測済み署名の決定](decisions/device-identity.md)あり、他の改版・左右・動作モードは未検証） | udevとDeviceGroup | 未観測範囲の自動検出・権限、配布時のACL検証 |
 | R-006 | gotk4 branch 4と対象GTK4版、native GtkWindow/GdkSurface pointer連携 | 安定したCGo bridge | Overlay起動 |
 | R-007 | gtk4-layer-shellのNiri/Hyprlandでのanchor、exclusive zone、monitor指定 | 正しい配置 | Overlay正式対応 |
 | R-008 | GDK empty input regionのmap/remap/hotplug後挙動 | 完全click-through | Overlay正式対応 |
