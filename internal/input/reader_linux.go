@@ -14,9 +14,17 @@ const timestampWordSize = int(unsafe.Sizeof(syscall.Timeval{}.Sec))
 const inputEventSize = 2*timestampWordSize + 8
 
 type nodeEvent struct {
-	node  int
-	event Event
-	err   error
+	node        int
+	event       Event
+	err         error
+	replacement *recoveryState
+}
+
+type eventReader struct {
+	source  io.Reader
+	node    int
+	output  chan<- nodeEvent
+	recover func(context.Context) (recoveryState, time.Duration, error)
 }
 
 func decodeEvent(record []byte) Event {
@@ -35,23 +43,53 @@ func decodeEvent(record []byte) Event {
 	}
 }
 
-// readEvents retains only a partial native record between reads. os.File.Read
+// read retains only a partial native record between reads. os.File.Read
 // performs nonblocking descriptor waits through the Go poller.
-func readEvents(ctx context.Context, source io.Reader, node int, output chan<- nodeEvent) error {
+func (r eventReader) read(ctx context.Context) error {
 	var buffer [inputEventSize * 64]byte
 	used := 0
+	lost := false
+	var timestamp time.Duration
 	for {
-		n, err := source.Read(buffer[used:])
+		if ctx.Err() != nil {
+			return nil
+		}
+		n, err := r.source.Read(buffer[used:])
 		used += n
 		consumed := 0
 		for used-consumed >= inputEventSize {
 			event := decodeEvent(buffer[consumed : consumed+inputEventSize])
-			select {
-			case <-ctx.Done():
-				return nil
-			case output <- nodeEvent{node: node, event: event}:
-			}
 			consumed += inputEventSize
+			if lost {
+				timestamp = max(timestamp, event.Timestamp)
+				if event.Type != EV_SYN || event.Code != SYN_REPORT {
+					continue
+				}
+				for used-consumed >= inputEventSize {
+					timestamp = max(timestamp, decodeEvent(buffer[consumed:consumed+inputEventSize]).Timestamp)
+					consumed += inputEventSize
+				}
+				consumed = used
+				state, drainedTime, recoveryErr := r.recover(ctx)
+				if ctx.Err() != nil {
+					return nil
+				}
+				if recoveryErr != nil {
+					return inputReadError(recoveryErr)
+				}
+				event.Timestamp = max(timestamp, drainedTime)
+				if !r.send(ctx, nodeEvent{node: r.node, event: event, replacement: &state}) {
+					return nil
+				}
+				lost = false
+				continue
+			}
+			if !r.send(ctx, nodeEvent{node: r.node, event: event}) {
+				return nil
+			}
+			if event.Type == EV_SYN && event.Code == SYN_DROPPED {
+				lost, timestamp = true, event.Timestamp
+			}
 		}
 		used = copy(buffer[:], buffer[consumed:used])
 		if err != nil {
@@ -61,7 +99,16 @@ func readEvents(ctx context.Context, source io.Reader, node int, output chan<- n
 			if ctx.Err() != nil {
 				return nil
 			}
-			return &InputError{Code: ERR_INPUT_READ}
+			return inputReadError(err)
 		}
+	}
+}
+
+func (r eventReader) send(ctx context.Context, event nodeEvent) bool {
+	select {
+	case <-ctx.Done():
+		return false
+	case r.output <- event:
+		return true
 	}
 }

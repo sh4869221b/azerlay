@@ -2,11 +2,13 @@ package input
 
 import (
 	"context"
+	"errors"
 	"maps"
 	"os"
 	"sync"
 	"sync/atomic"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/sh4869221b/azerlay/internal/device"
@@ -15,20 +17,29 @@ import (
 // Session owns all selected descriptors and publishes immutable input state.
 // Stop and join an old session before replacing it with another session.
 type Session struct {
-	latest atomic.Pointer[Snapshot]
-	cancel context.CancelFunc
-	done   chan struct{}
-	err    error
+	latest     atomic.Pointer[Snapshot]
+	cancel     context.CancelFunc
+	done       chan struct{}
+	err        error
+	cleanupErr error
 }
 
 type sessionOps struct {
-	open  func(device.Group) ([]device.OpenedNode, error)
-	clock func(*os.File) error
-	axes  func(*os.File, []int) (map[uint16]AxisInfo, error)
+	open    func(device.Group) ([]device.OpenedNode, error)
+	clock   func(*os.File) error
+	axes    func(*os.File, []int) (map[uint16]AxisInfo, error)
+	recover func(context.Context, device.OpenedNode) (recoveryState, time.Duration, error)
 	// observe runs on the reducer after each event, including unreported events.
 	// It is private so tests can acknowledge processing without polling Latest.
 	observe func(int, Event, *Snapshot)
 }
+
+type sessionSetupError struct {
+	error
+	cleanup error
+}
+
+func (e *sessionSetupError) Unwrap() error { return e.error }
 
 // Start revalidates and opens only the selected group. Ownership transfers to
 // the session only after every descriptor's clock and axis metadata are ready.
@@ -37,32 +48,48 @@ func Start(ctx context.Context, group device.Group, generations Generations) (*S
 }
 
 func startSession(ctx context.Context, group device.Group, generations Generations, ops sessionOps) (*Session, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	nodes, err := ops.open(group)
 	if err != nil {
 		return nil, err
 	}
 	closeFiles := func() error {
-		var first error
+		var result error
 		for _, node := range nodes {
-			if err := node.File.Close(); err != nil && first == nil {
-				first = &InputError{Code: ERR_INPUT_READ}
+			if err := node.File.Close(); err != nil {
+				result = errors.Join(result, inputReadError(err))
 			}
 		}
-		return first
+		return result
+	}
+	rollback := func(err error) error {
+		if closeErr := closeFiles(); closeErr != nil {
+			return &sessionSetupError{error: errors.Join(err, closeErr), cleanup: closeErr}
+		}
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, rollback(err)
 	}
 	axisInfo := make([]map[uint16]AxisInfo, len(nodes))
 	for index, node := range nodes {
 		if err := ops.clock(node.File); err != nil {
-			_ = closeFiles()
-			return nil, &InputError{Code: ERR_INPUT_READ}
+			return nil, rollback(inputReadError(err))
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, rollback(err)
 		}
 		if codes := node.Node.Capabilities["abs"]; len(codes) > 0 {
 			info, err := ops.axes(node.File, codes)
 			if err != nil {
-				_ = closeFiles()
-				return nil, &InputError{Code: ERR_INPUT_READ}
+				return nil, rollback(inputReadError(err))
 			}
 			axisInfo[index] = maps.Clone(info)
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, rollback(err)
 		}
 	}
 	ctx, cancel := context.WithCancel(ctx)
@@ -71,10 +98,16 @@ func startSession(ctx context.Context, group device.Group, generations Generatio
 	reducer.latest.axisInfo = axisInfo
 	session.latest.Store(reducer.snapshot())
 	events := make(chan nodeEvent)
+	if ops.recover == nil {
+		ops.recover = recoverNode
+	}
 	var readers sync.WaitGroup
 	for index, node := range nodes {
 		readers.Go(func() {
-			if err := readEvents(ctx, node.File, index, events); err != nil {
+			reader := eventReader{source: node.File, node: index, output: events,
+				recover: func(ctx context.Context) (recoveryState, time.Duration, error) { return ops.recover(ctx, node) },
+			}
+			if err := reader.read(ctx); err != nil {
 				select {
 				case events <- nodeEvent{node: index, err: err}:
 				case <-ctx.Done():
@@ -85,9 +118,8 @@ func startSession(ctx context.Context, group device.Group, generations Generatio
 	go func() {
 		defer func() {
 			cancel()
-			if err := closeFiles(); session.err == nil {
-				session.err = err
-			}
+			session.cleanupErr = closeFiles()
+			session.err = errors.Join(session.err, session.cleanupErr)
 			readers.Wait()
 			session.latest.Store(reducer.stop())
 			close(session.done)
@@ -104,7 +136,13 @@ func startSession(ctx context.Context, group device.Group, generations Generatio
 					session.err = received.err
 					return
 				}
-				snapshot, err := reducer.apply(received.node, received.event)
+				var snapshot *Snapshot
+				var err error
+				if received.replacement != nil {
+					snapshot = reducer.replace(received.node, *received.replacement, received.event.Timestamp)
+				} else {
+					snapshot, err = reducer.apply(received.node, received.event)
+				}
 				if err != nil {
 					session.err = err
 					return

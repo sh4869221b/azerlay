@@ -82,7 +82,7 @@ func TestReaderSplitRecordsAndTruncation(t *testing.T) {
 			output := make(chan nodeEvent)
 			done := make(chan error, 1)
 			go func() {
-				done <- readEvents(context.Background(), &interruptedReader{source: io.MultiReader(parts...)}, 2, output)
+				done <- (eventReader{source: &interruptedReader{source: io.MultiReader(parts...)}, node: 2, output: output}).read(context.Background())
 			}()
 			var got []Event
 			for range events {
@@ -133,7 +133,9 @@ func TestReaderCancelBlockedSend(t *testing.T) {
 	defer cancel()
 	read := make(chan struct{})
 	done := make(chan error, 1)
-	go func() { done <- readEvents(ctx, notifyingReader{reader, read}, 0, make(chan nodeEvent)) }()
+	go func() {
+		done <- (eventReader{source: notifyingReader{reader, read}, output: make(chan nodeEvent)}).read(ctx)
+	}()
 	if _, err := writer.Write(nativeEvents(Event{Type: EV_SYN})); err != nil {
 		t.Fatal(err)
 	}

@@ -50,6 +50,51 @@ partial result and all diagnostics, with the first error also in `error`; use
 `severity`, not the code prefix alone, to distinguish errors from warnings.
 The [CLI contract](design-research.md#1711-devices-implemented) defines the schema.
 
+## Internal input recovery
+
+Recovery is implemented in the internal input library. It is not connected to
+`run`, the controller, GTK, or CLI status yet; the device CLI still performs
+discovery and access probes without reading events.
+
+After `SYN_DROPPED`, the affected node's keys and raw axes become unknown while
+the library discards the loss interval and queued events, then queries the
+retained descriptor. A complete successful query replaces that node's key and
+axis state; it does not reconstruct missed press/release transitions or relative
+motion. Other nodes continue processing. A failed query or disconnected node
+stops the session and clears observed state across the selected group.
+
+Callers using `StartManaged` retain their selected target while degraded and
+retry discovery/open after a 250ms wait. Event paths may change. A unique known
+serial allows a port move; an originally serial-free target requires the same
+resolved USB device parent and supported identity. The original selected node
+slots and order must all be available, while unselected siblings are not
+required. See the [selection contract](decisions/device-identity.md#reconnect-selection)
+for ambiguity handling and the limits of same-port matching.
+
+Managed diagnostics reuse the device permission, disappearance, and selection
+codes above, with these additional internal recovery results:
+
+| Code | Meaning and next step |
+| --- | --- |
+| `ERR_DEVICE_AMBIGUOUS` | More than one group or selected interface matches. Select a unique device; an unreadable duplicate serial still counts. The manager stays degraded instead of choosing the first candidate. |
+| `ERR_INPUT_READ` | Event reading or a state query failed without a more specific permission/disconnection cause. Check the selected device connection and access. The manager retains the target and retries. |
+| `ERR_INPUT_EVENT` | An ordinary input event is invalid. The manager stops; reconnect the selected device and restart the input lifecycle after investigating the cause. |
+
+For `ERR_DEVICE_PERMISSION`, follow the active-session and specific-device
+packaging checks below. The manager does not change permissions. A successful
+reconnect starts with unknown input until new events arrive; it preserves the
+caller-supplied Profile generation and does not change the selected profile.
+Closing the manager cancels retry, closes descriptors, and joins its sessions
+and readers before `Done`. Callers should check `Err` after `Done` or the return
+value of `Close`, since cleanup failures are retained even after a later retry
+succeeds.
+
+Tests exercise synthetic metadata and ioctl results, real OS-pipe events,
+renumbered selections, and fd cleanup. The two-second live reconnect acceptance
+target in [#45](https://github.com/sh4869221b/azerlay/issues/45) remains
+unmeasured; these tests do not establish physical unplug/replug or permission
+revocation acceptance.
+
 ## Permission checks and packaging status
 
 Run discovery as the ordinary user in the active local seat/session. If access

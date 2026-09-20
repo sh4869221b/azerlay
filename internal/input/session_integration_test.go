@@ -282,7 +282,7 @@ func TestSessionIntegrationConcurrentNodeOrder(t *testing.T) {
 }
 
 func TestSessionIntegrationPendingNodeInvalidation(t *testing.T) {
-	for _, code := range []string{ERR_INPUT_READ, ERR_INPUT_DROPPED} {
+	for _, code := range []string{ERR_INPUT_READ, ERR_INPUT_EVENT} {
 		t.Run(code, func(t *testing.T) {
 			t.Parallel()
 			generations := Generations{Device: 13, Profile: 17}
@@ -293,7 +293,7 @@ func TestSessionIntegrationPendingNodeInvalidation(t *testing.T) {
 				if err := s.writers[0].Close(); err != nil {
 					t.Fatal(err)
 				}
-			} else if _, err := s.writers[0].Write(nativeEvents(Event{Type: EV_SYN, Code: SYN_DROPPED}, Event{Type: EV_SYN})); err != nil {
+			} else if _, err := s.writers[0].Write(nativeEvents(Event{Type: EV_KEY, Code: 30, Value: 3})); err != nil {
 				t.Fatal(err)
 			}
 			assertIntegrationStopped(t, s, code, 2, generations)

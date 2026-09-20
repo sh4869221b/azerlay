@@ -1,6 +1,10 @@
 package input
 
-import "maps"
+import (
+	"maps"
+	"slices"
+	"time"
+)
 
 // reducer has one owner. Pending events cannot affect committed state until
 // their own node reports, regardless of other nodes' report boundaries.
@@ -17,7 +21,7 @@ func newReducer(nodeCount int, generations Generations) *reducer {
 	}
 	return &reducer{
 		nodes: nodes, pending: make([][]Event, nodeCount),
-		latest: Snapshot{Connected: true, Generations: generations, reportingNode: -1},
+		latest: Snapshot{Connected: true, Generations: generations, reportingNode: -1, axisInfo: make([]map[uint16]AxisInfo, nodeCount)},
 	}
 }
 
@@ -40,7 +44,7 @@ func (r *reducer) apply(node int, event Event) (*Snapshot, error) {
 		case SYN_REPORT:
 			return r.commit(node, event), nil
 		case SYN_DROPPED:
-			return nil, &InputError{Code: ERR_INPUT_DROPPED}
+			return r.replace(node, recoveryState{axes: r.latest.axisInfo[node]}, event.Timestamp), nil
 		default:
 			return nil, nil
 		}
@@ -86,16 +90,35 @@ func (r *reducer) commit(node int, report Event) *Snapshot {
 			relative[event.Code] += int64(event.Value)
 		}
 	}
+	r.latest = Snapshot{
+		Sequence: r.latest.Sequence + 1, Timestamp: timestamp,
+		Connected: true, Generations: r.latest.Generations,
+		nodes: r.copyNodes(), axisInfo: r.latest.axisInfo, reportingNode: node, events: frame, relative: relative,
+	}
+	return r.snapshot()
+}
+
+func (r *reducer) replace(node int, state recoveryState, timestamp time.Duration) *Snapshot {
+	r.pending[node] = nil
+	r.nodes[node] = nodeState{keys: make(map[uint16]bool), absolute: make(map[uint16]int32)}
+	maps.Copy(r.nodes[node].keys, state.state.keys)
+	maps.Copy(r.nodes[node].absolute, state.state.absolute)
+	axes := slices.Clone(r.latest.axisInfo)
+	axes[node] = maps.Clone(state.axes)
+	r.latest = Snapshot{
+		Sequence: r.latest.Sequence + 1, Timestamp: max(r.latest.Timestamp, timestamp),
+		Connected: true, Generations: r.latest.Generations, reportingNode: -1,
+		nodes: r.copyNodes(), axisInfo: axes,
+	}
+	return r.snapshot()
+}
+
+func (r *reducer) copyNodes() []nodeState {
 	nodes := make([]nodeState, len(r.nodes))
 	for i, state := range r.nodes {
 		nodes[i] = nodeState{keys: maps.Clone(state.keys), absolute: maps.Clone(state.absolute)}
 	}
-	r.latest = Snapshot{
-		Sequence: r.latest.Sequence + 1, Timestamp: timestamp,
-		Connected: true, Generations: r.latest.Generations,
-		nodes: nodes, axisInfo: r.latest.axisInfo, reportingNode: node, events: frame, relative: relative,
-	}
-	return r.snapshot()
+	return nodes
 }
 
 // stop discards every pending frame and publishes a single cleared terminal

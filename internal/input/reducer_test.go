@@ -154,7 +154,6 @@ func TestReducerRejectsInvalidInput(t *testing.T) {
 	}{
 		{"negative key", Event{Type: EV_KEY, Code: 30, Value: -1}, ERR_INPUT_EVENT},
 		{"unknown key value", Event{Type: EV_KEY, Code: 30, Value: 3}, ERR_INPUT_EVENT},
-		{"dropped", Event{Type: EV_SYN, Code: SYN_DROPPED}, ERR_INPUT_DROPPED},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newReducer(1, Generations{})

@@ -15,10 +15,15 @@ and derives normalized axes, stick direction, and intensity from committed
 snapshots. Confirmed neutral Software 2.0.2 Keyboard/WASD and Xbox Joystick
 exports automatically select distinct normalized stick modes that survive
 save/reload; callers still explicitly select the input nodes. Other stick
-settings remain Unknown. Input processing is not connected to `run` or GTK yet;
-input recovery and overlay functionality remain unimplemented. Export-to-input
-integration is tested with synthetic exports and OS pipes, not live Xbox or
-Cyborg II input.
+settings remain Unknown. The input library restores current key and axis state
+after `SYN_DROPPED` and offers a managed lifecycle for selected-device reconnect,
+including event-node renumbering and permission return. Input processing and
+recovery are not connected to `run`, the controller, or GTK yet; overlay
+functionality remains unimplemented. Export-to-input integration and recovery
+are tested with synthetic exports, device metadata, ioctl responses, and OS
+pipes, not live Xbox or Cyborg II input. The two-second live reconnect target
+remains unmeasured. See [input recovery](docs/troubleshooting.md#internal-input-recovery)
+for the selection policy and current limits.
 
 An internal configuration package loads, validates, and watches TOML settings
 with last-good reload preservation. A same-user control socket and CLI can
