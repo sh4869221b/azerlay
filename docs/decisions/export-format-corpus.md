@@ -174,7 +174,7 @@ The original R-013 result at `docs/design-research.md:2121` remains accurate for
 
 ### Issue #14: physical mapping
 
-Issue #14 receives **no physical map**. It remains blocked until separate privacy-safe, anonymized, version-bearing annotated exports are paired with left/right physical press tests and revision/firmware notes. Neither root shape, MessagePack tag, wrapper form, nor synthetic profile establishes an input-ID/pin-to-physical-control mapping.
+Issue #14 receives **no physical map**. For v1, it remains blocked until separate privacy-safe, anonymized, version-bearing annotated exports are paired with left-hand physical press tests and revision/firmware notes. Right-hand physical press tests and support are deferred beyond v1 and do not block the left-hand mapping. Neither root shape, MessagePack tag, wrapper form, nor synthetic profile establishes an input-ID/pin-to-physical-control mapping.
 
 ### Issue #19: decoder-boundary root detection
 
