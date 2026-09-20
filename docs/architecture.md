@@ -64,25 +64,78 @@ from known releases or zeroes. No initial-state capture is performed. REL deltas
 accumulate within the reporting frame, with legacy and high-resolution wheel
 codes kept separate. `MSC_SCAN` stays in that frame's compact event list and is
 not a physical-control identity. Transitions, REL deltas, and frame events do
-not persist into later reports. Axis metadata is copied once into immutable
-session storage; it does not establish an initial raw-axis observation.
+not persist into later reports. Axis metadata is copied into immutable storage
+at startup and refreshed on successful resync; startup metadata does not
+establish an initial raw-axis observation.
 
 `Session.Latest` reads an atomic pointer and returns an independently owned
 scalar header over immutable storage; collection accessors return copies.
 The connected initial snapshot has sequence zero and no observed state. Every
-`SYN_REPORT`, including an empty report, increments sequence once. Publication
+ordinary `SYN_REPORT`, including an empty report, increments sequence once. Publication
 timestamps never decrease; frame events retain their own monotonic timestamps.
 Caller-supplied device/profile generations stay fixed throughout the session.
 Consumers must stop and join an old session before starting its replacement.
 
-A fatal read error, invalid key value, or `SYN_DROPPED` stops the whole selected
-group. Cancellation also stops the group, without a device error. Shutdown
-closes owned descriptors, joins readers, discards pending state, and publishes
-one disconnected snapshot with all state and frame data cleared, sequence
-incremented once, and generations preserved. `Done` closes only after this
-work finishes; `Close` is idempotent and waits for it. There is no resync or
-reconnect. This package is not yet wired into `run`, controller, or GTK; its
-pipeline tests use synthetic OS pipes and do not establish live-device acceptance.
+On `SYN_DROPPED`, the reader first sends an ordered loss notification. The
+reducer clears only that node's pending frame, keys, and raw ABS values to
+unknown, retaining its axis metadata and the other nodes' state and pending
+frames. The session remains connected. The reader discards events through the
+next `SYN_REPORT`, the rest of the already-read buffer, and queued records on
+the retained nonblocking descriptor through EAGAIN before querying current
+state. Repeated drop markers in this interval do not publish repeated loss.
+
+Bounded `EVIOCGKEY` and `EVIOCGABS` queries recover advertised keys as known
+pressed or released values, plus raw axes and current normalization metadata.
+Only a complete successful query replaces the affected node's state in one
+reducer publication. This is atomic publication, not a simultaneous kernel
+sample across ioctls or nodes. Loss and replacement each increment sequence
+once, preserve nondecreasing timestamps, and have no reporting node, frame
+events, key transitions, or REL deltas. Old snapshots remain unchanged; normal
+events resume after the replacement without replaying the discarded queue.
+
+A fatal read or recovery-query error, or an invalid ordinary key value, stops
+the whole selected group. Cancellation also stops the group, without a device
+error. Shutdown closes owned descriptors, joins readers, discards pending
+state, and publishes one disconnected snapshot with observed state and frame
+data cleared, sequence incremented once, and generations and axis metadata
+preserved. `Done` closes only after this work finishes; `Close` is idempotent
+and waits for it. Read `Session.Err` only after `Done`.
+
+### Managed selected-device lifecycle
+
+`device.NewReconnectTarget(result, selected)` captures the selected hardware
+identity and node slots from discovery metadata, including when read access is
+denied. Its serial/port and ambiguity rules are defined in the
+[reconnect selection contract](decisions/device-identity.md#reconnect-selection).
+`input.StartManaged(ctx, target, generations)` keeps that target across
+discovery, access, and read failures. Each attempt uses `target.Select` and
+`target.Open`, then the ordinary session clock and axis setup. No initial-state
+capture is added on reconnect. An invalid target is a synchronous startup error;
+a valid target starts asynchronously and may initially be degraded with unknown
+input and no diagnostic until the first attempt completes.
+
+One supervisor owns session replacement and a cancellable 250ms retry timer,
+used only while degraded. It waits for the old session's `Done` and resource
+cleanup before starting a replacement. `Managed.Latest` returns a coherent
+`ManagedSnapshot` containing a snapshot, connected/degraded/stopped state, and
+a copied diagnostic when available. It reads the active session directly;
+there is no snapshot-forwarding worker. A disconnected session cannot appear
+connected while the supervisor is still handling its completion.
+
+The first successful session uses the supplied Device generation. Each later
+successful replacement increments it once; failed attempts do not. Profile
+generation stays fixed, and input recovery does not own or mutate profiles or
+their persisted selection. Snapshot sequence remains session-local, so
+consumers must also use Device generation. Invalid ordinary input stops the
+manager with `ERR_INPUT_EVENT`; availability and read failures remain degraded
+and retry. `Managed.Close` cancels retries, closes and joins active work, and is
+idempotent. `Done` closes after cleanup; `Err`, read afterward, retains terminal
+and cleanup failures, including rollback close errors from earlier attempts.
+
+These APIs are not yet wired into `run`, the controller, or GTK. Tests use
+synthetic device metadata and ioctl responses with real OS pipes and fd cleanup
+checks. They do not establish live-device acceptance or the two-second reconnect
+target, which remains unmeasured.
 
 ### Axis normalization and stick projection
 

@@ -164,6 +164,30 @@ one node with all its roles; it must not be duplicated into separate keyboard
 and joystick nodes. Group discovery does not authorize reading every group:
 runtime input remains restricted to the owner's selected qualifying group.
 
+### Reconnect selection
+
+The internal `ReconnectTarget` pins the supported USB identity, original
+resolved USB device parent, optional nonempty serial, and selected interface
+descriptors and admitted roles in selection order. Capture requires consistent
+identity and unambiguous selected slots; denied read access does not discard
+otherwise admitted identity metadata.
+
+A target with a known serial follows exactly one matching group, including
+after a USB port move. A missing or duplicated known serial never falls back
+to the original port or first candidate. Separate USB parents remain separate
+groups even when serials match, and an unreadable duplicate still makes the
+selection ambiguous. When the original target has no serial, reconnect requires
+the original resolved USB parent and supported identity. This same-port rule
+cannot establish serial-level physical identity.
+
+Rediscovery must find each selected interface/role slot exactly once, preserving
+the selected subset and node order despite event-number changes. Missing or
+ambiguous slots remain degraded; extra siblings are not selected or required.
+`ReconnectTarget.Open` uses the existing verified `OpenGroup` path and compares
+freshly returned identity and slots with the pinned target before reader startup.
+A mismatch closes every acquired descriptor. This selection policy does not
+broaden the admission signature or establish live reconnect timing.
+
 ## Matching checks
 
 The predicate above was evaluated against the acquired target metadata and two
