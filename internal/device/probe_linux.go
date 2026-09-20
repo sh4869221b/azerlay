@@ -47,23 +47,9 @@ func (ops probeOps) probe(n Node) (result probeResult) {
 			}
 		}
 	}()
-	var st syscall.Stat_t
-	if err := ops.fstat(fd, &st); err != nil {
-		fail(err)
-		return
-	}
-	if st.Mode&syscall.S_IFMT != syscall.S_IFCHR || st.Rdev != n.deviceNumber {
-		fail(errMetadata)
-		return
-	}
-	id, err := ops.id(fd)
+	result.contradiction, err = ops.validate(fd, n)
 	if err != nil {
 		fail(err)
-		return
-	}
-	if id != (InputID{3, 0x16d0, 0x12f7, 0x111}) || n.InputID != nil && id != *n.InputID {
-		result.contradiction = true
-		fail(errMetadata)
 		return
 	}
 	name, err := ops.name(fd)
@@ -80,6 +66,24 @@ func (ops probeOps) probe(n Node) (result probeResult) {
 	}
 	result.access = "readable"
 	return
+}
+
+func (ops probeOps) validate(fd int, n Node) (contradiction bool, err error) {
+	var st syscall.Stat_t
+	if err := ops.fstat(fd, &st); err != nil {
+		return false, err
+	}
+	if st.Mode&syscall.S_IFMT != syscall.S_IFCHR || st.Rdev != n.deviceNumber {
+		return false, errMetadata
+	}
+	id, err := ops.id(fd)
+	if err != nil {
+		return false, err
+	}
+	if id != (InputID{3, 0x16d0, 0x12f7, 0x111}) || n.InputID != nil && id != *n.InputID {
+		return true, errMetadata
+	}
+	return false, nil
 }
 
 func ioctlID(fd int) (InputID, error) {
