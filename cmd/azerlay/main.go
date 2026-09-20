@@ -21,7 +21,7 @@ func main() {
 }
 
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	if len(args) != 0 && args[0] == "doctor" {
+	if len(args) != 0 && (args[0] == "doctor" || args[0] == "devices") {
 		pipeSignals := make(chan os.Signal, 1)
 		signal.Notify(pipeSignals, syscall.SIGPIPE)
 		defer signal.Stop(pipeSignals)
@@ -49,7 +49,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	root := command("azerlay", func(cmd *cli.Command) int {
 		if len(args) == 1 && args[0] == "--help" && cmd.IsSet("help") {
-			if _, err := fmt.Fprintln(stdout, "Usage: azerlay <command>\n\nCommands:\n  version  Print version information\n  validate Validate a profile export without saving state\n  import   Save an export and profile selection\n  profiles Show saved or select active profiles\n  run      Run the application in foreground\n  doctor   Diagnose configuration and runtime without changes\n  show     Request overlay visibility\n  hide     Request overlay hidden\n  toggle   Toggle requested visibility\n  reload   Request configuration reload\n  status   Show running instance status\n  quit     Stop the running application\n\n"+validateHelp+"\n\n"+importHelp+"\n\n"+profilesHelp+"\n\n"+runHelp+"\n\n"+doctorHelp); err != nil {
+			if _, err := fmt.Fprintln(stdout, "Usage: azerlay <command>\n\nCommands:\n  version  Print version information\n  validate Validate a profile export without saving state\n  import   Save an export and profile selection\n  profiles Show saved or select active profiles\n  run      Run the application in foreground\n  doctor   Diagnose configuration and runtime without changes\n  devices  List or inspect supported input devices\n  show     Request overlay visibility\n  hide     Request overlay hidden\n  toggle   Toggle requested visibility\n  reload   Request configuration reload\n  status   Show running instance status\n  quit     Stop the running application\n\n"+validateHelp+"\n\n"+importHelp+"\n\n"+profilesHelp+"\n\n"+runHelp+"\n\n"+doctorHelp+"\n\n"+devicesHelp); err != nil {
 				return 1
 			}
 			return 0
@@ -84,6 +84,27 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return normalized, valid
 	}
 	root.Commands = append(root.Commands, doctor)
+	var deviceOptions devicesOptions
+	devicesAction := func(*cli.Command) int {
+		return runDevices(deviceOptions, collectDevices, stdout, stderr)
+	}
+	devices := command("devices", devicesAction)
+	devices.Flags = []cli.Flag{&helpFlag{BoolFlag: cli.BoolFlag{Name: "help", Local: true}}}
+	for _, name := range []string{"list", "inspect"} {
+		leaf := command(name, devicesAction)
+		leaf.Flags = []cli.Flag{
+			&cli.BoolFlag{Name: "json", Local: true},
+			&helpFlag{BoolFlag: cli.BoolFlag{Name: "help", Local: true}},
+		}
+		devices.Commands = append(devices.Commands, leaf)
+	}
+	prepareArgs[devices] = func(original []string) ([]string, bool) {
+		normalized, options, valid := normalizeDevicesArgs(original)
+		deviceOptions = options
+		usage = func() int { return writeDevicesUsage(options, stdout, stderr) }
+		return normalized, valid
+	}
+	root.Commands = append(root.Commands, devices)
 	foreground := command("run", func(cmd *cli.Command) int {
 		return runApplication(cmd, stdout, stderr)
 	})
