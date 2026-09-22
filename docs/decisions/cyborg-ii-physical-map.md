@@ -46,6 +46,12 @@ set; their physical role is not inferred. Private exports, decoded profiles,
 screenshots, assignments, labels, macros, serials, local paths, and bundled
 application code are not reproduced.
 
+For repeatable source review, S2 is the installed package's `resources/app.asar`:
+its `package.json` states the version, and the renderer asset under
+`out/renderer/assets/` contains the Cyborg II visible-button list and layout
+variant. The numeric result below was compared against both S1 sources in
+memory; no application asset is copied into this repository.
+
 In the subsequent owner-operated test with the same displayed profile, the
 owner pressed controls one at a time while watching Azeron Software. The owner
 reported that each named button region lit separately and returned after
