@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "model": "cyborg-ii",
+  "hand": "left",
+  "applicability": {
+    "software_release": "2.0.2",
+    "displayed_firmware": "111",
+    "hardware_revision": null,
+    "mode": "keyboard-stick"
+  },
+  "view_box": {"x": 0, "y": 0, "width": 694, "height": 640},
+  "controls": [
+    {
+      "id": "grid.c1.r1",
+      "group": "grid",
+      "source_input_id": 1,
+      "pin_one": 255,
+      "pin_two": 4,
+      "z_index": 0,
+      "shape": {"type": "rounded_rect", "x": 10, "y": 20, "width": 70, "height": 100, "radius": 6},
+      "label_anchor": {"x": 45, "y": 70}
+    }
+  ]
+}
