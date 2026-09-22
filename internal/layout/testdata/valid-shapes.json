@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "model": "cyborg-ii",
+  "hand": "left",
+  "applicability": {"software_release": "2.0.2", "displayed_firmware": "111", "hardware_revision": null, "mode": "keyboard-stick"},
+  "view_box": {"x": 0, "y": 0, "width": 100, "height": 100},
+  "controls": [
+    {"id": "rect", "group": "synthetic", "source_input_id": 1, "pin_one": 255, "pin_two": 0, "z_index": 0, "shape": {"type": "rounded_rect", "x": 0, "y": 0, "width": 20, "height": 20, "radius": 10}, "label_anchor": {"x": 10, "y": 10}},
+    {"id": "polygon", "group": "synthetic", "source_input_id": 2, "pin_one": 0, "pin_two": 0, "z_index": 0, "shape": {"type": "polygon", "points": [{"x": 30, "y": 0}, {"x": 40, "y": 0}, {"x": 35, "y": 10}]}, "label_anchor": {"x": 35, "y": 5}},
+    {"id": "circle", "group": "synthetic", "source_input_id": 3, "pin_one": 0, "pin_two": 0, "z_index": 0, "shape": {"type": "circle", "cx": 60, "cy": 10, "radius": 10}, "label_anchor": {"x": 60, "y": 10}},
+    {"id": "ellipse", "group": "synthetic", "source_input_id": 4, "pin_one": 0, "pin_two": 0, "z_index": 0, "shape": {"type": "ellipse", "cx": 85, "cy": 10, "rx": 15, "ry": 10}, "label_anchor": {"x": 85, "y": 10}},
+    {"id": "line", "group": "synthetic", "source_input_id": 5, "pin_one": 0, "pin_two": 0, "z_index": 0, "shape": {"type": "line", "from": {"x": 0, "y": 30}, "to": {"x": 20, "y": 40}}, "label_anchor": {"x": 10, "y": 35}},
+    {"id": "path", "group": "synthetic", "source_input_id": 6, "pin_one": 0, "pin_two": 0, "z_index": 0, "shape": {"type": "path", "commands": [{"op": "M", "points": [{"x": 30, "y": 30}]}, {"op": "L", "points": [{"x": 40, "y": 30}]}, {"op": "C", "points": [{"x": 45, "y": 30}, {"x": 45, "y": 40}, {"x": 30, "y": 40}]}, {"op": "Z", "points": []}]}, "label_anchor": {"x": 35, "y": 35}},
+    {"id": "group", "group": "synthetic", "source_input_id": 7, "pin_one": 0, "pin_two": 0, "z_index": 0, "shape": {"type": "group", "transform": {"translate_x": 70, "translate_y": 70, "scale_x": 2, "scale_y": 2}, "children": [{"type": "rounded_rect", "x": 0, "y": 0, "width": 10, "height": 10, "radius": 0}, {"type": "circle", "cx": 10, "cy": 10, "radius": 5}]}, "label_anchor": {"x": 80, "y": 80}}
+  ],
+  "decorations": [{"type": "line", "from": {"x": 0, "y": 100}, "to": {"x": 100, "y": 100}}]
+}

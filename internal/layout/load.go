@@ -33,6 +33,9 @@ func Parse(data []byte) (Definition, error) {
 	if definition.Hand != "left" && definition.Hand != "right" {
 		return Definition{}, &Error{Code: ERR_LAYOUT_INVALID, Path: "hand"}
 	}
+	if err := validateDefinition(definition); err != nil {
+		return Definition{}, err
+	}
 	return definition, nil
 }
 
