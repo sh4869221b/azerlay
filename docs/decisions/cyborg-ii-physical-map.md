@@ -1,4 +1,4 @@
-# Cyborg II screen layout and physical-mapping limits
+# Cyborg II left-hand screen layout and physical mapping
 
 ## Scope and status
 
@@ -10,14 +10,16 @@ press directions. Further anatomical descriptions are not needed to recreate
 this arrangement.
 
 Formal v1 support targets left-hand Cyborg II only. The screenshot has 31
-visible control regions: 29 have direct UI/export correlations and two have
-weaker, explicitly provisional correlations. The owner subsequently confirmed
-that each of the 31 screen regions responds to a distinct physical operation
-and returns to its prior display after release or joystick recentering. This
-verifies the screen arrangement for the tested profile, but does not by itself
-prove each export ID/pin relation or an evdev-to-control mapping. Issue #14
-remains open for those gaps. No layout assets, rendering, or matching code are
-implemented by this document.
+visible control regions: 30 buttons and one joystick, matching the
+[manufacturer's device description](https://www.azeron.eu/support/faq/).
+The installed Software `2.0.2` renderer directly identifies all 31 regions by
+input ID. Every listed ID/pin pair agrees with the owner's same-profile export,
+and the owner confirmed that each region responds to its own physical operation
+and returns after release or joystick recentering. This establishes the
+left-hand position map for the observed Software/profile/device combination.
+It does not prove other firmware, hardware revisions, hands, or an
+evdev-to-control matching rule. No layout assets, rendering, or matching code
+are implemented by this document.
 
 ## Evidence and limitations
 
@@ -29,15 +31,26 @@ the same profile, left-hand Cyborg II, Software `2.0.2`, and displayed firmware
 Read-only Python inspection in memory checked complete LZMA-Alone decompression,
 end-of-stream without trailing compressed data, exact MessagePack str32 length,
 and a complete JSON bundle. This was not a production decoder test. Structure
-does not prove physical positions. The [export corpus](export-format-corpus.md#issue-14-physical-mapping)
-and [device identity observation](device-identity.md) also supply no physical map.
-Displayed firmware is not an independent query or equivalent to USB
-`bcdDevice` or hardware revision.
+alone does not prove physical positions. The [export corpus](export-format-corpus.md#issue-14-physical-mapping)
+and [device identity observation](device-identity.md) supply the earlier
+evidence boundary. Displayed firmware is not an independent query or
+equivalent to USB `bcdDevice` or hardware revision.
 
-The source pair is **S1**, a document-local evidence name. Private exports,
-decoded profiles, screenshots, assignments, labels, macros, serials, and local
-paths are not reproduced. Published numeric fields identify source inputs and
-pins, not profiles; UI correlations do not establish anatomical positions.
+The owner export and screenshot are **S1**, a document-local evidence name.
+The locally installed `azeron-software` package identifies itself as version
+`2.0.2`; its bundled renderer data is **S2**. S2 selects the Cyborg II
+31-button-code set and supplies the screen-position-to-ID layout variant that
+matches every visible position in S1. All 31 IDs in that set appear in S1 with
+the listed pins. The other 12 export inputs are outside this displayed button
+set; their physical role is not inferred. Private exports, decoded profiles,
+screenshots, assignments, labels, macros, serials, local paths, and bundled
+application code are not reproduced.
+
+For repeatable source review, S2 is the installed package's `resources/app.asar`:
+its `package.json` states the version, and the renderer asset under
+`out/renderer/assets/` contains the Cyborg II visible-button list and layout
+variant. The numeric result below was compared against both S1 sources in
+memory; no application asset is copied into this repository.
 
 In the subsequent owner-operated test with the same displayed profile, the
 owner pressed controls one at a time while watching Azeron Software. The owner
@@ -46,26 +59,22 @@ release. The joystick region responded to movement and returned at neutral.
 The agent did not operate or independently observe the device; these results
 are owner attestations, not a captured input-event trace.
 
-## UI correlation method
+## Source-to-screen matching
 
-The central 20 and two side regions have unique single-trigger keyboard-symbol
-or modifier metadata matches within S1. The cluster's left and center regions
-also have unique single-trigger matches. Its right region has a unique private
-label match and matching macro step count, with neither private content copied.
+S2's Cyborg II button list contains exactly the 31 IDs in the table below.
+Its screen layout places each ID at the corresponding S1 screenshot region,
+including `cluster.top` (`28`) and `cluster.bottom` (`30`). The table's pin
+values come from those exact IDs in S1. A row-by-row comparison confirmed all
+31 position/ID/pin triples; no assignment value, source array index, or
+macro count is needed to choose a position.
 
-The main stick matches the sole keyboard-stick input. Its three adjacent
-regions match single/long/double trigger combinations. The below-stick region
-is distinguished from another input sharing its output by the long-trigger
-glyph. Output equality without trigger context is insufficient. These source
-comparisons add no canonical binding or generic modifier conversion.
-
-Two correlations are weaker. `cluster.top` matches the sample's unique
-single-trigger macro with three steps, but count alone is not stable identity.
-`cluster.bottom` is a residual correspondence to the sole input with first
-`types` value string `"38"`, not an admitted meaning for that value. Both
-are possible pairings, not confirmed source mappings or generic lookup rules.
-Their geometry may be drawn with unknown mapping; neither authorizes runtime
-physical highlighting.
+S1's distinct keyboard symbols, modifier metadata, joystick type, and trigger
+glyphs provide independent visual corroboration for most regions. The macro
+count and raw type value used as tentative clues in the first research pass
+are not generic position or binding rules. S2 resolves the two formerly
+tentative positions directly. Neither source establishes an evdev event-to-ID
+rule, a new canonical binding conversion, or applicability beyond the stated
+combination.
 
 ## Screen position contract
 
@@ -76,63 +85,64 @@ the lower-right group. Follow S1 as displayed, without mirroring or interpreting
 screen directions as anatomical directions.
 
 These are stable screen-position IDs with owner-confirmed physical responses
-for the tested profile, not anatomical finger or action names. The
-[Physical Control design](../design-research.md#93-physical-control) still
-requires a supported source-to-position mapping before runtime highlighting.
-Model, hand, and firmware applicability belong at a future version-scoped
-adapter boundary. Rendering and matching must not inspect opaque raw fields
-for new semantics. This decision does not extend the normalized model or
-admit parser rules for the recorded raw fields.
+for the tested profile, not anatomical finger or action names. They provide
+the position identity required by the
+[Physical Control design](../design-research.md#93-physical-control) for this
+observed scope. Model, hand, and firmware applicability belong at a future
+version-scoped adapter boundary. Rendering and matching must not inspect
+opaque raw fields for new semantics. This decision does not extend the
+normalized model or admit parser rules for the recorded raw fields.
 
 ## Left-hand UI-to-export correspondence
 
-All rows reference S1: owner-attributed left-hand / Software `2.0.2` / displayed
-firmware `111` / unknown revision. `id`, `pinOne`, and `pinTwo` are JSON
+All rows refer to S1's owner-attributed left-hand unit / Software `2.0.2` /
+displayed firmware `111` / unknown hardware revision, with positions verified
+against S2's matching screen layout. `id`, `pinOne`, and `pinTwo` are JSON
 numbers, not strings or array indices. Literal `255` remains a number, with
-no absent-pin or sentinel semantics inferred. Every row has an owner-confirmed
-physical-operation-to-screen-region response. The numeric source relation
-remains UI/export correlation, including rows marked `UI-correlated`.
+no absent-pin or sentinel semantics inferred. Every region also has an
+owner-confirmed physical-operation-to-screen response.
 
-| Screen region | `id` | `pinOne` | `pinTwo` | UI evidence / disposition |
-| --- | --- | --- | --- | --- |
-| `grid.c1.r1` | 4 | 5 | 255 | UI-correlated: unique single-trigger symbol |
-| `grid.c1.r2` | 3 | 4 | 255 | UI-correlated: unique single-trigger symbol |
-| `grid.c1.r3` | 2 | 3 | 255 | UI-correlated: unique single-trigger symbol |
-| `grid.c1.r4` | 1 | 2 | 255 | UI-correlated: unique single-trigger symbol |
-| `grid.c1.r5` | 37 | 1 | 255 | UI-correlated: unique single-trigger symbol |
-| `grid.c2.r1` | 8 | 11 | 255 | UI-correlated: unique single-trigger symbol |
-| `grid.c2.r2` | 7 | 10 | 255 | UI-correlated: unique single-trigger symbol |
-| `grid.c2.r3` | 6 | 9 | 255 | UI-correlated: unique single-trigger symbol |
-| `grid.c2.r4` | 5 | 8 | 255 | UI-correlated: unique single-trigger modifier |
-| `grid.c2.r5` | 38 | 7 | 255 | UI-correlated: unique single-trigger symbol |
-| `grid.c3.r1` | 12 | 17 | 255 | UI-correlated: unique single-trigger symbol |
-| `grid.c3.r2` | 11 | 16 | 255 | UI-correlated: unique single-trigger symbol |
-| `grid.c3.r3` | 10 | 15 | 255 | UI-correlated: unique single-trigger symbol |
-| `grid.c3.r4` | 9 | 14 | 255 | UI-correlated: unique single-trigger symbol |
-| `grid.c3.r5` | 13 | 13 | 255 | UI-correlated: unique single-trigger symbol |
-| `grid.c4.r1` | 17 | 26 | 255 | UI-correlated: unique single-trigger symbol |
-| `grid.c4.r2` | 16 | 25 | 255 | UI-correlated: unique single-trigger symbol |
-| `grid.c4.r3` | 15 | 24 | 255 | UI-correlated: unique single-trigger symbol |
-| `grid.c4.r4` | 14 | 23 | 255 | UI-correlated: unique single-trigger modifier |
-| `grid.c4.r5` | 18 | 22 | 255 | UI-correlated: unique single-trigger symbol |
-| `grid.side-left` | 36 | 6 | 255 | UI-correlated: unique single-trigger symbol |
-| `grid.side-right` | 19 | 27 | 255 | UI-correlated: unique single-trigger symbol |
-| `cluster.top` | 28 | 34 | 255 | Provisional: sample-specific macro count only |
-| `cluster.left` | 29 | 35 | 255 | UI-correlated: unique single-trigger symbol |
-| `cluster.center` | 22 | 37 | 255 | UI-correlated: unique single-trigger symbol |
-| `cluster.right` | 31 | 33 | 255 | UI-correlated: private label and macro count |
-| `cluster.bottom` | 30 | 36 | 255 | Provisional: residual type correspondence |
-| `stick.main` | 24 | 31 | 30 | UI-correlated: sole keyboard-stick input |
-| `stick.right-upper` | 41 | 20 | 255 | UI-correlated: symbol and three trigger glyphs |
-| `stick.right-lower` | 20 | 19 | 255 | UI-correlated: double-trigger symbol |
-| `stick.below` | 23 | 32 | 255 | UI-correlated: long-trigger symbol |
+| Screen region | `id` | `pinOne` | `pinTwo` |
+| --- | --- | --- | --- |
+| `grid.c1.r1` | 4 | 5 | 255 |
+| `grid.c1.r2` | 3 | 4 | 255 |
+| `grid.c1.r3` | 2 | 3 | 255 |
+| `grid.c1.r4` | 1 | 2 | 255 |
+| `grid.c1.r5` | 37 | 1 | 255 |
+| `grid.c2.r1` | 8 | 11 | 255 |
+| `grid.c2.r2` | 7 | 10 | 255 |
+| `grid.c2.r3` | 6 | 9 | 255 |
+| `grid.c2.r4` | 5 | 8 | 255 |
+| `grid.c2.r5` | 38 | 7 | 255 |
+| `grid.c3.r1` | 12 | 17 | 255 |
+| `grid.c3.r2` | 11 | 16 | 255 |
+| `grid.c3.r3` | 10 | 15 | 255 |
+| `grid.c3.r4` | 9 | 14 | 255 |
+| `grid.c3.r5` | 13 | 13 | 255 |
+| `grid.c4.r1` | 17 | 26 | 255 |
+| `grid.c4.r2` | 16 | 25 | 255 |
+| `grid.c4.r3` | 15 | 24 | 255 |
+| `grid.c4.r4` | 14 | 23 | 255 |
+| `grid.c4.r5` | 18 | 22 | 255 |
+| `grid.side-left` | 36 | 6 | 255 |
+| `grid.side-right` | 19 | 27 | 255 |
+| `cluster.top` | 28 | 34 | 255 |
+| `cluster.left` | 29 | 35 | 255 |
+| `cluster.center` | 22 | 37 | 255 |
+| `cluster.right` | 31 | 33 | 255 |
+| `cluster.bottom` | 30 | 36 | 255 |
+| `stick.main` | 24 | 31 | 30 |
+| `stick.right-upper` | 41 | 20 | 255 |
+| `stick.right-lower` | 20 | 19 | 255 |
+| `stick.below` | 23 | 32 | 255 |
 
 The remaining 12 numeric source IDs are `21`, `25`, `26`, `27`, `32`,
-`33`, `34`, `35`, `39`, `40`, `42`, and `43`. Their displayed
-controls are unknown; do not invent regions or merge them into visible controls.
-The 31 listed, including two provisional, and 12 unresolved records account for
-all 43 inputs exactly once. This is not a physical-button count or proof that
-unresolved inputs are unused.
+`33`, `34`, `35`, `39`, `40`, `42`, and `43`. They are not in S2's
+Cyborg II visible-button list or the selected screenshot. Do not invent
+regions or merge them into visible controls. The 31 listed and 12 excluded
+source records account for all 43 export inputs exactly once. The role of the
+excluded records is not established; their absence from this layout does not
+prove they are unused across modes or revisions.
 
 ## Schematic geometry
 
@@ -177,30 +187,33 @@ against the selected screenshot:
 
 These reports establish which displayed region reacts to each tested physical
 operation. The owner was not asked to identify fingers or anatomical press
-directions. The test did not expose live raw input IDs/pins for each press, and
-it did not resolve the two provisional UI/export correspondences. It also did
-not identify physical positions for the 12 inputs absent from the screenshot.
-If a future source exposes raw input IDs during a press, compare them to the
-recorded rows one at a time without rebinding; keep conflicts unresolved.
+directions. The test did not expose live raw input IDs/pins for each press; S2's
+matching screen layout supplies those ID positions independently. It also did
+not identify physical positions for the 12 inputs outside the displayed button
+set. If a future direct input trace conflicts with a recorded row, keep that
+relation unresolved instead of overriding the observation.
 
 ## Unmapped and ambiguous behavior
 
 Unknown physical mapping, unknown binding semantics, and duplicate-output
-candidates are separate states. Unresolved or provisional evidence must not
-select an arbitrary physical highlight. Preserve all known duplicate-output
-candidates under #30's existing contract. Missing or conflicting ID/pin facts
-stay unresolved; no field precedence, substituted pin, or array-index fallback
-is admitted. Missing pin evidence does not invalidate an independently proven
-input-ID relation; this test did not expose raw IDs during a press.
+candidates are separate states. A source ID outside the evidenced 31-control
+set must not select an arbitrary physical highlight. Preserve all known
+duplicate-output candidates under #30's existing contract. Missing or
+conflicting ID/pin facts stay unresolved; no field precedence, substituted pin,
+or array-index fallback is admitted. Missing pin evidence does not invalidate
+an independently proven input-ID relation. A keyboard output alone does not
+prove which of multiple known controls generated it.
 
 ## Revision and firmware coverage
 
-S1 supplies one left-hand software-profile keyboard-stick arrangement. It does
-not prove unchanged source positions after rebinding, equivalence to on-board
-or Xbox modes, or a universal left-hand pin map. Automatic runtime selection
-and highlighting still require supported adapter/device evidence. Unknown
-revision does not admit all revisions. Other profiles, modes, releases,
-firmware versions, and hands need their own applicability evidence.
+S1 and S2 jointly support the observed left-hand Software `2.0.2` keyboard-stick
+arrangement with displayed firmware `111` and unknown hardware revision. They
+do not prove equivalence to on-board or Xbox modes, a universal left-hand pin
+map, or automatic detection of a compatible device. Rebinding changes labels
+and output semantics, not these position IDs in S2, but other Software
+releases, firmware versions, revisions, and hands need applicability evidence.
+Unknown revision does not admit all revisions. Runtime selection and
+highlighting still require scoped adapter and device evidence.
 
 ## Deferred right-hand support
 
@@ -220,22 +233,23 @@ must not copy S1's private assignments or labels.
 | #29 | Selected screen arrangement | Exactly 31 uniquely named regions; all positions and sizes match the geometry and fit the viewBox. |
 | #29 | Every label and analog center | Shape-center label anchors; analog confined to `stick.main`; no labels overlap unrelated shapes. |
 | #29 | Reordered inputs and changed labels | Region names and geometry remain unchanged; no array index or private label becomes a region key. |
-| #29 | Missing, conflicting, or provisional mapping | No fabricated region, pin precedence, mirrored mapping, or promotion to physical proof. |
-| #29 | Twelve unresolved inputs and literal pins | Inputs remain unresolved; numeric `255` is not silently treated as missing. |
+| #29 | Missing or conflicting mapping | No fabricated region, pin precedence, mirrored mapping, or promotion of an unsupported combination to physical proof. |
+| #29 | Twelve excluded export inputs and literal pins | No visible position is invented for excluded IDs; numeric `255` is not silently treated as missing. |
 | #29 | Unsupported hand or other applicability | Explicit unsupported scope; no unverified automatic layout selection. |
 | #30 | Duplicate outputs among known candidates | Preserve the complete candidate set independent of source order. |
 | #30 | Equal outputs with distinct triggers | Preserve single/long/double distinctions without adding canonical conversion rules. |
-| #30 | Macro-count and residual-type matches | Provisional observations never authorize generic matching or physical highlighting. |
+| #30 | Macro-count and residual-type clues | Sample-specific clues never authorize generic matching or new binding semantics. |
 
 ## Downstream readiness
 
-#29 can use the names, geometry, owner-confirmed screen responses, and fixture
-requirements to prepare the owner-selected schematic. The UI table provides
-scoped research correlations; its two provisional rows require stronger source
-evidence before admission as mapping rules. #30 receives no verified
-evdev-to-physical candidate rule or new binding conversions.
+#29 can implement the owner-selected left-hand schematic with all 31 region
+names, shapes, label anchors, and source ID/pin relations for the evidenced
+combination. #30 can consume this scoped position mapping as candidate data,
+but must still resolve actual device events and duplicate outputs under its
+own contract. No new binding conversion is admitted here.
 
-Source review, the screen layout decision, and owner-operated screen-response
-check are complete at this scope. The complete input-ID/pin-to-physical map
-remains unverified. Committing this document alone does not complete #14 or v1,
-and does not waive rendering, integration, compatibility, or release gates.
+The #14 research requirements for this observed left-hand combination are
+met by S1's attributed export and owner-operated screen response, S2's direct
+position/ID mapping, and the explicit revision gaps above. This does not
+complete v1 or waive #29's asset, #30's matching, integration, compatibility,
+or release gates.
