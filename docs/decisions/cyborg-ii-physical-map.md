@@ -4,16 +4,20 @@
 
 For [#14](https://github.com/sh4869221b/azerlay/issues/14), the owner selected
 the supplied Azeron Software screenshot's arrangement as the overlay reference.
-This decision describes screen positions and observed export correlations,
-without finger names or claims about which physical press activates a region.
-Further anatomical descriptions are not needed to recreate this arrangement.
+This decision describes screen positions, owner-confirmed physical responses,
+and observed export correlations without assigning finger names or anatomical
+press directions. Further anatomical descriptions are not needed to recreate
+this arrangement.
 
 Formal v1 support targets left-hand Cyborg II only. The screenshot has 31
 visible control regions: 29 have direct UI/export correlations and two have
-weaker, explicitly provisional correlations. Physical press verification is
-**unperformed for every row**. Issue #14 remains open because its physical
-observation criterion is unmet. No layout assets, rendering, or matching code
-are implemented by this document.
+weaker, explicitly provisional correlations. The owner subsequently confirmed
+that each of the 31 screen regions responds to a distinct physical operation
+and returns to its prior display after release or joystick recentering. This
+verifies the screen arrangement for the tested profile, but does not by itself
+prove each export ID/pin relation or an evdev-to-control mapping. Issue #14
+remains open for those gaps. No layout assets, rendering, or matching code are
+implemented by this document.
 
 ## Evidence and limitations
 
@@ -34,6 +38,13 @@ The source pair is **S1**, a document-local evidence name. Private exports,
 decoded profiles, screenshots, assignments, labels, macros, serials, and local
 paths are not reproduced. Published numeric fields identify source inputs and
 pins, not profiles; UI correlations do not establish anatomical positions.
+
+In the subsequent owner-operated test with the same displayed profile, the
+owner pressed controls one at a time while watching Azeron Software. The owner
+reported that each named button region lit separately and returned after
+release. The joystick region responded to movement and returned at neutral.
+The agent did not operate or independently observe the device; these results
+are owner attestations, not a captured input-event trace.
 
 ## UI correlation method
 
@@ -64,20 +75,23 @@ array order. `grid.c1` through `grid.c4` run left to right; `r1` through
 the lower-right group. Follow S1 as displayed, without mirroring or interpreting
 screen directions as anatomical directions.
 
-These are layout-region IDs, not verified anatomical PhysicalControlIDs.
-The [Physical Control design](../design-research.md#93-physical-control)
-still requires physical evidence. Model, hand, and firmware applicability
-belong at a future version-scoped adapter boundary. Rendering and matching
-must not inspect opaque raw fields for new semantics. This decision does not
-extend the normalized model or admit parser rules for the recorded raw fields.
+These are stable screen-position IDs with owner-confirmed physical responses
+for the tested profile, not anatomical finger or action names. The
+[Physical Control design](../design-research.md#93-physical-control) still
+requires a supported source-to-position mapping before runtime highlighting.
+Model, hand, and firmware applicability belong at a future version-scoped
+adapter boundary. Rendering and matching must not inspect opaque raw fields
+for new semantics. This decision does not extend the normalized model or
+admit parser rules for the recorded raw fields.
 
 ## Left-hand UI-to-export correspondence
 
 All rows reference S1: owner-attributed left-hand / Software `2.0.2` / displayed
 firmware `111` / unknown revision. `id`, `pinOne`, and `pinTwo` are JSON
 numbers, not strings or array indices. Literal `255` remains a number, with
-no absent-pin or sentinel semantics inferred. Every row is physically
-unverified, including those marked `UI-correlated`.
+no absent-pin or sentinel semantics inferred. Every row has an owner-confirmed
+physical-operation-to-screen-region response. The numeric source relation
+remains UI/export correlation, including rows marked `UI-correlated`.
 
 | Screen region | `id` | `pinOne` | `pinTwo` | UI evidence / disposition |
 | --- | --- | --- | --- | --- |
@@ -149,18 +163,25 @@ region IDs and grouping under scaling. Use normal runtime label resolution,
 without private labels, official artwork, screenshots, or copied Software UI
 assets embedded in the layout.
 
-## Physical press procedure and remaining limit
+## Owner-operated screen response and remaining limit
 
-Physical testing is unperformed. The selected screenshot is sufficient for
-this screen arrangement; further finger-name or press questions are not
-prerequisites for arranging its shapes.
+The owner confirmed the following groups, one physical operation at a time,
+against the selected screenshot:
 
-For later physical verification, retain the attributed profile and mode,
-have the owner press and release one control at a time, and record which
-screen-region ID responds. Correlate the exact source row without rebinding.
-Repeat unclear observations or keep them unresolved. Inventory controls outside
-the displayed regions separately. No general keyboard monitoring, broad event
-capture, or device change is needed. The agent must not claim hardware actuation.
+| Group | Screen regions confirmed | Observed result reported by owner |
+| --- | --- | --- |
+| Grid top | `grid.c1.r1`, `grid.c2.r1`, `grid.c3.r1`, `grid.c4.r1` | Four distinct buttons lit their respective regions and returned after release. |
+| Grid remainder | `grid.c1..c4.r2..r5` | Sixteen distinct buttons lit their respective regions and returned after release. |
+| Grid sides and cluster | `grid.side-left`, `grid.side-right`, `cluster.top`, `cluster.left`, `cluster.center`, `cluster.right`, `cluster.bottom` | Seven distinct buttons lit their respective regions and returned after release. |
+| Stick group | `stick.main`, `stick.right-upper`, `stick.right-lower`, `stick.below` | Joystick movement and three distinct buttons activated their respective regions; the display returned after recentering or release. |
+
+These reports establish which displayed region reacts to each tested physical
+operation. The owner was not asked to identify fingers or anatomical press
+directions. The test did not expose live raw input IDs/pins for each press, and
+it did not resolve the two provisional UI/export correspondences. It also did
+not identify physical positions for the 12 inputs absent from the screenshot.
+If a future source exposes raw input IDs during a press, compare them to the
+recorded rows one at a time without rebinding; keep conflicts unresolved.
 
 ## Unmapped and ambiguous behavior
 
@@ -170,7 +191,7 @@ select an arbitrary physical highlight. Preserve all known duplicate-output
 candidates under #30's existing contract. Missing or conflicting ID/pin facts
 stay unresolved; no field precedence, substituted pin, or array-index fallback
 is admitted. Missing pin evidence does not invalidate an independently proven
-input-ID relation, but no such physical proof exists here.
+input-ID relation; this test did not expose raw IDs during a press.
 
 ## Revision and firmware coverage
 
@@ -208,12 +229,13 @@ must not copy S1's private assignments or labels.
 
 ## Downstream readiness
 
-#29 can use the names, geometry, and fixture requirements to prepare the
-owner-selected schematic. The UI table provides scoped research correlations;
-its two provisional rows require stronger evidence before admission as mapping
-rules. #30 receives no verified physical candidates or new binding conversions.
+#29 can use the names, geometry, owner-confirmed screen responses, and fixture
+requirements to prepare the owner-selected schematic. The UI table provides
+scoped research correlations; its two provisional rows require stronger source
+evidence before admission as mapping rules. #30 receives no verified
+evdev-to-physical candidate rule or new binding conversions.
 
-Source review and the screen layout decision are complete at this scope.
-Actual press evidence and supported physical mapping remain unmet. Committing
-this document alone does not complete #14 or v1, and does not waive rendering,
-integration, compatibility, or release gates.
+Source review, the screen layout decision, and owner-operated screen-response
+check are complete at this scope. The complete input-ID/pin-to-physical map
+remains unverified. Committing this document alone does not complete #14 or v1,
+and does not waive rendering, integration, compatibility, or release gates.
