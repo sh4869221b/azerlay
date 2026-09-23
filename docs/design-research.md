@@ -17,7 +17,7 @@
 | GitHubリポジトリ | **`azerlay`** |
 | 製品形態 | Linux/Wayland専用、単一プロセス・単一バイナリのAzeron入力オーバーレイ |
 | 初期正式対応機器 | Azeron Cyborg II 左手用（v1）。右手用はv1後の対応へ延期 |
-| 初期正式対応Compositor | Niri、Hyprland |
+| 初期正式対応Compositor | Hyprland（v1目標）。Niriはv1後へ延期し、動作未検証 |
 | 初期ゲームプロファイル | Bodycam |
 | 実装言語 | Go 1.27.x |
 | GUI | GTK4 / gotk4 |
@@ -168,7 +168,7 @@ Azeron Cyborg II
 2. ゲーム中に確認しやすいCyborg II模式図を、低遅延・低負荷で表示する。
 3. キー、マウスボタン、ゲームパッドボタン、アナログスティックをリアルタイム表示する。
 4. Azeron固有のラベル、長押し、ダブルタップ、マクロ、ターボ、アナログ設定を欠落させず内部表現へ正規化する。
-5. NiriおよびHyprlandで、フルスクリーンゲーム上にクリック透過表示する。
+5. v1ではHyprlandで、フルスクリーンゲーム上にクリック透過表示する。Niriはv1後へ延期し、動作未検証とする。
 6. root実行、`input`グループへの恒久追加、入力デバイスの排他的取得を必要としない。
 7. 不正・破損・未知バージョンのプロファイルを安全に拒否し、最後に正常だった設定で動作を継続する。
 8. オフラインで動作し、テレメトリーや外部通信を行わない。
@@ -213,7 +213,7 @@ Azeron Cyborg II
 |---|---|
 | OS | Linux |
 | Display server | Wayland |
-| Compositor | Niri、Hyprland |
+| Compositor | Hyprland（v1）。Niriはv1後、動作未検証 |
 | 入力API | Linux evdev |
 | 対象機器 | Azeron Cyborg II 左手用（v1）。右手用はv1後の対応へ延期 |
 | CPU architecture | x86_64 |
@@ -242,13 +242,13 @@ Layer Shellを実装する以下の環境は、動作確認後に「準対応」
 
 - CachyOS / Arch Linux系
 - NVIDIA proprietary driver
-- Niri
 - Hyprland
 - 複数モニター
 - 高リフレッシュレート、VRR
 - Proton上のBodycam
 
 HDR、VRR、Direct Scanoutとの相互作用は要調査であり、正式サポート表に結果を記載する。
+Niriの実機検証はv1の必須マトリクスに含めず、v1後に行う。
 
 ---
 
@@ -380,8 +380,8 @@ Azeronを外すと「Disconnected」を表示し、読取goroutineを終了す�
 | FR-071 | Layer namespaceを`azerlay`とすること。 |
 | FR-072 | キーボードフォーカスを要求しないこと。 |
 | FR-073 | GDK Surfaceの空Input Regionを用い、ポインター入力を完全透過すること。 |
-| FR-074 | 画面の排他的領域を確保せず、ゲームのワークエリアを変更しないこと。具体値はCompositor検証後に確定する。 |
-| FR-075 | モニターをconnector名、説明、永続ID候補から選択できること。 |
+| FR-074 | 画面の排他的領域を確保せず、ゲームのワークエリアを変更しないこと。v1のHyprland配置ではexclusive zone `-1`を用いる（[実測と限界](decisions/compositor-placement.md)）。 |
+| FR-075 | v1ではモニターをconnector名の完全一致、次に一意な説明の完全一致で選択すること。明示指定が不在・曖昧なら非表示で状態を保持し、他出力へ移動しない。永続的な物理IDは保証しない。 |
 | FR-076 | 左上・上・右上・左・中央・右・左下・下・右下のanchorと、X/Y marginを設定できること。 |
 | FR-077 | scale、opacity、font scale、背景表示、プロファイル名表示を設定できること。 |
 | FR-078 | 高DPIおよびfractional scaling環境で物理サイズ・文字が破綻しないこと。 |
@@ -1163,7 +1163,7 @@ Go向けに古いGTK3用bindingを流用しない。`gtk4-layer-shell`のC API�
 - set margin
 - set monitor
 - set keyboard mode = none
-- set exclusive zone / auto exclusive behavior
+- set exclusive zone = `-1`（v1のHyprland配置では排他的領域を確保しない）
 
 CGoは`internal/layershell`へ隔離し、他パッケージへ`C.*`型を漏らさない。
 
@@ -1184,7 +1184,7 @@ Layer Shellのkeyboard modeだけではポインター透過を保証しない�
 
 Compositorによってはoverlay surfaceが存在するとDirect Scanoutを無効化し、性能、VRR、遅延、消費電力へ影響する可能性がある。
 
-- Niri、Hyprland、Gamescopeで実測する。
+- v1対象のHyprlandで実測する。NiriとGamescopeの実測はv1後の別課題とする。
 - オーバーレイ非表示時はsurfaceをunmapまたは破棄し、Direct Scanout復帰可能性を高める。
 - 単にopacity 0にするだけで隠さない。
 - 影響をREADMEへ明記する。
@@ -1568,7 +1568,7 @@ text診断はstdout、text構文エラーはstderrへ出す。JSONは構文エ�
 
 ### 18.1 目的
 
-Hyprland/Niriのキーバインドやスクリプトから、動作中Azerlayを即時操作する。
+v1ではHyprlandのキーバインドやスクリプトから、動作中Azerlayを即時操作する。Niriでの連携はv1後に検証する。
 
 ### 18.2 プロトコル
 
@@ -1716,7 +1716,7 @@ GTK、font cache、環境差があるため、CIだけでなくターゲット�
 
 - オーバーレイがなくてもCLI診断・インポートが使える。
 - Profile source障害時はlast-known-goodで表示継続。
-- monitor消失時は設定されたfallback monitorへ移動するか、状態を非表示で保持する。
+- 明示指定したmonitorの消失時は他出力へ移動せず、状態を保持して非表示にする。同じ設定キーが一意に再解決された場合のみ表示を再開する。物理的に同じmonitorの復帰は保証しない（[実測と未検証範囲](decisions/compositor-placement.md)）。
 
 ### 21.4 保守性
 
@@ -2079,7 +2079,6 @@ CIで再現できないDirect Scanout、VRR、HDR、Protonフルスクリーン�
 
 | 環境 | 必須 |
 |---|---:|
-| Niri + NVIDIA + Wayland native desktop | 必須 |
 | Hyprland + NVIDIA | 必須 |
 | Bodycam + Proton + borderless | 必須 |
 | Bodycam + Proton + fullscreen | 必須 |
@@ -2090,6 +2089,8 @@ CIで再現できないDirect Scanout、VRR、HDR、Protonフルスクリーン�
 | Gamescope nested | 推奨 |
 | Sway | 推奨 |
 | KDE Plasma Wayland | 推奨 |
+
+Niriはv1後の対象で、実機動作は未検証。v1の必須試験には含めない。
 
 ### 25.7 長時間試験
 
@@ -2231,7 +2232,7 @@ Cyborg IIを正しいevent node群として検出し、他の一般キーボー�
 
 ### AC-006 リアルタイム表示
 
-NiriおよびHyprland上で、Bodycamのフルスクリーンまたはborderless表示より上にオーバーレイを表示し、入力p95 20ms以下でハイライトする。
+v1ではHyprland上で、Bodycamのフルスクリーンまたはborderless表示より上にオーバーレイを表示し、入力p95 20ms以下でハイライトする。Niriはv1後の対象で、動作未検証とする。
 
 ### AC-007 透過
 
@@ -2287,9 +2288,9 @@ fuzz testでpanic、無制限メモリ確保、部分保存が発生しない。
 | R-004 | active profile、favorite、software/on-board状態の保存方法 | 自動選択 | プロファイル自動追従 |
 | R-005 | Cyborg II各改版のVID/PID、USB interface、event node topology（[観測済み署名の決定](decisions/device-identity.md)あり、他の改版・左右・動作モードは未検証） | udevとDeviceGroup | 未観測範囲の自動検出・権限、配布時のACL検証 |
 | R-006 | gotk4 branch 4と対象GTK4版、native GtkWindow/GdkSurface pointer連携 | 安定したCGo bridge | Overlay起動 |
-| R-007 | gtk4-layer-shellのNiri/Hyprlandでのanchor、exclusive zone、monitor指定 | 正しい配置 | Overlay正式対応 |
-| R-008 | GDK empty input regionのmap/remap/hotplug後挙動 | 完全click-through | Overlay正式対応 |
-| R-009 | connector名、fractional scale、monitor hotplug | 複数モニター | Multi-monitor正式対応 |
+| R-007 | [Hyprland v1配置の実測と決定](decisions/compositor-placement.md)：anchor、exclusive zone、monitor指定。Niriはv1後、動作未検証 | 正しい配置 | Overlay正式対応 |
+| R-008 | GDK empty input regionのmap/remap/hotplug後挙動（[アプリ起点のremap実測](decisions/overlay-abi.md)あり。compositor起点のremapと物理hotplugは未検証） | 完全click-through | Overlay正式対応 |
+| R-009 | [connector選択、fractional scale、一時出力の消失・再作成](decisions/compositor-placement.md)。同じキーへの復帰は未検証、物理hotplugも未検証 | 複数モニター | Multi-monitor正式対応 |
 | R-010 | Direct Scanout、VRR、HDR、Gamescopeへの影響 | 性能・ゲーム互換性 | 性能保証 |
 | R-011 | Bodycam現行バージョンの全キーバインドとアクション名 | built-in game profile | Bodycamプロファイル |
 | R-012 | プロジェクト名、GitHub名、商標、依存ライセンス | 公開上の安全 | 公開リリース |
@@ -2315,7 +2316,7 @@ fuzz testでpanic、無制限メモリ確保、部分保存が発生しない。
 - single/long/double/macro/turbo/analog全種を含む匿名化fixture。
 - `lsusb -v`、`udevadm info`、`evtest`能力情報。
 - `/proc/bus/input/devices`。
-- Niri/Hyprland/Gamescopeのversion。
+- v1対象Hyprlandのversion。Niri/Gamescopeはv1後に検証する場合のversion。
 - fractional scaling、VRR、HDR別の挙動。
 
 秘密や個人ラベルを除去し、公開fixtureはsynthetic化する。
