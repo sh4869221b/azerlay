@@ -485,6 +485,7 @@ func runPlacement(args placementArgs) int {
 		}
 	}()
 	var target *gdk.Monitor
+	var targetHandler coreglib.SignalHandle
 	create := func(monitor *gdk.Monitor) {
 		p.window = gtk.NewWindow()
 		p.window.SetTitle("Azerlay placement probe")
@@ -511,10 +512,21 @@ func runPlacement(args placementArgs) int {
 			}
 		})
 		p.window.ConnectUnrealize(func() { p.disconnect() })
-		p.window.Present()
+		if monitor != nil {
+			window := p.window
+			targetHandler = monitor.ConnectInvalidate(func() {
+				window.SetVisible(false)
+				p.applied = false
+			})
+		}
 		target = monitor
+		p.window.Present()
 	}
 	destroy := func() {
+		if target != nil {
+			target.HandlerDisconnect(targetHandler)
+			target = nil
+		}
 		if p.window != nil {
 			p.disconnect()
 			p.window.Destroy()
