@@ -38,7 +38,8 @@ The initial supported target is Linux/Wayland on x86-64 with left-hand Azeron
 Cyborg II, Hyprland, and a Bodycam game profile. Niri and right-hand Cyborg II
 are deferred beyond v1 and remain unverified. The overlay is not implemented
 yet; the [placement decision](docs/decisions/compositor-placement.md) records
-the measured Hyprland scope and the unresolved monitor-return case.
+the measured Hyprland scope and a successful same-name headless return on the
+tested host. The cause of an earlier compositor crash remains unresolved.
 
 ## Development
 
