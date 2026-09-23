@@ -1,5 +1,41 @@
 # Overlay ABI decision evidence
 
+## Decision for the Issue #32 bridge
+
+Use the tested gotk4 `v0.4.1` modules (the `4` branch commit
+`f90c213bbae79f6dcb74c5101a88b630f158de25`) with GTK4 `4.22.5` and
+gtk4-layer-shell `1.3.0` as the proven v1 Hyprland ABI tuple. The probe was
+built with Go `go1.27.1-X:nodwarf5 linux/amd64` on Linux
+`7.3.0-rc3-1-cachyos-rc` and exercised on Hyprland `0.56.2`. Keep its
+reproducible source and nested pin at `internal/layershell/probe/`; the root
+module and CI acquire no GTK dependency from this decision. The ABI evidence
+below records the build, direct link order, actual library load order, and
+first mapped Layer Shell surface. Earlier GTK4 versions have not been tested.
+
+The observed ownership contract is: lock the GTK main OS thread before GTK
+work; keep GTK objects and their callbacks there; pass the `GtkWindow` native
+address only into an immediate CGo call and keep the Go window wrapper alive
+through that call. Obtain the current `GdkSurface` from
+`GtkWidget.Native().Surface()` after realization, check absent or unexpected
+values before use, and retain the Go surface wrapper rather than a native
+pointer. Keep C types inside `internal/layershell`. The pointer/lifecycle
+evidence below covers the guards and disconnection of stale surface handlers.
+
+Set an empty Cairo region on the *actual mapped* `GdkSurface`, as indicated by
+`GdkSurface.Mapped()` and `notify::mapped`; a widget `map` signal alone is not
+the observed timing. On hide/show of the same surface, the handler remains
+connected and reapplies the empty region when that surface maps again. On
+unrealize or window replacement, disconnect the old handler; acquire the new
+surface and connect its own handler before applying the region at its mapped
+state. The six Hyprland counter rows below establish compositor-routed
+pass-through for empty regions and blocking for full-region controls at
+initial map, hide/show remap, and application-driven surface recreation.
+
+Niri runtime verification was excluded from v1 by the owner and remains
+unverified. Monitor hotplug and compositor-originated remap were not exercised;
+the observed hide/show and application-driven recreation do not prove them.
+This decision makes no claim about those cases or lower GTK4 versions.
+
 ## ABI evidence (Issue #15, Todo 1; 2026-09-23)
 
 The standalone probe is a nested module at `internal/layershell/probe/`. It
@@ -82,7 +118,7 @@ section is the captured evidence artifact; no separate ignored log is needed.
 | RED: original smoke-only probe | `CGO_ENABLED=1 go build -o /tmp/azerlay-overlay-t2-probe .`, then prefix + `--lifecycle` | Build exit 0; invocation prints `usage: overlay-abi-probe --smoke`, exit 2; lifecycle and region evidence absent | Expected failure before change |
 | GREEN: updated probe compile | `CGO_ENABLED=1 go build -o /tmp/azerlay-overlay-t2-probe .` | Exit 0; existing generated C wrapper `free` declaration warnings remain nonfatal | Pass |
 | GREEN: empty-region lifecycle | prefix + `--lifecycle` | Exact ordered transcript below; exit 0, no fatal GTK warning | Pass |
-| GREEN: full-reactive negative control | prefix + `--reactive` | Same three mapped stages, each reports `input-region=full-reactive (negative control)`; `lifecycle complete`; exit 0 | Pass for selecting reactive region; click blocking is not yet tested |
+| GREEN: full-reactive negative control | prefix + `--reactive` | Same three mapped stages, each reports `input-region=full-reactive (negative control)`; `lifecycle complete`; exit 0 | Pass for selecting reactive region; click blocking is tested separately in Todo 3 below |
 | Missing native/surface failure | prefix + `--absent-surface` | `before-parent: native absent: non-success`, then `before-realize: surface absent: non-success`; exit 1, no C dereference of either absent value | Pass |
 | Existing smoke mode | prefix + `--smoke` | Absence checks, `initial surface-acquired mapped=false`, `initial notify::mapped=true`, `initial mapped input-region=empty`, `layer-shell surface mapped`, `initial handler-disconnected`; exit 0 | Pass |
 
@@ -122,7 +158,155 @@ Additional validation and cleanup for Todo 2:
 | Root dependency isolation | `git diff -- go.mod go.sum` | Exit 0, empty. Nested module files also required no change in Todo 2. |
 | Cleanup | `rm /tmp/azerlay-overlay-t2-probe` | Exit 0. Each bounded runtime invocation had already exited; cleanup disconnected its surface handler and destroyed its window. |
 
-The probe remains one lifecycle test surface in one file (210 nonblank,
-non-comment lines under the simple source-count check). The reviewed native
-boundary uses the pinned library wrappers for surface/region ownership; no
-new dependency, production abstraction, or test-only root package was added.
+The reviewed native boundary uses the pinned library wrappers for
+surface/region ownership; no new dependency, production abstraction, or
+test-only root package was added by Todo 2.
+
+## Hyprland click-through evidence (Issue #15, Todo 3; 2026-09-23)
+
+`--clicks` adds a lower, undecorated GTK window containing one expanding button
+(`Lower clicks: N`) and accepts `count`, `full`, `empty`, `hide`, `show`,
+`recreate`, and `quit` on stdin. The scanner sends strings through a channel;
+only the locked GTK main thread handles widgets, regions, counters and lifecycle
+commands. EOF/quit closes both windows; a five-minute deadline bounds the mode.
+The overlay now contains a synthetic label, and region application requests a
+redraw with `QueueDraw()` so the changed region participates in a subsequent
+render/commit. Commands are observed asynchronously: wait for their printed
+state and the next frame before clicking. `count` prints the current counter;
+only the lower button's clicked signal increments it.
+
+The fresh tuple checks were `go version` → `go1.27.1-X:nodwarf5 linux/amd64`,
+`pkg-config --modversion gtk4 gtk4-layer-shell-0` → `4.22.5`, `1.3.0`,
+`uname -r` → `7.3.0-rc3-1-cachyos-rc`, `hyprctl version` → Hyprland `0.56.2`,
+and `pacman -Q ydotool` → `ydotool 1.0.4-2.1`. `ydotool --version` is not
+supported by this executable and was not used as version evidence.
+
+Build and start in a terminal with stdin kept open:
+
+```sh
+cd internal/layershell/probe
+CGO_ENABLED=1 go build -o /tmp/azerlay-overlay-t3-probe .
+env XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-1 \
+  GDK_BACKEND=wayland GSK_RENDERER=cairo G_DEBUG=fatal-warnings \
+  /tmp/azerlay-overlay-t3-probe --clicks
+```
+
+Build exited 0, with the same nonfatal generated-wrapper `free` declaration
+warnings as Todo 1. The live session reported actual `notify::mapped=true` and
+`mapped input-region=empty` before controls were applied. The successful run
+exited 0 after `quit`, without fatal GTK warnings.
+
+In another terminal, use the running session's
+`HYPRLAND_INSTANCE_SIGNATURE` and query geometry at **each** mapped phase:
+
+```sh
+hyprctl clients -j | jq '[.[] | select(.title == "Azerlay ABI lower target") | {at,size}]'
+hyprctl layers -j | jq '[.. | objects | select(.namespace? == "azerlay-abi-probe") | {x,y,w,h}]'
+```
+
+All three queries returned lower `at=[10,50]`, `size=[1904,1024]` and overlay
+`x=0,y=44,w=160,h=80`. Their overlap was `x=[10,160)`, `y=[50,124)`; its
+midpoint `(85,87)` was used for every click. No placement policy or monitor
+identifier/serial is implied. `hyprctl cursorpos` confirmed `85, 87`.
+
+The planned legacy command `hyprctl dispatch movecursor 85 87` failed with
+exit 7 and a Lua syntax error (`')' expected near '85'`), so no click was sent
+by that `&&` chain. This installed compositor uses the documented
+[Lua cursor dispatcher](https://wiki.hypr.land/configuring/core/dispatchers/).
+The real compositor-routed command used for **each** table row was:
+
+```sh
+hyprctl dispatch 'hl.dsp.cursor.move({x=85,y=87})' && \
+  YDOTOOL_SOCKET=/run/user/1000/.ydotool_socket ydotool click 0xC0
+```
+
+Both commands exited 0 on every successful row (`ok`, then `c0 110`). The socket
+is the existing user's `$XDG_RUNTIME_DIR/.ydotool_socket`; no daemon was started
+or stopped, and no permissions were changed. Window-directed synthetic clicks
+were not used.
+
+The first draft with an unpainted overlay and no redraw request failed its
+negative control: `full` printed the requested mode, but the real lower counter
+changed `0→1`; `empty` then changed `1→2`. That was **not** accepted as full
+input-region evidence. Adding the visible label and redraw request, rebuilding,
+and restarting from counter zero produced the complete results below. These
+observations prove the corrected probe path; they do not isolate which of the
+two render changes caused the earlier failure.
+
+For each phase: enter `full`, then `count`; wait one second; run the click;
+enter `count`, then `empty`; wait one second; run the same click; enter `count`.
+Between phases, enter `hide`, wait for `notify::mapped=false`, then `show` and
+wait for `hide-show-remap notify::mapped=true`. Next enter `recreate`; observe
+old-handler disconnection, new `surface-acquired mapped=false`, and
+`recreated notify::mapped=true`. Re-query geometry before each phase's clicks.
+
+| Phase | Region | Lower before | Lower after | Binary observable / verdict |
+| --- | --- | ---: | ---: | --- |
+| Initial map | Full reactive | 0 | 0 | RED pass-through control: blocked; no lower clicked signal |
+| Initial map | Empty | 0 | 1 | GREEN: exactly one lower clicked signal; pass-through |
+| Hide/show remap | Full reactive | 1 | 1 | RED pass-through control: blocked; no lower clicked signal |
+| Hide/show remap | Empty | 1 | 2 | GREEN: exactly one lower clicked signal; pass-through |
+| Recreated surface | Full reactive | 2 | 2 | RED pass-through control: blocked; no lower clicked signal |
+| Recreated surface | Empty | 2 | 3 | GREEN: exactly one lower clicked signal; pass-through |
+
+The explicit `count` outputs establish the before/after values even when a click
+is blocked. Every empty click additionally printed `lower count=1`, `2`, or `3`
+from the actual clicked callback. `full`/`empty` commands also call the existing
+observer to read and print current mapped state; those command-triggered lines
+are not additional compositor map events.
+
+| Additional scenario | Exact invocation | Observable result |
+| --- | --- | --- |
+| Invalid display | `env XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=azerlay-probe-nonexistent GDK_BACKEND=wayland GSK_RENDERER=cairo G_DEBUG=fatal-warnings timeout 5s /tmp/azerlay-overlay-t3-probe --clicks` | `GTK initialization failed: Wayland display unavailable`; exit 1 before timeout, no crash or hang |
+| Existing lifecycle regression | `env XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-1 GDK_BACKEND=wayland GSK_RENDERER=cairo G_DEBUG=fatal-warnings timeout 10s /tmp/azerlay-overlay-t3-probe --lifecycle` | All three empty mapped stages and `lifecycle complete`; exit 0 |
+| Nested vet | `CGO_ENABLED=1 go vet ./...` in probe module | Exit 0; only existing generated C warnings |
+| Root gates | `go vet ./... && go test -race -shuffle=on -count=1 ./... && go build -o /dev/null ./cmd/azerlay` | Exit 0; all test-bearing packages passed, profile has no test files |
+| Formatting/scope | `gofmt -l internal/layershell/probe`; `git diff --check`; `git diff -- go.mod go.sum .github/workflows/ci.yml` | Exit 0, no output for each |
+| Cleanup | `quit` on probe stdin; `rm /tmp/azerlay-overlay-t3-probe`; `test ! -e /tmp/azerlay-overlay-t3-probe` | Probe exit 0 after `recreated handler-disconnected`; binary removal and absence check exit 0 |
+| No remaining test windows | Geometry queries above with `length` appended, selecting both probe titles for clients | Zero matching clients and zero matching layers |
+| No remaining test process | `pgrep -af '^/tmp/azerlay-overlay-t3-probe'` | Exit 1, no matches; no child process was spawned by the probe |
+| User daemon preserved | `pgrep -a -u 1000 ydotoold`; `stat -c '%U %F' /run/user/1000/.ydotool_socket` | Existing `/usr/bin/ydotoold` still running, socket still owned by `sh4869` |
+
+This section is the captured Todo 3 evidence artifact. Only initial mapping,
+application hide/show remapping and application-driven surface recreation were
+exercised. Monitor hotplug and compositor-originated remapping remain unverified.
+Niri was not run and remains excluded from v1 runtime verification.
+
+## Evidence boundary and Issue #32 handoff
+
+**Observed on the tested host:** The nested probe built and mapped with the
+pinned tuple; `readelf` and `LD_DEBUG=libs` established the recorded link/load
+order; an absent pre-realization surface and unavailable Wayland display failed
+without a native dereference, crash, or timeout. The probe applied an empty
+region at each actual mapped stage and disconnected the stale handler before
+surface replacement. The six real Hyprland click results above establish only
+the three tested lifecycle phases. A test-only omission of Layer Shell
+initialization failed the smoke assertion; the corrected path passed.
+
+**Upstream contracts:** The linked gotk4 README identifies branch `4` for
+GTK 4.14. The linked gtk4-layer-shell guidance requires the Layer Shell
+library to load before Wayland client. The
+[GDK input-region API](https://docs.gtk.org/gdk4/method.Surface.set_input_region.html)
+defines an empty region as nonreactive and `nil` as the full surface. These
+sources explain the chosen calls; they do not establish behavior on untested
+compositors or library versions.
+
+**Implementation advice for #32:** Start from the probe's pinned tuple and
+keep the same synchronous GTK-thread CGo boundary, surface guards, and
+`notify::mapped` observer. Initialize Layer Shell before presenting the window;
+reject unavailable display or Layer Shell support explicitly. Reapply the
+empty region after a mapped hide/show and attach a fresh handler to each new
+surface, disconnecting the old handler on unrealize or replacement. Preserve
+the proven library load order when linking the production bridge. Verify
+compositor-routed clicks for any newly supported lifecycle or environment;
+the probe evidence alone does not cover monitor hotplug or compositor-originated
+remap. This document selects an ABI contract; it does not implement #32.
+
+## Issue #15 acceptance traceability
+
+| Issue #15 checkbox | Direct evidence or decision | Verification |
+| --- | --- | --- |
+| `docs/decisions/overlay-abi.md is committed` | This decision document and the probe source are the deliverables. | Confirm that the delivered commit contains this version of the document in PR/repository history; a working-tree diff alone does not satisfy the checkbox. |
+| Compatible library versions or commits are pinned | [Decision for the Issue #32 bridge](#decision-for-the-issue-32-bridge) and [ABI evidence](#abi-evidence-issue-15-todo-1-2026-09-23), including the nested `go.mod` pin and native tuple. | Evidence recorded for the tested tuple. |
+| Native pointer lifetime and error behavior are documented | [Decision for the Issue #32 bridge](#decision-for-the-issue-32-bridge), [Pointer/lifecycle evidence](#pointerlifecycle-evidence-issue-15-todo-2-2026-09-23), and [Evidence boundary and Issue #32 handoff](#evidence-boundary-and-issue-32-handoff). | Documented for observed cases. |
+| Empty input-region lifecycle timing is evidenced | [Pointer/lifecycle evidence](#pointerlifecycle-evidence-issue-15-todo-2-2026-09-23) and the six [Hyprland click-through rows](#hyprland-click-through-evidence-issue-15-todo-3-2026-09-23). | Evidenced for initial map, hide/show remap, and application-driven surface recreation on Hyprland. |

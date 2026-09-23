@@ -21,6 +21,7 @@ static gboolean is_layer_window(uintptr_t address) {
 import "C"
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"runtime"
@@ -84,6 +85,7 @@ func (p *probe) observe() {
 		return
 	}
 	p.surface.SetInputRegion(p.region)
+	p.window.QueueDraw()
 	runtime.KeepAlive(p.surface)
 	runtime.KeepAlive(p.region)
 	mode := "empty"
@@ -98,6 +100,7 @@ func (p *probe) createWindow() {
 	p.window = gtk.NewWindow()
 	p.window.SetTitle("Azerlay ABI probe")
 	p.window.SetDefaultSize(160, 80)
+	p.window.SetChild(gtk.NewLabel("Overlay ABI probe"))
 	C.init_layer(C.uintptr_t(glib.BaseObject(p.window).Native()))
 	runtime.KeepAlive(p.window)
 	p.window.ConnectRealize(func() {
@@ -127,8 +130,8 @@ func run() int {
 	if len(os.Args) == 2 {
 		mode = os.Args[1]
 	}
-	if len(os.Args) > 2 || (mode != "--smoke" && mode != "--lifecycle" && mode != "--reactive" && mode != "--absent-surface") {
-		fmt.Fprintln(os.Stderr, "usage: overlay-abi-probe [--smoke|--lifecycle|--reactive|--absent-surface]")
+	if len(os.Args) > 2 || (mode != "--smoke" && mode != "--lifecycle" && mode != "--reactive" && mode != "--absent-surface" && mode != "--clicks") {
+		fmt.Fprintln(os.Stderr, "usage: overlay-abi-probe [--smoke|--lifecycle|--reactive|--absent-surface|--clicks]")
 		return 2
 	}
 	if !gtk.InitCheck() {
@@ -165,6 +168,9 @@ func run() int {
 			fmt.Fprintln(os.Stderr, "empty region creation failed:", err)
 			return 1
 		}
+	}
+	if mode == "--clicks" {
+		return runClicks(&p)
 	}
 	loop := glib.NewMainLoop(nil, false)
 	deadline := time.Now().Add(5 * time.Second)
@@ -217,6 +223,95 @@ func run() int {
 		return true
 	})
 	p.createWindow()
+	loop.Run()
+	p.disconnect()
+	p.window.Destroy()
+	if !complete {
+		fmt.Fprintln(os.Stderr, p.err)
+		return 1
+	}
+	return 0
+}
+
+// Stdin carries only probe commands; all GTK state stays on the main thread.
+func runClicks(p *probe) int {
+	commands := make(chan string)
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		defer close(commands)
+		scanner := bufio.NewScanner(os.Stdin)
+		for scanner.Scan() {
+			select {
+			case commands <- scanner.Text():
+			case <-done:
+				return
+			}
+		}
+	}()
+	lower := gtk.NewWindow()
+	lower.SetTitle("Azerlay ABI lower target")
+	lower.SetDecorated(false)
+	lower.SetDefaultSize(400, 240)
+	button := gtk.NewButtonWithLabel("Lower clicks: 0")
+	count := 0
+	button.ConnectClicked(func() {
+		count++
+		button.SetLabel(fmt.Sprintf("Lower clicks: %d", count))
+		fmt.Printf("lower count=%d\n", count)
+	})
+	lower.SetChild(button)
+	lower.Present()
+	defer lower.Destroy()
+	loop := glib.NewMainLoop(nil, false)
+	empty := p.region
+	deadline := time.Now().Add(5 * time.Minute)
+	complete := false
+	glib.TimeoutAdd(50, func() bool {
+		if p.err != nil || time.Now().After(deadline) {
+			if p.err == nil {
+				p.err = fmt.Errorf("click probe exceeded 5 minutes")
+			}
+			loop.Quit()
+			return false
+		}
+		select {
+		case command, ok := <-commands:
+			if !ok || command == "quit" {
+				complete = true
+				loop.Quit()
+				return false
+			}
+			switch command {
+			case "empty", "full":
+				p.region = empty
+				if command == "full" {
+					p.region = nil
+				}
+				if p.surface != nil {
+					p.observe()
+				}
+			case "hide":
+				p.window.SetVisible(false)
+			case "show":
+				p.label = "hide-show-remap"
+				p.window.Present()
+			case "recreate":
+				p.disconnect()
+				p.window.Destroy()
+				p.label = "recreated"
+				p.createWindow()
+			case "count":
+				fmt.Printf("lower count=%d\n", count)
+			default:
+				fmt.Println("unknown probe command")
+			}
+		default:
+		}
+		return true
+	})
+	p.createWindow()
+	fmt.Println("commands: count empty full hide show recreate quit; lower count=0")
 	loop.Run()
 	p.disconnect()
 	p.window.Destroy()
