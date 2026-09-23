@@ -17,6 +17,24 @@ static void init_layer(uintptr_t address) {
 static gboolean is_layer_window(uintptr_t address) {
 	return gtk_layer_is_layer_window((GtkWindow *)address);
 }
+
+static void init_placement(uintptr_t address, uintptr_t monitor_address, int horizontal, int vertical, int margin_x, int margin_y, int zone) {
+	GtkWindow *window = (GtkWindow *)address;
+	gtk_layer_init_for_window(window);
+	gtk_layer_set_namespace(window, "azerlay-placement-probe");
+	gtk_layer_set_layer(window, GTK_LAYER_SHELL_LAYER_OVERLAY);
+	gtk_layer_set_keyboard_mode(window, GTK_LAYER_SHELL_KEYBOARD_MODE_NONE);
+	gtk_layer_set_exclusive_zone(window, zone);
+	gtk_layer_set_monitor(window, (GdkMonitor *)monitor_address);
+	if (horizontal != 0) {
+		gtk_layer_set_anchor(window, horizontal < 0 ? GTK_LAYER_SHELL_EDGE_LEFT : GTK_LAYER_SHELL_EDGE_RIGHT, TRUE);
+	}
+	if (vertical != 0) {
+		gtk_layer_set_anchor(window, vertical < 0 ? GTK_LAYER_SHELL_EDGE_TOP : GTK_LAYER_SHELL_EDGE_BOTTOM, TRUE);
+	}
+	gtk_layer_set_margin(window, horizontal <= 0 ? GTK_LAYER_SHELL_EDGE_LEFT : GTK_LAYER_SHELL_EDGE_RIGHT, margin_x);
+	gtk_layer_set_margin(window, vertical <= 0 ? GTK_LAYER_SHELL_EDGE_TOP : GTK_LAYER_SHELL_EDGE_BOTTOM, margin_y);
+}
 */
 import "C"
 
@@ -25,11 +43,14 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/diamondburned/gotk4/pkg/cairo"
 	coreglib "github.com/diamondburned/gotk4/pkg/core/glib"
 	"github.com/diamondburned/gotk4/pkg/gdk/v4"
+	"github.com/diamondburned/gotk4/pkg/gio/v2"
 	"github.com/diamondburned/gotk4/pkg/glib/v2"
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
 )
@@ -126,6 +147,14 @@ func main() {
 }
 
 func run() int {
+	if len(os.Args) > 1 && os.Args[1] == "--placement" {
+		placement, ok := parsePlacement(os.Args[2:])
+		if !ok {
+			fmt.Fprintln(os.Stderr, "usage: overlay-abi-probe --placement ANCHOR MARGIN_X MARGIN_Y MONITOR ZONE")
+			return 2
+		}
+		return runPlacement(placement)
+	}
 	mode := "--lifecycle"
 	if len(os.Args) == 2 {
 		mode = os.Args[1]
@@ -315,6 +344,251 @@ func runClicks(p *probe) int {
 	loop.Run()
 	p.disconnect()
 	p.window.Destroy()
+	if !complete {
+		fmt.Fprintln(os.Stderr, p.err)
+		return 1
+	}
+	return 0
+}
+
+type placementArgs struct {
+	anchor  string
+	marginX int
+	marginY int
+	monitor string
+	zone    int
+}
+
+func parsePlacement(args []string) (placementArgs, bool) {
+	if len(args) != 5 {
+		return placementArgs{}, false
+	}
+	switch args[0] {
+	case "top-left", "top", "top-right", "left", "center", "right", "bottom-left", "bottom", "bottom-right":
+	default:
+		return placementArgs{}, false
+	}
+	mx, errX := strconv.Atoi(args[1])
+	my, errY := strconv.Atoi(args[2])
+	zone, errZone := strconv.Atoi(args[4])
+	if errX != nil || errY != nil || errZone != nil || mx < -16384 || mx > 16384 || my < -16384 || my > 16384 || (zone != -1 && zone != 0) || args[3] == "" {
+		return placementArgs{}, false
+	}
+	return placementArgs{args[0], mx, my, args[3], zone}, true
+}
+
+func resolveMonitor(monitors *gio.ListModel, selector string) (*gdk.Monitor, string) {
+	if selector == "default" {
+		return nil, "default"
+	}
+	var connector, description *gdk.Monitor
+	connectorCount, descriptionCount := 0, 0
+	for i := uint(0); i < monitors.NItems(); i++ {
+		object := monitors.Item(i)
+		if object == nil {
+			continue
+		}
+		monitor := &gdk.Monitor{Object: object}
+		if monitor.Connector() == selector {
+			connector, connectorCount = monitor, connectorCount+1
+		} else if monitor.Description() == selector {
+			description, descriptionCount = monitor, descriptionCount+1
+		}
+	}
+	if connectorCount == 1 {
+		return connector, "connector"
+	}
+	if connectorCount > 1 || descriptionCount > 1 {
+		return nil, "ambiguous selector"
+	}
+	if descriptionCount == 1 {
+		return description, "description"
+	}
+	return nil, "missing selector"
+}
+
+func sameMonitor(a, b *gdk.Monitor) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return a.IsValid() && glib.BaseObject(a).Native() == glib.BaseObject(b).Native()
+}
+
+func placementAxes(anchor string, monitor *gdk.Monitor, x, y int) (int, int, int, int) {
+	horizontal, vertical := 0, 0
+	if strings.Contains(anchor, "left") {
+		horizontal = -1
+	} else if strings.Contains(anchor, "right") {
+		horizontal = 1
+	}
+	if strings.Contains(anchor, "top") {
+		vertical = -1
+	} else if strings.Contains(anchor, "bottom") {
+		vertical = 1
+	}
+	if monitor != nil {
+		geometry := monitor.Geometry()
+		if horizontal == 0 {
+			horizontal, x = -1, (geometry.Width()-160)/2+x
+		}
+		if vertical == 0 {
+			vertical, y = -1, (geometry.Height()-80)/2+y
+		}
+	}
+	return horizontal, vertical, x, y
+}
+
+func placementStatus(p *probe, display *gdk.Display, args placementArgs, phase, resolution string) {
+	actual := "none"
+	if p.surface != nil && p.surface.Mapped() {
+		if monitor := display.MonitorAtSurface(p.surface); monitor != nil {
+			// The raw GDK description may contain a device serial. Only report its availability.
+			actual = fmt.Sprintf("connector=%q description-available=%t", monitor.Connector(), monitor.Description() != "")
+		}
+	}
+	selector := args.monitor
+	if selector != "default" {
+		selector = "<explicit redacted>"
+	}
+	fmt.Printf("phase=%s requested=%q resolution=%s mapped=%t actual=%s\n", phase, selector, resolution, p.surface != nil && p.surface.Mapped(), actual)
+}
+
+func runPlacement(args placementArgs) int {
+	if !gtk.InitCheck() {
+		fmt.Fprintln(os.Stderr, "GTK initialization failed: Wayland display unavailable")
+		return 1
+	}
+	if C.gtk_layer_is_supported() == 0 {
+		fmt.Fprintln(os.Stderr, "Layer Shell unavailable on this display")
+		return 1
+	}
+	region, err := cairo.RegionCreate()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "empty region creation failed:", err)
+		return 1
+	}
+	display := gdk.DisplayGetDefault()
+	monitors := display.Monitors()
+	p := probe{label: "initial", region: region}
+	commands := make(chan string)
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		defer close(commands)
+		scanner := bufio.NewScanner(os.Stdin)
+		for scanner.Scan() {
+			select {
+			case commands <- scanner.Text():
+			case <-done:
+				return
+			}
+		}
+	}()
+	var target *gdk.Monitor
+	create := func(monitor *gdk.Monitor) {
+		p.window = gtk.NewWindow()
+		p.window.SetTitle("Azerlay placement probe")
+		p.window.SetDefaultSize(160, 80)
+		p.window.SetChild(gtk.NewLabel("Placement probe"))
+		h, v, mx, my := placementAxes(args.anchor, monitor, args.marginX, args.marginY)
+		var nativeMonitor C.uintptr_t
+		if monitor != nil {
+			nativeMonitor = C.uintptr_t(glib.BaseObject(monitor).Native())
+		}
+		C.init_placement(C.uintptr_t(glib.BaseObject(p.window).Native()), nativeMonitor, C.int(h), C.int(v), C.int(mx), C.int(my), C.int(args.zone))
+		runtime.KeepAlive(p.window)
+		runtime.KeepAlive(monitor)
+		p.window.ConnectRealize(func() {
+			p.disconnect()
+			p.surface, p.err = currentSurface(&p.window.Widget)
+			if p.err != nil {
+				return
+			}
+			p.handler = p.surface.Connect("notify::mapped", func() { p.observe() })
+			fmt.Printf("%s surface-acquired mapped=%t\n", p.label, p.surface.Mapped())
+			if p.surface.Mapped() {
+				p.observe()
+			}
+		})
+		p.window.ConnectUnrealize(func() { p.disconnect() })
+		p.window.Present()
+		target = monitor
+	}
+	destroy := func() {
+		if p.window != nil {
+			p.disconnect()
+			p.window.Destroy()
+			p.window = nil
+			p.applied = false
+		}
+	}
+	defer destroy()
+	loop := glib.NewMainLoop(nil, false)
+	deadline := time.Now().Add(5 * time.Minute)
+	lastResolution := ""
+	userHidden := false
+	reported := false
+	complete := false
+	glib.TimeoutAdd(50, func() bool {
+		if p.err != nil || time.Now().After(deadline) {
+			if p.err == nil {
+				p.err = fmt.Errorf("placement probe exceeded 5 minutes")
+			}
+			loop.Quit()
+			return false
+		}
+		monitor, resolution := resolveMonitor(monitors, args.monitor)
+		if resolution != lastResolution || (p.window != nil && !sameMonitor(target, monitor)) {
+			destroy()
+			target = nil
+			reported = false
+			lastResolution = resolution
+			placementStatus(&p, display, args, "selection", resolution)
+		}
+		if !userHidden && p.window == nil && (monitor != nil || resolution == "default") {
+			create(monitor)
+		}
+		if p.applied && !reported {
+			placementStatus(&p, display, args, "mapped", resolution)
+			reported = true
+		}
+		select {
+		case command, ok := <-commands:
+			if !ok || command == "quit" {
+				complete = true
+				loop.Quit()
+				return false
+			}
+			switch command {
+			case "status":
+				placementStatus(&p, display, args, "status", resolution)
+			case "hide":
+				userHidden = true
+				if p.window != nil {
+					p.window.SetVisible(false)
+					p.applied = false
+				}
+				placementStatus(&p, display, args, "hidden", resolution)
+			case "show":
+				userHidden = false
+				p.label = "hide-show-remap"
+				reported = false
+				if p.window != nil {
+					p.window.Present()
+				}
+			case "recreate":
+				destroy()
+				p.label = "recreated"
+				reported = false
+			default:
+				fmt.Println("unknown probe command")
+			}
+		default:
+		}
+		return true
+	})
+	fmt.Println("commands: status hide show recreate quit")
+	loop.Run()
 	if !complete {
 		fmt.Fprintln(os.Stderr, p.err)
 		return 1
