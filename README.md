@@ -35,8 +35,10 @@ stale control sockets.
 status without changing state; unavailable backend checks remain warnings.
 
 The initial supported target is Linux/Wayland on x86-64 with left-hand Azeron
-Cyborg II, Niri or Hyprland, and a Bodycam game profile. Right-hand Cyborg II
-support is deferred beyond v1.
+Cyborg II, Hyprland, and a Bodycam game profile. Niri and right-hand Cyborg II
+are deferred beyond v1 and remain unverified. The overlay is not implemented
+yet; the [placement decision](docs/decisions/compositor-placement.md) records
+the measured Hyprland scope and the unresolved monitor-return case.
 
 ## Development
 
