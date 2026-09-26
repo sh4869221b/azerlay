@@ -54,14 +54,20 @@ locked main OS thread. Explicit selectors match a unique connector first, then
 a unique description; an absent or ambiguous selection stays hidden. Monitor
 invalidation hides synchronously, and reconciliation recreates the window only
 for the same resolved selection. Requested visibility is retained across this
-lifecycle. Empty selection delegates the output choice to the compositor.
+lifecycle. Empty selection delegates the output choice to the compositor. The
+owner applies an empty GDK input region after each surface maps and reapplies it
+after placement changes. Hiding unmaps the window and clears the observed mapped
+and input-region state.
 
 `run` creates this owner hidden before readiness and runs the GLib main loop.
 Background work posts main-context notifications; successful configuration
 generations apply on that thread, while failed reloads retain the previous
 placement. Shutdown joins control handlers and configuration work before
 removing notification sources, disconnecting handlers, and destroying the GTK
-window. Renderer, input, click-through, and CLI visibility integration remain
+window. CLI visibility requests are applied asynchronously by the GTK owner.
+Status keeps requested visibility separate from observed mapping and reports
+whether the empty-region call was applied. GDK provides no compositor
+acknowledgement for that call. Profile rendering and device input remain
 separate work.
 
 ### Reader and reducer contract

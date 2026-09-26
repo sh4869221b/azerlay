@@ -1170,16 +1170,20 @@ CGoは`internal/layershell`へ隔離し、他パッケージへ`C.*`型を漏ら
 
 ### 14.7 Click-through
 
-Layer Shellのkeyboard modeだけではポインター透過を保証しない。GTK/GDK surfaceがmapされた後、空のinput regionを設定する。
+Layer Shellのkeyboard modeだけではポインター透過を保証しない。実装は
+GTK/GDK surfaceがmapされた後に空のinput regionを設定し、surfaceの再生成や
+placement更新後にも適用する。keyboard modeは`none`のまま維持する。
+GDKの設定APIは成否を返さないため、statusの
+`overlay.input_region_applied`は適用呼び出しの状態であり、Compositorの
+acknowledgementやポインター配送そのものを示さない。requested visibilityと
+実際のmapping状態は別々にstatusへ出す。show/hide/toggleの応答は要求受付を
+示し、GTK main threadでのmappingは非同期に進む。
 
-必要なタイミング:
-
-- 初回map後
-- surface再生成後
-- monitor変更後
-- Compositor側のremap後
-
-具体的なgotk4 APIおよびnative pointerの扱いは**要調査・リリース阻害**。
+2026-09-26のHyprland QAでは、アプリ側で空のinput regionを設定した状態で
+pointer motion、click、scrollが下側のGTK receiverへ届き、同じ重なり位置で
+full input regionに切り替えた対照ではpointer deliveryが止まることを確認した。
+Hyprland v1の実測詳細と範囲は[overlay troubleshooting](troubleshooting.md#overlay-click-through-and-monitor-recovery)を参照。
+Swayは隔離されたnative test fixtureに限り、製品適合の根拠にしない。Niriはv1対象外。
 
 ### 14.8 Direct Scanout
 
@@ -1777,7 +1781,7 @@ GTK、font cache、環境差があるため、CIだけでなくターゲット�
 
 本番bridgeは`internal/layershell`へ隔離し、`Init`/`Apply`とsurface取得をGoのGTK/GDK wrapperで公開する。C型を公開APIへ出さない。surfaceのtransfer-none参照はgotk4の所有権管理で保持し、動的marshalerのuintptr往復を避ける。gtk4-layer-shellをWayland client libraryより先にロードする。
 
-GTK ownerの生成・設定適用・破棄はlocked main OS threadで行う。現在の`run`はhidden windowのlifecycleまでを接続し、描画、click-through、入力、CLI要求による実表示切替は後続実装とする。
+GTK ownerの生成・設定適用・破棄はlocked main OS threadで行う。`run`は起動時にhidden windowを作り、CLI visibility要求を同じthreadへ通知して実際のmappingを切り替える。描画とdevice inputのruntime統合は未実装。
 
 ### 22.4 非採用
 
