@@ -73,9 +73,12 @@ that is removed after checkout. Container users can differ from the mounted
 workspace's owner, so the build step trusts only that workspace in its own
 global Git config. This preserves normal Go VCS metadata during compilation.
 
-Go caching is disabled in `container-build`. Arch is a rolling image, so its
-package set can change between runs. Package installation, compilation, and
-binary execution failures block their respective job.
+`test`, `container-build`, `cgo-smoke`, `vulnerability`, and `licenses` each
+use an isolated Go cache keyed by `go.mod`, `go.sum`, the job ID, and the
+sorted installed Arch package list. A change to the native package set causes
+that job to build cold. Cache hits and misses are both followed by the full
+checks for the job; package installation, compilation, and binary execution
+failures block their respective job.
 
 The test job also installs Sway and D-Bus, removes Sway's file capability inside
 the container, and runs tests as a dedicated non-root user with writable Go

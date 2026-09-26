@@ -33,6 +33,16 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Prepare native Go cache input
+        env:
+          CI_CACHE_JOB: ${{ github.job }}
+        run: |
+          set -euo pipefail
+          {
+            printf 'job=%s\n' "$CI_CACHE_JOB"
+            LC_ALL=C pacman -Q | LC_ALL=C sort
+          } > .git/ci-native-cache-input
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -41,6 +51,7 @@ jobs:
           cache-dependency-path: |
             go.mod
             go.sum
+            .git/ci-native-cache-input
 
       - name: Check formatting
         shell: bash
@@ -117,11 +128,25 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Prepare native Go cache input
+        env:
+          CI_CACHE_JOB: ${{ github.job }}
+        run: |
+          set -euo pipefail
+          {
+            printf 'job=%s\n' "$CI_CACHE_JOB"
+            LC_ALL=C pacman -Q | LC_ALL=C sort
+          } > .git/ci-native-cache-input
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: 1.27.1
-          cache: false
+          cache: true
+          cache-dependency-path: |
+            go.mod
+            go.sum
+            .git/ci-native-cache-input
 
       - name: Build and run binary
         run: |
@@ -145,6 +170,16 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Prepare native Go cache input
+        env:
+          CI_CACHE_JOB: ${{ github.job }}
+        run: |
+          set -euo pipefail
+          {
+            printf 'job=%s\n' "$CI_CACHE_JOB"
+            LC_ALL=C pacman -Q | LC_ALL=C sort
+          } > .git/ci-native-cache-input
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -153,6 +188,7 @@ jobs:
           cache-dependency-path: |
             go.mod
             go.sum
+            .git/ci-native-cache-input
 
       - name: Compile and inspect native binary
         run: |
@@ -178,6 +214,16 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Prepare native Go cache input
+        env:
+          CI_CACHE_JOB: ${{ github.job }}
+        run: |
+          set -euo pipefail
+          {
+            printf 'job=%s\n' "$CI_CACHE_JOB"
+            LC_ALL=C pacman -Q | LC_ALL=C sort
+          } > .git/ci-native-cache-input
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -186,6 +232,7 @@ jobs:
           cache-dependency-path: |
             go.mod
             go.sum
+            .git/ci-native-cache-input
 
       - name: Install govulncheck
         run: go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
@@ -211,6 +258,16 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Prepare native Go cache input
+        env:
+          CI_CACHE_JOB: ${{ github.job }}
+        run: |
+          set -euo pipefail
+          {
+            printf 'job=%s\n' "$CI_CACHE_JOB"
+            LC_ALL=C pacman -Q | LC_ALL=C sort
+          } > .git/ci-native-cache-input
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -219,6 +276,7 @@ jobs:
           cache-dependency-path: |
             go.mod
             go.sum
+            .git/ci-native-cache-input
 
       - name: Install go-licenses
         run: go install github.com/google/go-licenses/v2@v2.0.1
