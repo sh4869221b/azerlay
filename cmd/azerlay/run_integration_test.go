@@ -169,9 +169,6 @@ func TestRunLiveVisibility(t *testing.T) {
 	if initial.Visible || initial.Overlay == nil || initial.Overlay.Mapped || initial.Overlay.InputRegionApplied {
 		t.Fatalf("initial status before readiness: %+v", initial)
 	}
-	if !strings.Contains(p.stdout.buffer.String(), "Overlay mapped: false") || !strings.Contains(p.stdout.buffer.String(), "Input region applied: false") {
-		t.Fatalf("startup report omitted initial observation: %q", p.stdout.buffer.String())
-	}
 	await := func(visible bool) {
 		t.Helper()
 		deadline := time.NewTimer(5 * time.Second)
@@ -202,6 +199,9 @@ func TestRunLiveVisibility(t *testing.T) {
 	}
 	controlCLIResult[control.QuitResult](t, fixture.env, "quit")
 	stoppedRunProcess(t, p, fixture)
+	if !strings.Contains(p.stdout.buffer.String(), "Overlay mapped: false") || !strings.Contains(p.stdout.buffer.String(), "Input region applied: false") {
+		t.Fatalf("startup report omitted initial observation: %q", p.stdout.buffer.String())
+	}
 }
 
 func TestRunDuplicate(t *testing.T) {
