@@ -131,10 +131,6 @@ func runForeground(ctx context.Context, configPath string, stdout, stderr io.Wri
 	if err != nil {
 		return runStartupFailure(ctx, err, stdout, stderr)
 	}
-	response := controller.Dispatch(managerCtx, control.Request{Version: control.ProtocolVersion, ID: "startup", Method: control.MethodStatus})
-	if response.Error != nil {
-		return runStartupFailure(ctx, response.Error, stdout, stderr)
-	}
 	if !stopStartup() || ctx.Err() != nil {
 		return 0
 	}
@@ -142,6 +138,24 @@ func runForeground(ctx context.Context, configPath string, stdout, stderr io.Wri
 	window, err = overlay.New(initialConfig.Config.Overlay)
 	if err != nil {
 		return writeRunError(err, stdout, stderr)
+	}
+	window.SetObserver(func(state overlay.State) {
+		var diagnostic *control.Diagnostic
+		switch state.Diagnostic {
+		case "OVERLAY_MONITOR_UNAVAILABLE":
+			diagnostic = &control.Diagnostic{Code: state.Diagnostic, Stage: "overlay", Reason: "Configured monitor is unavailable."}
+		case "ERR_OVERLAY_SURFACE":
+			diagnostic = &control.Diagnostic{Code: state.Diagnostic, Stage: "overlay", Reason: "Overlay surface is unavailable."}
+		case "ERR_OVERLAY_INPUT_REGION":
+			diagnostic = &control.Diagnostic{Code: state.Diagnostic, Stage: "overlay", Reason: "Overlay input region is unavailable."}
+		case "ERR_OVERLAY_PLACEMENT":
+			diagnostic = &control.Diagnostic{Code: state.Diagnostic, Stage: "overlay", Reason: "Overlay placement is unavailable."}
+		}
+		controller.SetOverlayStatus(control.OverlayStatus{Mapped: state.Mapped, InputRegionApplied: state.InputRegionApplied}, diagnostic)
+	})
+	response := controller.Dispatch(managerCtx, control.Request{Version: control.ProtocolVersion, ID: "startup", Method: control.MethodStatus})
+	if response.Error != nil {
+		return runStartupFailure(ctx, response.Error, stdout, stderr)
 	}
 	server, err = owner.Start(ctx, controller, stopConfig)
 	if err != nil {
@@ -156,12 +170,12 @@ func runForeground(ctx context.Context, configPath string, stdout, stderr io.Wri
 		}
 	}
 	loop := glib.NewMainLoop(nil, false)
-	stopEvents = watchOverlay(manager, server, window, loop, initialConfig.Status.ConfigGeneration)
+	stopEvents = watchOverlay(manager, controller, server, window, loop, initialConfig.Status.ConfigGeneration)
 	loop.Run()
 	return 0
 }
 
-func watchOverlay(manager *config.Manager, server *control.Server, window *overlay.Window, loop *glib.MainLoop, lastGeneration uint64) func() error {
+func watchOverlay(manager *config.Manager, controller *control.Controller, server *control.Server, window *overlay.Window, loop *glib.MainLoop, lastGeneration uint64) func() error {
 	stop := make(chan struct{})
 	done := make(chan struct{})
 	var mu sync.Mutex
@@ -171,6 +185,7 @@ func watchOverlay(manager *config.Manager, server *control.Server, window *overl
 	go func() {
 		defer close(done)
 		changes := manager.Changes()
+		visibility := controller.VisibilityChanges()
 		for {
 			select {
 			case <-server.Done():
@@ -190,24 +205,30 @@ func watchOverlay(manager *config.Manager, server *control.Server, window *overl
 					changes = nil
 					continue
 				}
-				mu.Lock()
-				if pending == 0 {
-					pending = glib.IdleAdd(func() {
-						mu.Lock()
-						pending = 0
-						mu.Unlock()
-						snapshot := manager.Snapshot()
-						if snapshot.Status.ConfigGeneration > lastGeneration {
-							lastGeneration = snapshot.Status.ConfigGeneration
-							if err := window.ApplyConfig(snapshot.Config.Overlay); err != nil {
-								applyError = err
-								loop.Quit()
-							}
-						}
-					})
-				}
-				mu.Unlock()
+			case <-visibility:
 			}
+			mu.Lock()
+			if pending == 0 {
+				pending = glib.IdleAdd(func() {
+					mu.Lock()
+					pending = 0
+					mu.Unlock()
+					snapshot := manager.Snapshot()
+					if snapshot.Status.ConfigGeneration > lastGeneration {
+						lastGeneration = snapshot.Status.ConfigGeneration
+						if err := window.ApplyConfig(snapshot.Config.Overlay); err != nil {
+							applyError = err
+							loop.Quit()
+							return
+						}
+					}
+					if err := window.SetVisible(controller.RequestedVisible()); err != nil {
+						applyError = err
+						loop.Quit()
+					}
+				})
+			}
+			mu.Unlock()
 		}
 	}()
 	return func() error {
@@ -221,6 +242,7 @@ func watchOverlay(manager *config.Manager, server *control.Server, window *overl
 			glib.SourceRemove(quitPending)
 		}
 		mu.Unlock()
+		window.SetObserver(nil)
 		return applyError
 	}
 }

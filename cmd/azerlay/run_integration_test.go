@@ -162,6 +162,48 @@ func TestRunForeground(t *testing.T) {
 	}
 }
 
+func TestRunLiveVisibility(t *testing.T) {
+	fixture := newRunFixture(t)
+	p := startRunProcess(t, fixture)
+	initial := readyRunProcess(t, p, fixture)
+	if initial.Visible || initial.Overlay == nil || initial.Overlay.Mapped || initial.Overlay.InputRegionApplied {
+		t.Fatalf("initial status before readiness: %+v", initial)
+	}
+	if !strings.Contains(p.stdout.buffer.String(), "Overlay mapped: false") || !strings.Contains(p.stdout.buffer.String(), "Input region applied: false") {
+		t.Fatalf("startup report omitted initial observation: %q", p.stdout.buffer.String())
+	}
+	await := func(visible bool) {
+		t.Helper()
+		deadline := time.NewTimer(5 * time.Second)
+		defer deadline.Stop()
+		for {
+			status := controlCLIResult[control.Status](t, fixture.env, "status")
+			if status.Visible == visible && status.Overlay != nil && status.Overlay.Mapped == visible && status.Overlay.InputRegionApplied == visible {
+				return
+			}
+			select {
+			case <-deadline.C:
+				t.Fatalf("visibility did not reach requested state: %+v", status)
+			case <-time.After(10 * time.Millisecond):
+			}
+		}
+	}
+	for _, step := range []struct {
+		method  string
+		visible bool
+	}{
+		{"show", true}, {"hide", false}, {"toggle", true}, {"toggle", false},
+	} {
+		result := controlCLIResult[control.VisibilityResult](t, fixture.env, step.method)
+		if result.Visible != step.visible {
+			t.Fatalf("%s response: %+v", step.method, result)
+		}
+		await(step.visible)
+	}
+	controlCLIResult[control.QuitResult](t, fixture.env, "quit")
+	stoppedRunProcess(t, p, fixture)
+}
+
 func TestRunDuplicate(t *testing.T) {
 	fixture := newRunFixture(t)
 	p := startRunProcess(t, fixture)
