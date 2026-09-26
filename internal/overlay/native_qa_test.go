@@ -54,6 +54,26 @@ func runNativeQAChild() int {
 		return 1
 	}
 	defer w.Close()
+	lower := gtk.NewWindow()
+	lower.SetTitle("Azerlay QA Receiver")
+	lower.SetDecorated(false)
+	lower.SetDefaultSize(400, 240)
+	button := gtk.NewButtonWithLabel("Azerlay QA Receiver")
+	lower.SetChild(button)
+	var clicks, scrolls, motions, keys int
+	button.ConnectClicked(func() { clicks++ })
+	motion := gtk.NewEventControllerMotion()
+	motion.ConnectMotion(func(_, _ float64) { motions++ })
+	button.AddController(motion)
+	scroll := gtk.NewEventControllerScroll(gtk.EventControllerScrollVertical)
+	scroll.ConnectScroll(func(_, _ float64) bool { scrolls++; return false })
+	button.AddController(scroll)
+	key := gtk.NewEventControllerKey()
+	key.ConnectKeyPressed(func(_, _ uint, _ gdk.ModifierType) bool { keys++; return false })
+	lower.AddController(key)
+	lower.Present()
+	defer lower.Destroy()
+	regionMode := "empty"
 	var contentWindow *gtk.Window
 	attach := func() {
 		if w.widget != nil && w.widget != contentWindow {
@@ -81,15 +101,26 @@ func runNativeQAChild() int {
 			mapped, width, height = w.surface.Mapped(), w.surface.Width(), w.surface.Height()
 		}
 		return json.NewEncoder(os.Stdout).Encode(struct {
-			Event     string `json:"event"`
-			Requested bool   `json:"requested"`
-			Visible   bool   `json:"visible"`
-			Mapped    bool   `json:"mapped"`
-			Resolved  bool   `json:"resolved"`
-			Width     int    `json:"width"`
-			Height    int    `json:"height"`
-			Retained  bool   `json:"state_retained"`
-		}{event, w.requested, visible, mapped, resolved, width, height, retained})
+			Event              string `json:"event"`
+			Requested          bool   `json:"requested"`
+			Visible            bool   `json:"visible"`
+			Mapped             bool   `json:"mapped"`
+			InputRegionApplied bool   `json:"input_region_applied"`
+			Diagnostic         string `json:"diagnostic"`
+			Region             string `json:"region"`
+			Resolved           bool   `json:"resolved"`
+			Width              int    `json:"width"`
+			Height             int    `json:"height"`
+			LowerVisible       bool   `json:"lower_visible"`
+			LowerActive        bool   `json:"lower_active"`
+			Clicks             int    `json:"clicks"`
+			Scrolls            int    `json:"scrolls"`
+			Motions            int    `json:"motions"`
+			Keys               int    `json:"keys"`
+			Retained           bool   `json:"state_retained"`
+		}{event, w.requested, visible, mapped, w.State().InputRegionApplied, w.State().Diagnostic,
+			regionMode, resolved, width, height, lower.Visible(), lower.IsActive(),
+			clicks, scrolls, motions, keys, retained})
 	}
 	commands := make(chan string)
 	go func() {
@@ -122,7 +153,7 @@ func runNativeQAChild() int {
 		}
 		if pending != "" {
 			_, resolved := currentMonitor(w.monitors, settings.Monitor)
-			contentReady := mappedLayer(w) && w.surface.Width() == 160 && w.surface.Height() == 80
+			contentReady := mappedLayer(w) && w.surface.Width() > 0 && w.surface.Height() > 0
 			if w.placePending != 0 || w.requested && resolved && !contentReady {
 				if time.Now().After(deadline) {
 					failure = fmt.Errorf("native QA mapping timed out: window_exists=%t owner_closed=%t monitor_selected=%t invalidated=%t", w.widget != nil, w.closed, w.monitor != nil, w.invalidated)
@@ -136,6 +167,7 @@ func runNativeQAChild() int {
 		case line, ok := <-commands:
 			if !ok || line == "quit" {
 				w.Close()
+				lower.SetVisible(false)
 				failure = report("closed")
 				loop.Quit()
 				return true
@@ -163,9 +195,29 @@ func runNativeQAChild() int {
 				}
 				failure = w.ApplyConfig(settings)
 				attach()
+				regionMode = "empty"
 			case "show", "hide":
 				failure = w.SetVisible(parts[0] == "show")
-			case "state":
+				regionMode = "empty"
+			case "recreate":
+				w.invalidated = true
+				failure = w.reconcile()
+				attach()
+				regionMode = "empty"
+			case "full":
+				if w.surface == nil || !w.surface.Mapped() || w.placePending != 0 {
+					failure = errors.New("full requires a mapped surface")
+					return true
+				}
+				w.surface.SetInputRegion(nil)
+				w.widget.QueueDraw()
+				regionMode = "full"
+			case "empty":
+				if w.surface != nil && w.surface.Mapped() {
+					w.applyInputRegion()
+				}
+				regionMode = "empty"
+			case "state", "count":
 			default:
 				failure = errors.New("unknown QA command")
 			}
