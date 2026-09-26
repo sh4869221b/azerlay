@@ -75,7 +75,7 @@ func runVisibilityChild() int {
 		return nil
 	}
 	source := glib.TimeoutAdd(10, func() bool {
-		if ctx.Err() != nil {
+		if ctx.Err() != nil || phase == 10 {
 			return true
 		}
 		response, err := control.Call(ctx, control.MethodStatus, control.Params{})
