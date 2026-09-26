@@ -32,7 +32,26 @@ var cliBinary string
 
 // The child is built from this checkout once, not taken from PATH or a stale
 // artifact. Returning through cliTestMain ensures cleanup precedes os.Exit.
-func TestMain(m *testing.M) { os.Exit(cliTestMain(m)) }
+func TestMain(m *testing.M) {
+	if mode := os.Getenv("AZERLAY_RUN_NATIVE_CHILD"); mode != "" {
+		os.Exit(runNativeChild(mode))
+	}
+	if os.Getenv("AZERLAY_TEST_WAYLAND_DISPLAY") == "" {
+		launcher, err := filepath.Abs("../../scripts/test-wayland.sh")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		cmd := exec.Command("bash", append([]string{launcher, os.Args[0]}, os.Args[1:]...)...)
+		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+		if err := cmd.Run(); err != nil {
+			fmt.Fprintln(os.Stderr, "Wayland fixture:", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+	os.Exit(cliTestMain(m))
+}
 
 func cliTestMain(m *testing.M) (status int) {
 	dir, err := os.MkdirTemp("", "azerlay-cli-tests-")

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/sh4869221b/azerlay/internal/control"
+	"github.com/sh4869221b/azerlay/internal/overlay"
 )
 
 func TestRunUsage(t *testing.T) {
@@ -137,9 +139,13 @@ func TestRunStartupCleanup(t *testing.T) {
 		fixture := newRunFixture(t)
 		setRunEnvironment(t, fixture)
 		var stderr bytes.Buffer
-		status := run([]string{"run"}, nil, &refusingWriter{}, &stderr)
-		if status != 1 || stderr.Len() != 0 {
-			t.Fatalf("output failure=%d stderr=%q", status, &stderr)
+		cmd := exec.CommandContext(t.Context(), os.Args[0])
+		cmd.Env = append(fixture.env, "AZERLAY_RUN_NATIVE_CHILD=output-failure")
+		cmd.Stderr = &stderr
+		err := cmd.Run()
+		var exit *exec.ExitError
+		if !errors.As(err, &exit) || exit.ExitCode() != 1 || stderr.Len() != 0 {
+			t.Fatalf("output failure=%v stderr=%q", err, &stderr)
 		}
 		checkRunOwnerReleased(t, fixture)
 	})
@@ -179,7 +185,27 @@ func TestRunStartupCleanup(t *testing.T) {
 			defer cancel()
 			result := make(chan int, 1)
 			var stderr bytes.Buffer
-			go func() { result <- runForeground(ctx, fifo, io.Discard, &stderr) }()
+			if cancelled {
+				go func() { result <- runForeground(ctx, fifo, io.Discard, &stderr) }()
+			} else {
+				cmd := exec.CommandContext(ctx, os.Args[0])
+				cmd.Env = append(fixture.env, "AZERLAY_RUN_NATIVE_CHILD=server-start-failure", "AZERLAY_RUN_NATIVE_CONFIG="+fifo)
+				cmd.Stderr = &stderr
+				if err := cmd.Start(); err != nil {
+					t.Fatal(err)
+				}
+				go func() {
+					err := cmd.Wait()
+					var exit *exec.ExitError
+					if errors.As(err, &exit) {
+						result <- exit.ExitCode()
+					} else if err != nil {
+						result <- -1
+					} else {
+						result <- 0
+					}
+				}()
+			}
 			writerReady := make(chan *os.File, 1)
 			openError := make(chan error, 1)
 			go func() {
@@ -237,5 +263,25 @@ func TestRunStartupCleanup(t *testing.T) {
 			}
 			checkRunOwnerReleased(t, fixture)
 		})
+	}
+}
+
+func TestRunNativeFailure(t *testing.T) {
+	fixture := newRunFixture(t)
+	setRunEnvironment(t, fixture)
+	env := append(fixture.env, "WAYLAND_DISPLAY="+filepath.Join(t.TempDir(), "missing"), "DISPLAY=:invalid")
+	output := invokeCLI(t, env, nil, "run")
+	checkCLIStatus(t, output, 1, false)
+	if output.stdout != "" || !strings.Contains(output.stderr, "ERR_RUNTIME_WAYLAND (runtime)") || strings.Contains(output.stderr, "missing") {
+		t.Fatalf("unsafe or incorrect display failure: %+v", output)
+	}
+	checkRunOwnerReleased(t, fixture)
+}
+
+func TestRunLayerUnavailableReport(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	status := writeRunError(overlay.ErrLayerUnavailable, &stdout, &stderr)
+	if status != 1 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "ERR_LAYER_SHELL_UNAVAILABLE (runtime)") {
+		t.Fatalf("layer failure=%d stdout=%q stderr=%q", status, &stdout, &stderr)
 	}
 }

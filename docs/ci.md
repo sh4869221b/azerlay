@@ -11,9 +11,9 @@ explicit versions without changing the application's `go.mod` or `go.sum`.
 | --- | --- | --- |
 | `test` | Formatting, vet, Staticcheck, race tests, binary build | GitHub default (360 minutes) |
 | `fuzz` | Seven existing fuzz targets, each with a 10-second fuzz allocation | 10 minutes |
-| `container-build` | Build and run the binary in Ubuntu 24.04 and Arch | 15 minutes per image |
-| `cgo-smoke` | Explain the explicit GTK/CGo compile skip | GitHub default (360 minutes) |
-| `vulnerability` | Reachable Go vulnerability scan | 10 minutes |
+| `container-build` | Build and run the binary in Arch | 15 minutes |
+| `cgo-smoke` | Compile the native binary, run version, and inspect shared libraries | GitHub default (360 minutes) |
+| `vulnerability` | Reachable Go vulnerability scan | 20 minutes |
 | `licenses` | Third-party Go dependency license CSV | 10 minutes |
 | `generated-files` | Regenerate both LZMA fixtures and reject differences | 15 minutes |
 
@@ -23,12 +23,13 @@ The `test` job rejects any output from `gofmt -l .`, then runs:
 go vet ./...
 go install honnef.co/go/tools/cmd/staticcheck@2026.2.1
 staticcheck ./...
-go test -race -shuffle=on -count=1 ./...
+scripts/test-wayland.sh go test -race -shuffle=on -count=1 ./...
 go build ./cmd/azerlay
 ```
 
 Ordinary tests run once, retaining the race detector, shuffled ordering and
-uncached execution. The current packages do not depend on a GTK/CGo bridge.
+uncached execution, including the production GTK/CGo packages. Native child
+tests initialize GTK on their process main thread.
 Analyzer installation or execution failures fail CI; they are not suppressed.
 
 ## Fuzz budget
@@ -52,10 +53,13 @@ from this job by `-run='^$'`. Longer fuzz campaigns are outside PR CI.
 
 ## Distribution builds and GTK coverage
 
-The container matrix uses `ubuntu:24.04` and `archlinux:base`. Ubuntu installs
-`ca-certificates git curl tar gzip build-essential` with apt; Arch performs
-`pacman -Syu` and installs `ca-certificates git curl tar gzip base-devel`.
-These dependencies are installed before checkout and Go setup. Each image runs:
+`test`, `container-build`, `cgo-smoke`, `vulnerability`, and `licenses` use
+`archlinux:base`. Before checkout and Go setup, they run `pacman -Syu` and install
+`ca-certificates git curl tar gzip base-devel pkgconf gtk4 gtk4-layer-shell
+gobject-introspection`. Ubuntu distribution support is excluded from v1 and
+tracked in [Issue #98](https://github.com/sh4869221b/azerlay/issues/98).
+The Ubuntu-hosted runner and the pure `fuzz`/`generated-files` jobs do not qualify
+Ubuntu as a product target. The distribution build runs:
 
 ```sh
 git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -69,20 +73,30 @@ that is removed after checkout. Container users can differ from the mounted
 workspace's owner, so the build step trusts only that workspace in its own
 global Git config. This preserves normal Go VCS metadata during compilation.
 
-Go caching is disabled in these jobs to avoid sharing native build caches
-across distributions. Matrix fail-fast is disabled so both results remain
-visible; package installation, compilation and binary execution failures block
-their respective job. Arch is a rolling image, so its package set can change
-between runs. These checks demonstrate builds and CLI startup, not a working
-Wayland session or hardware integration.
+Go caching is disabled in `container-build`. Arch is a rolling image, so its
+package set can change between runs. Package installation, compilation, and
+binary execution failures block their respective job.
 
-The isolated `cgo-smoke` job reports **GTK/CGo compilation skipped** in its job
-summary and keeps its compile step visibly disabled. There is no production
-GTK/gotk4/gtk4-layer-shell bridge yet, which is the documented skip exception
-allowed by [Issue #36](https://github.com/sh4869221b/azerlay/issues/36).
-The informational job's success is not native compile coverage. Introducing
-that bridge must replace the disabled step with native dependency installation
-and actual bridge compilation. No placeholder bridge is built for this check.
+The test job also installs Sway and D-Bus, removes Sway's file capability inside
+the container, and runs tests as a dedicated non-root user with writable Go
+caches. `scripts/test-wayland.sh` starts a private two-output headless Sway with
+the pixman renderer, waits for its socket, and provides an absolute test display
+path. CLI fixtures retain separate runtime/config/data directories. The launcher
+stops its compositor and removes its private runtime directory on exit. This
+is protocol coverage, not Sway support or physical monitor/device qualification.
+
+`cgo-smoke` performs actual native compilation and inspection:
+
+```sh
+pkg-config --modversion gtk4 gtk4-layer-shell-0
+CGO_ENABLED=1 go build -o /tmp/azerlay ./cmd/azerlay
+/tmp/azerlay version
+readelf -d /tmp/azerlay
+```
+
+The compile check has no skip guard. Hyprland placement, fractional scaling, and
+output lifecycle require separate isolated compositor QA; CI does not establish
+physical hotplug, Niri behavior, or game input/rendering acceptance.
 
 ## Vulnerabilities and dependency licenses
 

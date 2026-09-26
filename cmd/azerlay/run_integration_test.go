@@ -41,7 +41,7 @@ func newRunFixture(t *testing.T) runFixture {
 			filtered = append(filtered, entry)
 		}
 	}
-	env = append(filtered, "WAYLAND_DISPLAY=test-wayland", "XDG_RUNTIME_DIR="+runtime)
+	env = append(filtered, "WAYLAND_DISPLAY="+os.Getenv("AZERLAY_TEST_WAYLAND_DISPLAY"), "XDG_RUNTIME_DIR="+runtime)
 	config := filepath.Join(root, "XDG_CONFIG_HOME", "azerlay", "config.toml")
 	if err := os.MkdirAll(filepath.Dir(config), 0700); err != nil {
 		t.Fatal(err)
