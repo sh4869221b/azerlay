@@ -153,6 +153,52 @@ func TestControlProtocolInvalid(t *testing.T) {
 	})
 }
 
+func TestControlProtocolOverlayStatus(t *testing.T) {
+	t.Parallel()
+	request := Request{Version: 1, ID: "42", Method: MethodStatus}
+	base := Status{SchemaVersion: 1, Generation: 1, EventNodes: []string{}, DegradedReasons: []Diagnostic{}}
+	oldWire, err := EncodeResponse(SuccessResponse(request, base))
+	if err != nil {
+		t.Fatal(err)
+	}
+	old, err := ReadResponse(bytes.NewReader(oldWire), request)
+	if err != nil || old.Result.(Status).Overlay != nil {
+		t.Fatalf("old status: %+v, %v", old, err)
+	}
+	nullWire := bytes.Replace(oldWire, []byte(`"visible":false`), []byte(`"visible":false,"overlay":null`), 1)
+	missing, err := ReadResponse(bytes.NewReader(nullWire), request)
+	if err != nil || missing.Result.(Status).Overlay != nil {
+		t.Fatalf("null overlay: %+v, %v", missing, err)
+	}
+	base.Overlay = &OverlayStatus{Mapped: true, InputRegionApplied: false}
+	wire, err := EncodeResponse(SuccessResponse(request, base))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := ReadResponse(bytes.NewReader(wire), request)
+	if err != nil || !reflect.DeepEqual(got.Result, base) {
+		t.Fatalf("new status: %+v, %v", got, err)
+	}
+	for name, overlay := range map[string]string{
+		"missing mapped":     `{"input_region_applied":false}`,
+		"missing applied":    `{"mapped":true}`,
+		"null mapped":        `{"mapped":null,"input_region_applied":false}`,
+		"wrong applied type": `{"mapped":true,"input_region_applied":"false"}`,
+		"unknown field":      `{"mapped":true,"input_region_applied":false,"private":1}`,
+		"duplicate mapped":   `{"mapped":true,"mapped":false,"input_region_applied":false}`,
+		"non-object":         `[]`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			bad := bytes.Replace(wire, []byte(`{"mapped":true,"input_region_applied":false}`), []byte(overlay), 1)
+			if bytes.Equal(bad, wire) {
+				t.Fatal("fixture replacement did not match")
+			}
+			_, err := ReadResponse(bytes.NewReader(bad), request)
+			assertControlError(t, err, ERR_CONTROL_REQUEST)
+		})
+	}
+}
+
 func assertControlError(t *testing.T, err error, code string) {
 	t.Helper()
 	var controlError *Error

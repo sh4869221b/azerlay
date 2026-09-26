@@ -148,13 +148,26 @@ func validateDiagnostic(raw []byte) error {
 
 func decodeStatus(raw []byte) (Status, error) {
 	var status Status
-	fields, err := decodeObject(raw, &status,
-		"schema_version", "uptime_seconds", "visible", "active_profile?", "device?", "event_nodes", "event_rate?", "dropped_count?", "resync_count?", "render_rate?", "last_reload", "generation", "degraded_reasons")
+	var rawFields map[string]json.RawMessage
+	if json.Unmarshal(raw, &rawFields) != nil {
+		return Status{}, NewError(ERR_CONTROL_REQUEST)
+	}
+	names := []string{"schema_version", "uptime_seconds", "visible", "active_profile?", "device?", "event_nodes", "event_rate?", "dropped_count?", "resync_count?", "render_rate?", "last_reload", "generation", "degraded_reasons"}
+	if _, present := rawFields["overlay"]; present {
+		names = append(names, "overlay?")
+	}
+	fields, err := decodeObject(raw, &status, names...)
 	if err != nil {
 		return Status{}, err
 	}
 	if status.SchemaVersion != 1 || status.UptimeSeconds < 0 || status.Generation == 0 {
 		return Status{}, NewError(ERR_CONTROL_REQUEST)
+	}
+	if len(fields["overlay"]) > 0 && !null(fields["overlay"]) {
+		var overlay OverlayStatus
+		if _, err := decodeObject(fields["overlay"], &overlay, "mapped", "input_region_applied"); err != nil {
+			return Status{}, err
+		}
 	}
 	if !null(fields["active_profile"]) {
 		if err := validateProfile(fields["active_profile"]); err != nil {

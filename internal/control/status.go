@@ -26,11 +26,17 @@ type ReloadStatus struct {
 	WatchFailure      *Diagnostic `json:"watch_failure"`
 }
 
+type OverlayStatus struct {
+	Mapped             bool `json:"mapped"`
+	InputRegionApplied bool `json:"input_region_applied"`
+}
+
 // Status reports unavailable capabilities explicitly instead of fabricated metrics.
 type Status struct {
 	SchemaVersion   int            `json:"schema_version"`
 	UptimeSeconds   float64        `json:"uptime_seconds"`
 	Visible         bool           `json:"visible"`
+	Overlay         *OverlayStatus `json:"overlay,omitempty"`
 	ActiveProfile   *ProfileStatus `json:"active_profile"`
 	Device          *string        `json:"device"`
 	EventNodes      []string       `json:"event_nodes"`
@@ -61,6 +67,13 @@ func (c *Controller) status() Status {
 	if c.active != nil {
 		active := c.active.status()
 		s.ActiveProfile = &active
+	}
+	if c.overlay != nil {
+		copy := *c.overlay
+		s.Overlay = &copy
+	}
+	if c.overlayDiagnostic != nil {
+		s.DegradedReasons = append(s.DegradedReasons, *c.overlayDiagnostic)
 	}
 	if c.selectionFailure != nil {
 		s.DegradedReasons = append(s.DegradedReasons, Diagnostic{Code: c.selectionFailure.Code, Stage: c.selectionFailure.Stage, Reason: c.selectionFailure.Summary})

@@ -58,6 +58,9 @@ func renderControlReport(result control.Result) string {
 		fmt.Fprintf(&text, "Quitting: %t\n", value.Quitting)
 	case control.Status:
 		fmt.Fprintf(&text, "Status schema: %d\nUptime: %.3f seconds\nRequested visibility: %t\nRuntime generation: %d\n", value.SchemaVersion, value.UptimeSeconds, value.Visible, value.Generation)
+		if value.Overlay != nil {
+			fmt.Fprintf(&text, "Overlay mapped: %t\nInput region applied: %t\n", value.Overlay.Mapped, value.Overlay.InputRegionApplied)
+		}
 		renderActiveProfile(&text, value.ActiveProfile)
 		text.WriteString("Device: unavailable\nEvent nodes: []\nEvent rate: unavailable\nDropped count: unavailable\nResync count: unavailable\nRender rate: unavailable\n")
 		fmt.Fprintf(&text, "Reload request generation: %d\nConfig generation: %d\n", value.LastReload.RequestGeneration, value.LastReload.ConfigGeneration)
