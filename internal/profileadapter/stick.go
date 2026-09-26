@@ -9,6 +9,15 @@ import (
 )
 
 func normalizeStick(raw profileraw.RawInput, bindings []profile.TriggerBinding) []profile.TriggerBinding {
+	if angle, ok := matchesObservedXbox(raw); ok {
+		bindings[0] = profile.TriggerBinding{
+			Trigger: profile.TriggerSingle,
+			Kind:    profile.BindingStick,
+			Stick:   &profile.StickBinding{Mode: profile.StickModeXbox, AngleDegrees: angle},
+		}
+		return bindings
+	}
+
 	var mode profile.StickMode
 	switch {
 	case matchesStringArray(raw, "types", []string{"4", "11", "11"}):
@@ -60,4 +69,48 @@ func normalizeStick(raw profileraw.RawInput, bindings []profile.TriggerBinding) 
 	}
 	bindings[0] = profile.TriggerBinding{Trigger: profile.TriggerSingle, Kind: profile.BindingStick, Stick: stick}
 	return bindings
+}
+
+func matchesObservedXbox(raw profileraw.RawInput) (int, bool) {
+	if !matchesStringArray(raw, "types", []string{"21", "11", "11"}) ||
+		raw["subType"] != nil || raw["isToggleOnHold"] != nil ||
+		!matchesStringArray(raw, "keyValues", []string{"87", "0", "0", "0"}) ||
+		!matchesStringArray(raw, "metaValues", []string{"0", "0", "3"}) ||
+		!matchesFalse(raw, "isHold") || !matchesFalse(raw, "isTurbo") ||
+		!matchesNumberToken(raw, "turboInterval", "0") || !matchesInactiveSlots(raw) {
+		return 0, false
+	}
+	var settings profileraw.RawInput
+	if json.Unmarshal(raw["analogSettings"], &settings) != nil {
+		return 0, false
+	}
+	for _, field := range []string{"lowerLimit", "upperLimit", "sensitivity", "analogThrottle", "rotateStickButtonId"} {
+		if !matchesNumberToken(settings, field, "0") {
+			return 0, false
+		}
+	}
+	for field, token := range map[string]string{
+		"mouseSensitivity": "5", "triggerMagnitude": "4", "combinedAnalogMagnitude": "6",
+		"holdMagnitude": "9", "lockZoneAngle": "70", "lockZoneSize": "30",
+	} {
+		if !matchesNumberToken(settings, field, token) {
+			return 0, false
+		}
+	}
+	if !matchesJSONString(settings["holdType"], "1") {
+		return 0, false
+	}
+	for _, field := range []string{"isRightAnalog", "invertXAxis", "invertYAxis", "isCombinedAnalog", "isEightDirectionalTrigger", "isHoldTrigger", "isAnalogSmoothing", "isAngleLock"} {
+		if !matchesFalse(settings, field) {
+			return 0, false
+		}
+	}
+	switch {
+	case matchesNumberToken(settings, "angle", "0"):
+		return 0, true
+	case matchesNumberToken(settings, "angle", "90"):
+		return 90, true
+	default:
+		return 0, false
+	}
 }

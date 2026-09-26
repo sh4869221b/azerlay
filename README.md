@@ -12,10 +12,13 @@ and report access diagnostics without reading input events. An internal input
 package reads selected, verified nodes and publishes immutable raw input
 snapshots at node-local `SYN_REPORT` boundaries. It captures kernel axis ranges
 and derives normalized axes, stick direction, and intensity from committed
-snapshots. Confirmed neutral Software 2.0.2 Keyboard/WASD and Xbox Joystick
-exports automatically select distinct normalized stick modes that survive
-save/reload; callers still explicitly select the input nodes. Other stick
-settings remain Unknown. The input library restores current key and axis state
+snapshots. Confirmed Software 2.0.2 Keyboard/WASD, neutral Xbox Joystick, and
+observed Xbox angle 0/90 settings survive save/reload. A nonzero stick angle
+remains unprojected because its coordinate behavior is unverified. Confirmed T
+Turbo 25/10 clicks per second and two-step W/Delay Macro settings are retained
+as inert typed configuration; they do not execute or create input actions.
+Other settings remain Unknown. Callers still explicitly select the input nodes.
+The input library restores current key and axis state
 after `SYN_DROPPED` and offers a managed lifecycle for selected-device reconnect,
 including event-node renumbering and permission return. Input processing and
 recovery are not connected to `run`, the controller, or GTK yet. Export-to-input
@@ -23,7 +26,11 @@ integration and recovery
 are tested with synthetic exports, device metadata, ioctl responses, and OS
 pipes, not live Xbox or Cyborg II input. The two-second live reconnect target
 remains unmeasured. See [input recovery](docs/troubleshooting.md#internal-input-recovery)
-for the selection policy and current limits.
+for the selection policy and current limits. Normalization requires an explicitly
+attributed Software 2.0.2 export and the closed predicates in
+[binding conversion](docs/decisions/binding-conversion.md). Legacy numeric
+conversion is outside v1 and tracked in
+[Issue #102](https://github.com/sh4869221b/azerlay/issues/102).
 
 An internal configuration package loads, validates, and watches TOML settings
 with last-good reload preservation. A same-user control socket and CLI can

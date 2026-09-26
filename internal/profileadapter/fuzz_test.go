@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"os"
 	"reflect"
 	"testing"
 
@@ -14,6 +15,11 @@ import (
 )
 
 func FuzzNormalize(f *testing.F) {
+	settings, err := os.ReadFile("testdata/v1-settings.input.json")
+	if err != nil {
+		f.Fatal(err)
+	}
+	f.Add(settings, true)
 	f.Add([]byte(`{"profiles":[]}`), true)
 	f.Add([]byte(`{"id":"seed","inputs":[{"types":null,"opaque":-0}]}`), true)
 	f.Add([]byte(`{"id":"seed","inputs":[]}`), false)

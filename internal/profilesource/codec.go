@@ -20,7 +20,7 @@ const (
 	modelSchemaVersion   = 1
 	// Parser/adapter semantic changes must bump the relevant interpretation revision.
 	decoderVersion    = "1"
-	normalizerVersion = "2"
+	normalizerVersion = "3"
 	maxIndexBytes     = 16 << 20
 	maxCacheBytes     = 512 << 20
 	// These mirror the existing admitted export structural bounds.
@@ -121,15 +121,31 @@ type diskTrigger struct {
 	Trigger           profile.TriggerKind `json:"trigger"`
 	Kind              profile.BindingKind `json:"kind"`
 	Actions           []diskAction        `json:"actions"`
+	Turbo             *diskTurbo          `json:"turbo,omitempty"`
+	Macro             *diskMacro          `json:"macro,omitempty"`
 	Stick             *diskStick          `json:"stick,omitempty"`
 	TriggerDelayMS    *int                `json:"trigger_delay_ms"`
 	TriggerIntervalMS *int                `json:"trigger_interval_ms"`
 	ReleaseBehavior   *string             `json:"release_behavior"`
 	Unknown           *diskUnknown        `json:"unknown"`
 }
+type diskTurbo struct {
+	Code            profile.CanonicalCode `json:"code"`
+	ClicksPerSecond int                   `json:"clicks_per_second"`
+}
+type diskMacro struct {
+	RepeatWhileHeld bool            `json:"repeat_while_held"`
+	Steps           []diskMacroStep `json:"steps"`
+}
+type diskMacroStep struct {
+	Kind       profile.MacroStepKind `json:"kind"`
+	Code       profile.CanonicalCode `json:"code"`
+	DurationMS int                   `json:"duration_ms"`
+}
 type diskStick struct {
 	Mode               profile.StickMode      `json:"mode"`
 	KeyboardDirections diskKeyboardDirections `json:"keyboard_directions"`
+	AngleDegrees       int                    `json:"angle_degrees,omitempty"`
 }
 type diskKeyboardDirections struct {
 	Up    profile.CanonicalCode `json:"up"`
@@ -172,6 +188,18 @@ func decodeObject(data []byte, target any, fields string) error {
 		return err
 	}
 	return json.Unmarshal(filtered, target)
+}
+func decodeNonNullObject(data []byte, target any, fields string) error {
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return err
+	}
+	for _, name := range strings.Fields(fields) {
+		if bytes.Equal(bytes.TrimSpace(object[name]), []byte("null")) {
+			return errCodecShape
+		}
+	}
+	return decodeObject(data, target, fields)
 }
 func (v *diskOrigin) UnmarshalJSON(b []byte) error {
 	type plain diskOrigin
@@ -235,13 +263,57 @@ func (v *diskTrigger) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	if value, ok := fields["stick"]; ok {
-		return json.Unmarshal(value, &v.Stick)
+		if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+			return errCodecShape
+		}
+		if err := json.Unmarshal(value, &v.Stick); err != nil {
+			return err
+		}
+	}
+	if value, ok := fields["turbo"]; ok {
+		if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+			return errCodecShape
+		}
+		if err := json.Unmarshal(value, &v.Turbo); err != nil {
+			return err
+		}
+	}
+	if value, ok := fields["macro"]; ok {
+		if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+			return errCodecShape
+		}
+		return json.Unmarshal(value, &v.Macro)
 	}
 	return nil
 }
+func (v *diskTurbo) UnmarshalJSON(b []byte) error {
+	type plain diskTurbo
+	return decodeNonNullObject(b, (*plain)(v), "code clicks_per_second")
+}
+func (v *diskMacro) UnmarshalJSON(b []byte) error {
+	type plain diskMacro
+	return decodeNonNullObject(b, (*plain)(v), "repeat_while_held steps")
+}
+func (v *diskMacroStep) UnmarshalJSON(b []byte) error {
+	type plain diskMacroStep
+	return decodeNonNullObject(b, (*plain)(v), "kind code duration_ms")
+}
 func (v *diskStick) UnmarshalJSON(b []byte) error {
 	type plain diskStick
-	return decodeObject(b, (*plain)(v), "mode keyboard_directions")
+	if err := decodeObject(b, (*plain)(v), "mode keyboard_directions"); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(b, &fields); err != nil {
+		return err
+	}
+	if angle, ok := fields["angle_degrees"]; ok {
+		if bytes.Equal(bytes.TrimSpace(angle), []byte("null")) {
+			return errCodecShape
+		}
+		return json.Unmarshal(angle, &v.AngleDegrees)
+	}
+	return nil
 }
 func (v *diskKeyboardDirections) UnmarshalJSON(b []byte) error {
 	var fields map[string]*profile.CanonicalCode
@@ -465,8 +537,17 @@ func profileToDisk(value profile.Profile) diskProfile {
 		}
 		for j, binding := range control.Bindings {
 			trigger := diskTrigger{Trigger: binding.Trigger, Kind: binding.Kind, TriggerDelayMS: binding.TriggerDelayMS, TriggerIntervalMS: binding.TriggerIntervalMS, ReleaseBehavior: binding.ReleaseBehavior}
+			if binding.Turbo != nil {
+				trigger.Turbo = &diskTurbo{Code: binding.Turbo.Code, ClicksPerSecond: binding.Turbo.ClicksPerSecond}
+			}
+			if binding.Macro != nil {
+				trigger.Macro = &diskMacro{RepeatWhileHeld: binding.Macro.RepeatWhileHeld, Steps: make([]diskMacroStep, len(binding.Macro.Steps))}
+				for k, step := range binding.Macro.Steps {
+					trigger.Macro.Steps[k] = diskMacroStep{Kind: step.Kind, Code: step.Code, DurationMS: step.DurationMS}
+				}
+			}
 			if binding.Stick != nil {
-				trigger.Stick = &diskStick{Mode: binding.Stick.Mode, KeyboardDirections: diskKeyboardDirections(binding.Stick.KeyboardDirections)}
+				trigger.Stick = &diskStick{Mode: binding.Stick.Mode, KeyboardDirections: diskKeyboardDirections(binding.Stick.KeyboardDirections), AngleDegrees: binding.Stick.AngleDegrees}
 			}
 			if binding.Unknown != nil {
 				trigger.Unknown = &diskUnknown{Reason: binding.Unknown.Reason}
@@ -495,8 +576,17 @@ func profileFromDisk(value diskProfile) profile.Profile {
 		}
 		for j, binding := range control.Bindings {
 			trigger := profile.TriggerBinding{Trigger: binding.Trigger, Kind: binding.Kind, TriggerDelayMS: binding.TriggerDelayMS, TriggerIntervalMS: binding.TriggerIntervalMS, ReleaseBehavior: binding.ReleaseBehavior}
+			if binding.Turbo != nil {
+				trigger.Turbo = &profile.TurboBinding{Code: binding.Turbo.Code, ClicksPerSecond: binding.Turbo.ClicksPerSecond}
+			}
+			if binding.Macro != nil {
+				trigger.Macro = &profile.MacroBinding{RepeatWhileHeld: binding.Macro.RepeatWhileHeld, Steps: make([]profile.MacroStep, len(binding.Macro.Steps))}
+				for k, step := range binding.Macro.Steps {
+					trigger.Macro.Steps[k] = profile.MacroStep{Kind: step.Kind, Code: step.Code, DurationMS: step.DurationMS}
+				}
+			}
 			if binding.Stick != nil {
-				trigger.Stick = &profile.StickBinding{Mode: binding.Stick.Mode, KeyboardDirections: profile.KeyboardDirections(binding.Stick.KeyboardDirections)}
+				trigger.Stick = &profile.StickBinding{Mode: binding.Stick.Mode, KeyboardDirections: profile.KeyboardDirections(binding.Stick.KeyboardDirections), AngleDegrees: binding.Stick.AngleDegrees}
 			}
 			if binding.Unknown != nil {
 				trigger.Unknown = &profile.UnknownBinding{Reason: binding.Unknown.Reason}
@@ -540,19 +630,34 @@ func bundleFromDisk(bundle diskBundle) profile.ProfileBundle {
 	return result
 }
 func validTrigger(binding profile.TriggerBinding) bool {
-	if binding.Kind != profile.BindingStick && binding.Stick != nil {
+	if binding.Kind != profile.BindingStick && binding.Stick != nil ||
+		binding.Kind != profile.BindingTurbo && binding.Turbo != nil ||
+		binding.Kind != profile.BindingMacro && binding.Macro != nil {
 		return false
 	}
 	switch binding.Kind {
+	case profile.BindingTurbo:
+		return binding.Trigger == profile.TriggerSingle && binding.Turbo != nil && binding.Turbo.Code == profile.KEY_T &&
+			(binding.Turbo.ClicksPerSecond == 10 || binding.Turbo.ClicksPerSecond == 25) &&
+			binding.Actions == nil && binding.Unknown == nil && binding.TriggerDelayMS == nil &&
+			binding.TriggerIntervalMS == nil && binding.ReleaseBehavior == nil
+	case profile.BindingMacro:
+		if binding.Trigger != profile.TriggerSingle || binding.Macro == nil || binding.Actions != nil ||
+			binding.Unknown != nil || binding.TriggerDelayMS != nil || binding.TriggerIntervalMS != nil ||
+			binding.ReleaseBehavior != nil || len(binding.Macro.Steps) != 2 {
+			return false
+		}
+		return binding.Macro.Steps[0] == (profile.MacroStep{Kind: profile.MacroStepButton, Code: profile.KEY_W, DurationMS: 50}) &&
+			binding.Macro.Steps[1] == (profile.MacroStep{Kind: profile.MacroStepDelay, DurationMS: 100})
 	case profile.BindingStick:
 		if binding.Trigger != profile.TriggerSingle || binding.Stick == nil || binding.Actions != nil || binding.Unknown != nil || binding.TriggerDelayMS != nil || binding.TriggerIntervalMS != nil || binding.ReleaseBehavior != nil {
 			return false
 		}
 		switch binding.Stick.Mode {
 		case profile.StickModeKeyboard:
-			return binding.Stick.KeyboardDirections == (profile.KeyboardDirections{Up: profile.KEY_W, Right: profile.KEY_D, Down: profile.KEY_S, Left: profile.KEY_A})
+			return binding.Stick.AngleDegrees == 0 && binding.Stick.KeyboardDirections == (profile.KeyboardDirections{Up: profile.KEY_W, Right: profile.KEY_D, Down: profile.KEY_S, Left: profile.KEY_A})
 		case profile.StickModeXbox:
-			return binding.Stick.KeyboardDirections == (profile.KeyboardDirections{})
+			return (binding.Stick.AngleDegrees == 0 || binding.Stick.AngleDegrees == 90) && binding.Stick.KeyboardDirections == (profile.KeyboardDirections{})
 		default:
 			return false
 		}

@@ -332,6 +332,8 @@ Azeronを外すと「Disconnected」を表示し、読取goroutineを終了す�
 | FR-026 | 同じキーへ複数の物理入力が割り当てられている状態を保持すること。 |
 | FR-027 | 左右スティック、デッドゾーン、角度、反転、回転、アナログ／WASD出力を欠落させないこと。 |
 
+現行のv1実装はSoftware 2.0.2の[閉じた変換行](decisions/binding-conversion.md)に限る。T Turboの25/10回毎秒、W 50 ms→Delay 100 msのMacro設定とrepeat、Xbox角度0/90を型付きで保持する。Turbo/Macroは実行せず、90度の座標投影も行わない。legacy numeric変換はv1対象外で、v1後の[Issue #102](https://github.com/sh4869221b/azerlay/issues/102)へ延期する。上表の広い機能要件を現行adapterの対応範囲と読み替えない。
+
 ### 7.3 プロファイルソース
 
 | ID | 要件 |
@@ -644,7 +646,7 @@ Bundle、profile、inputのunknown valueはowned `json.RawMessage`として保�
 
 Rootまたはprofileの`version`は省略、null、bool、string、numberをraw evidenceとして保持できる。Objectまたはarrayなら`ERR_IMPORT_UNSUPPORTED_VERSION`とする。このerrorはversionの表現が非対応であることを示すだけで、scalar versionが対応世代であることを示さない。Issue #20はgeneration admission APIを提供しない。
 
-Issue #40はprivacy-safeなversion-bearing binding evidenceとmacro grammarを確立する。Issue #42はそのevidenceに基づくadapter admission、semantic validation、normalizationを担当し、解釈前に1 macroあたり1,000 stepの上限を適用する。Issue #20はmacroをopaqueな値として構造制限の範囲で保持し、stepを数えない。推測ベースのadapterで未知世代を受け入れてはならない。
+Issue #40はprivacy-safeなversion-bearing binding evidenceとmacro grammarを確立した。Issue #42のadapterは、呼出側が明示する`SoftwareRelease="2.0.2"`と`SourceScope="azeron-software-export"`だけを受け付ける。閉じたTurbo/Macro/角度の設定行を正規化し、解釈前に1 macroあたり1,000 stepの上限を適用する。Issue #20はmacroをopaqueな値として構造制限の範囲で保持し、stepを数えない。raw `version`から世代を推測せず、未知世代を受け入れない。legacy numeric変換はv1後の[Issue #102](https://github.com/sh4869221b/azerlay/issues/102)で扱う。
 
 ### 8.6 セキュリティ制限
 
@@ -712,6 +714,9 @@ type TriggerBinding struct {
     Trigger           TriggerKind
     Kind              BindingKind
     Actions           []Action
+    Turbo             *TurboBinding
+    Macro             *MacroBinding
+    Stick             *StickBinding
     TriggerDelayMS    *int
     TriggerIntervalMS *int
     ReleaseBehavior   *string
@@ -727,11 +732,11 @@ type Action struct {
 
 `Profiles`、`Controls`、`Bindings`、`Actions`はsource順を保つ。`ProfileIndex`と`InputIndex`はprovenanceであり、物理control、input ID、pinを表さない。重複IDや同じcanonical actionを持つcontrolも統合しない。`RawBundleReference`、`RawProfileReference`、`RawBindingReference`はownedかつopaqueな保持領域であり、後段がAzeron field名を読んでbinding semanticsを追加してはならない。
 
-この段階では`RootKind`の`bundle`と`single`、`TriggerKind`の`single`、`long`、`double`、`unknown`、`BindingKind`の`keyboard`と`unknown`を扱う。実装済み`CanonicalCode`は、閉じたSoftware 2.0.2変換行に必要な`KEY_U`、`KEY_P`、`KEY_L`、`KEY_I`、`KEY_LEFTCTRL`だけである。物理control、device model、hand、pin、analog、turbo、実行可能macroへの投影は、このモデルから将来構築する別段階であり、option Aの実装範囲ではない。
+`RootKind`は`bundle`と`single`、`TriggerKind`は`single`、`long`、`double`、`unknown`を扱う。`BindingKind`は`keyboard`、`turbo`、`macro`、`stick`、`unknown`を区別する。`CanonicalCode`は閉じた行の`KEY_U`、`KEY_P`、`KEY_L`、`KEY_I`、`KEY_LEFTCTRL`、`KEY_T`と、Keyboard stick/Macro用の`KEY_W`、`KEY_A`、`KEY_S`、`KEY_D`を含む。`TurboBinding`はcodeと25/10回毎秒、`MacroBinding`はrepeatと順序付きのW Button 50 ms/Delay 100 ms、`StickBinding`はmodeとKeyboard方向、Xbox角度0/90を保持する。非0度のstickは入力座標へ投影しない。物理controlや未観測の実行動作はこのモデルから推測しない。
 
 ### 9.2 Canonical Code
 
-Linuxの標準名を内部Canonical Codeとする方針は維持する。現在実装された変換は、Software 2.0.2の7個の閉じたpredicateだけであり、symbol prefixや数値一致から変換を増やさない。
+Linuxの標準名を内部Canonical Codeとする方針は維持する。現在実装された変換は、Software 2.0.2の閉じたpredicateだけであり、symbol prefixや数値一致から変換を増やさない。
 
 次は将来のcanonical vocabulary例であり、現在の対応表でも変換evidenceでもない。
 
@@ -2213,7 +2218,7 @@ Azerlay 1.0は、以下をすべて満たした時点で完成とする。
 
 ### AC-003 形式世代
 
-legacy numeric valueとmodern symbolic valueの双方をCanonical Bindingへ変換し、未知値は`UnknownBinding`として可視化する。
+v1は、[binding conversion decision](decisions/binding-conversion.md)に記載した根拠のあるSoftware 2.0.2の閉じた変換行だけをCanonical Bindingへ変換し、行に一致しない値は`UnknownBinding`として保持する。現行のTurbo/Macro/角度は設定値の保持のみで、入力実行や90度の座標変換を意味しない。legacy numeric valueの変換はv1対象外とし、v1完了後の[Issue #102](https://github.com/sh4869221b/azerlay/issues/102)で扱う。未対応世代は受け入れない。
 
 ### AC-004 ローカル設定
 

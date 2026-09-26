@@ -51,6 +51,8 @@ func normalizeProfile(raw profileraw.RawProfile, rootKind profile.RootKind, prof
 			return profile.Profile{}, &NormalizeError{Code: ERR_IMPORT_LIMIT_EXCEEDED}
 		}
 		normalized.Controls[inputIndex].Bindings = normalizeKeyboard(input, normalized.Controls[inputIndex].Bindings)
+		normalized.Controls[inputIndex].Bindings = normalizeTurbo(input, normalized.Controls[inputIndex].Bindings)
+		normalized.Controls[inputIndex].Bindings = normalizeMacro(input, normalized.Controls[inputIndex].Bindings)
 		normalized.Controls[inputIndex].Bindings = normalizeStick(input, normalized.Controls[inputIndex].Bindings)
 	}
 	return normalized, nil

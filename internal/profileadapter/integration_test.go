@@ -56,6 +56,9 @@ type goldenTriggerBinding struct {
 	Trigger           profile.TriggerKind     `json:"trigger"`
 	Kind              profile.BindingKind     `json:"kind"`
 	Actions           []goldenAction          `json:"actions"`
+	Turbo             *profile.TurboBinding   `json:"turbo"`
+	Macro             *profile.MacroBinding   `json:"macro"`
+	Stick             *profile.StickBinding   `json:"stick"`
 	TriggerDelayMS    *int                    `json:"trigger_delay_ms"`
 	TriggerIntervalMS *int                    `json:"trigger_interval_ms"`
 	ReleaseBehavior   *string                 `json:"release_behavior"`
@@ -71,7 +74,7 @@ type goldenAction struct {
 func TestNormalizeGolden(t *testing.T) {
 	t.Parallel()
 
-	for _, name := range []string{"bundle", "single"} {
+	for _, name := range []string{"bundle", "single", "v1-settings"} {
 		name := name
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -112,6 +115,41 @@ func TestNormalizeGolden(t *testing.T) {
 			}
 		})
 	}
+	t.Run("v1-settings-bundle", func(t *testing.T) {
+		t.Parallel()
+		input, err := os.ReadFile("testdata/v1-settings.input.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+		literal, err := os.ReadFile("testdata/v1-settings.expected.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var expected normalizedGolden
+		if err := json.Unmarshal(literal, &expected); err != nil {
+			t.Fatal(err)
+		}
+		expected.RootKind = profile.RootBundle
+		expected.Raw = &goldenBundleRaw{}
+		for index := range expected.Profiles[0].Controls {
+			expected.Profiles[0].Controls[index].Raw.RootKind = profile.RootBundle
+		}
+		document, err := profiledecode.DecodeText(`{"profiles":[` + string(input) + `]}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		raw, err := profileraw.Parse(document)
+		if err != nil {
+			t.Fatal(err)
+		}
+		actual, err := profileadapter.Normalize(raw, admittedSource)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if projection := projectNormalized(actual); !reflect.DeepEqual(projection, expected) {
+			t.Fatalf("bundle projection = %#v, want literal bundle variant %#v", projection, expected)
+		}
+	})
 }
 
 func projectNormalized(bundle profile.ProfileBundle) normalizedGolden {
@@ -130,6 +168,7 @@ func projectNormalized(bundle profile.ProfileBundle) normalizedGolden {
 				}
 				bindings[bindingIndex] = goldenTriggerBinding{
 					Trigger: binding.Trigger, Kind: binding.Kind, Actions: actions,
+					Turbo: binding.Turbo, Macro: binding.Macro, Stick: binding.Stick,
 					TriggerDelayMS: binding.TriggerDelayMS, TriggerIntervalMS: binding.TriggerIntervalMS,
 					ReleaseBehavior: binding.ReleaseBehavior, Unknown: binding.Unknown,
 				}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"reflect"
 	"testing"
 
 	"github.com/sh4869221b/azerlay/internal/profile"
@@ -42,6 +43,72 @@ func TestStickNormalize(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestStickObservedXboxAngle(t *testing.T) {
+	t.Parallel()
+	for _, angle := range []struct {
+		token string
+		value int
+	}{{"0", 0}, {"90", 90}} {
+		t.Run(angle.token, func(t *testing.T) {
+			t.Parallel()
+			input := stickInput(t, "xbox-observed")
+			setAnalogStickField(t, input, "angle", angle.token)
+			actual := normalizeStickExport(t, marshalJSON(t, map[string]any{"id": "synthetic", "inputs": []any{input}}))
+			control := actual.Profiles[0].Controls[0]
+			want := profile.TriggerBinding{
+				Trigger: profile.TriggerSingle,
+				Kind:    profile.BindingStick,
+				Stick:   &profile.StickBinding{Mode: profile.StickModeXbox, AngleDegrees: angle.value},
+			}
+			if !reflect.DeepEqual(control.Bindings[0], want) {
+				t.Fatalf("primary = %#v, want %#v", control.Bindings[0], want)
+			}
+			assertStickTriggerSlots(t, control.Bindings)
+			if !bytes.Equal(marshalJSON(t, control.Raw.Fields), marshalJSON(t, input)) {
+				t.Fatal("observed Xbox lost raw fields")
+			}
+		})
+	}
+
+	for _, test := range []struct {
+		name, field, token string
+		analog             bool
+	}{
+		{"angle 45", "angle", "45", true},
+		{"string angle 90", "angle", `"90"`, true},
+		{"subType present", "subType", `"11"`, false},
+		{"subType null", "subType", "null", false},
+		{"toggle false", "isToggleOnHold", "false", false},
+		{"toggle null", "isToggleOnHold", "null", false},
+		{"nonzero lower limit", "lowerLimit", "1", true},
+		{"inverted axis", "invertXAxis", "true", true},
+		{"changed sensitivity", "sensitivity", "1", true},
+		{"wrong hold type", "holdType", "1", true},
+		{"missing inactive flag", "isHoldLong", "", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			input := stickInput(t, "xbox-observed")
+			if test.analog {
+				setAnalogStickField(t, input, test.field, test.token)
+			} else {
+				setStickField(input, test.field, test.token)
+			}
+			assertUnknownStick(t, input)
+		})
+	}
+}
+
+func setAnalogStickField(t *testing.T, input profileraw.RawInput, field, token string) {
+	t.Helper()
+	var settings map[string]json.RawMessage
+	if err := json.Unmarshal(input["analogSettings"], &settings); err != nil {
+		t.Fatal(err)
+	}
+	setStickField(settings, field, token)
+	input["analogSettings"] = marshalJSON(t, settings)
 }
 
 func TestStickUnsupportedContext(t *testing.T) {

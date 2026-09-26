@@ -77,6 +77,8 @@ type BindingKind string
 
 const (
 	BindingKeyboard BindingKind = "keyboard"
+	BindingTurbo    BindingKind = "turbo"
+	BindingMacro    BindingKind = "macro"
 	BindingStick    BindingKind = "stick"
 	BindingUnknown  BindingKind = "unknown"
 )
@@ -86,11 +88,36 @@ type TriggerBinding struct {
 	Trigger           TriggerKind
 	Kind              BindingKind
 	Actions           []Action
+	Turbo             *TurboBinding
+	Macro             *MacroBinding
 	Stick             *StickBinding
 	TriggerDelayMS    *int
 	TriggerIntervalMS *int
 	ReleaseBehavior   *string
 	Unknown           *UnknownBinding
+}
+
+type TurboBinding struct {
+	Code            CanonicalCode
+	ClicksPerSecond int
+}
+
+type MacroBinding struct {
+	RepeatWhileHeld bool
+	Steps           []MacroStep
+}
+
+type MacroStepKind string
+
+const (
+	MacroStepButton MacroStepKind = "button"
+	MacroStepDelay  MacroStepKind = "delay"
+)
+
+type MacroStep struct {
+	Kind       MacroStepKind
+	Code       CanonicalCode
+	DurationMS int
 }
 
 // StickMode identifies the configured source stick mode.
@@ -105,6 +132,7 @@ const (
 type StickBinding struct {
 	Mode               StickMode
 	KeyboardDirections KeyboardDirections
+	AngleDegrees       int
 }
 
 // KeyboardDirections contains canonical keys only for keyboard stick mode.
@@ -130,6 +158,7 @@ type CanonicalCode string
 
 const (
 	KEY_W        CanonicalCode = "KEY_W"
+	KEY_T        CanonicalCode = "KEY_T"
 	KEY_A        CanonicalCode = "KEY_A"
 	KEY_S        CanonicalCode = "KEY_S"
 	KEY_D        CanonicalCode = "KEY_D"

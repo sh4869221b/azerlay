@@ -75,6 +75,21 @@ func TestImportOutputFailures(t *testing.T) {
 }
 
 const savedBundleResult = `{"root_kind":"bundle","export_version":{"present":true,"value":1e+09},"profiles":[{"index":1,"name":"Primary","input_count":2},{"index":2,"name":null,"input_count":1}],"selected_profile_index":null,"warnings":[{"code":"WARN_IMPORT_UNKNOWN_BINDINGS","profile_index":1,"count":2},{"code":"WARN_IMPORT_UNKNOWN_BINDINGS","profile_index":2,"count":3}]}`
+const settingsResult = `{"root_kind":"single","export_version":{"present":true,"value":null},"profiles":[{"index":1,"name":"","input_count":7}],"selected_profile_index":null,"warnings":[{"code":"WARN_IMPORT_UNKNOWN_BINDINGS","profile_index":1,"count":15}]}`
+
+func TestValidateSettings(t *testing.T) {
+	input := cliRead(t, "../../internal/profileadapter/testdata/v1-settings.input.json")
+	status, stdout, stderr := validateForTest([]string{"--json", "--software-release", "2.0.2", "--text", string(input)}, strings.NewReader(""))
+	if status != 0 || stderr != "" {
+		t.Fatalf("settings validate status=%d stderr=%q", status, stderr)
+	}
+	assertJSONEqual(t, stdout, cliSuccess("validate", settingsResult))
+	for _, detail := range []string{"KeyT", "keyCode", "repeat_while_held", "angle_degrees", "near-match"} {
+		if strings.Contains(stdout, detail) {
+			t.Fatalf("settings detail %q leaked in CLI report", detail)
+		}
+	}
+}
 
 func TestValidateBundleJSONBaseline(t *testing.T) {
 	// Given: storage resolution would fail; validation still has its schema-1 output.

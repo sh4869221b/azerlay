@@ -250,7 +250,8 @@ not inspect Azeron field names in them to add binding semantics.
 
 Every control has an outcome. Exact `types` arrays `["1","1","1"]`,
 `["1","11","11"]`, `["11","1","11"]`, `["11","11","1"]`,
-`["11","11","11"]`, and `["16","11","11"]` produce ordered single,
+`["11","11","11"]`, `["16","11","11"]`, `["4","11","11"]`,
+and `["21","11","11"]` produce ordered single,
 long, and double slots. Other values produce one `trigger:unknown` outcome. An
 unmatched slot has `kind:unknown`, no action, timing, or release fields, and
 reason `unmapped_binding`. Unknown is successful normalization, not a default
@@ -284,7 +285,23 @@ string such as `"500"` remains Unknown. No broad symbolic conversion, Software
 1.x or 2.x mapping, numeric key namespace, numeric-to-Linux equivalence, timing
 range, inactive action, or unassigned meaning is inferred.
 
-### Confirmed stick modes
+### Confirmed Turbo, Macro, and stick settings
+
+The new Software 2.0.2 rows require `isToggleOnHold` to be absent. Their
+inactive long/double slots have four string `"0"` keys, three string `"0"`
+modifiers, false hold/turbo flags, and numeric token `0` turbo intervals.
+Missing, null, or differently typed values do not match. Unrelated fields stay
+opaque. The exact complete predicates are in
+[binding-conversion.md](decisions/binding-conversion.md).
+
+Turbo admits only `KeyT` with numeric `turboInterval:20` or `50`, recording
+`KEY_T` at 25 or 10 clicks per second respectively. It creates no keyboard
+Actions, release behavior, or timer. The inactive non-Turbo T case stays
+Unknown. Macro admits only the observed ordered Button `KEY_W` 50 ms then
+Delay 100 ms, with boolean repeat false or true retained as
+`RepeatWhileHeld`. No playback or event scheduling is implemented.
+
+The existing neutral stick shapes remain supported:
 
 Software 2.0.2 exports also normalize the owner-confirmed neutral Keyboard/WASD
 and Xbox Joystick shapes into distinct `BindingStick` payloads. Recognition uses
@@ -295,7 +312,7 @@ the source fields, never an input ordinal or a caller mode override:
 | `types:["4","11","11"]` | Keyboard, with up `KEY_W`, right `KEY_D`, down `KEY_S`, left `KEY_A` |
 | `types:["21","11","11"]` | Xbox, without keyboard direction assignments |
 
-Both require `subType:"11"`, primary `isHold`, `isTurbo`, and `isToggleOnHold`
+Both neutral shapes require `subType:"11"`, primary `isHold`, `isTurbo`, and `isToggleOnHold`
 false, four string `"0"` key values, and three string `"0"` modifier values.
 `analogSettings` requires exact numeric zero tokens for `angle`, `lowerLimit`,
 and `upperLimit`; `isRightAnalog`, `invertXAxis`, `invertYAxis`,
@@ -306,9 +323,18 @@ and left `[65,0,0]`. Xbox ignores dormant keyboard assignments. This admits
 these confirmed tuples only, not a general numeric key namespace. Equivalent
 number spellings such as `0.0` are not admitted in these exact-token predicates.
 
+The separate observed Xbox row has no `subType` or `isToggleOnHold`. It
+requires `types:["21","11","11"]`, key strings `["87","0","0","0"]`,
+modifier strings `["0","0","3"]`, false primary hold/turbo, numeric token
+`0` turbo interval, the shared inactive slots above, and exact observed
+`analogSettings` scalar values. It retains numeric angle token `0` or `90` in
+`StickBinding.AngleDegrees` with empty keyboard directions and no Actions.
+At 90 degrees, `ProjectStick` preserves snapshot metadata but returns
+`Known=false` and a zero projected vector; no coordinate rotation is inferred.
+
 The primary slot is single-trigger; long/double remain Unknown. Raw references
 and source order are preserved. Missing or wrong-type predicates, unconfirmed
-assignments, nonzero transformations, right/combined stick settings, and type
+assignments, other angle values, right/combined stick settings, and type
 `"3"` remain Unknown. This does not establish DirectInput or broad Software 2.x
 support. Exported configuration also does not identify the active hardware
 profile or input node. The owner attribution and observed limits are recorded
@@ -333,19 +359,19 @@ string `type:"Delay"`, string `direction:"Full"`, and numeric `duration`, with
 no `keyCode`. Extra or missing keys, another scalar type, another direction or
 step type, another `v` token, `longMacro`, and `doubleMacro` are unknown grammar.
 
-A fully recognized macro with 1,000 steps succeeds but remains Unknown because
-no executable macro semantics are implemented. A fully recognized macro with
+A fully recognized macro with 1,000 steps succeeds and normally remains Unknown;
+only the complete observed two-step setting above becomes typed configuration.
+A fully recognized macro with
 1,001 steps returns `ERR_IMPORT_LIMIT_EXCEEDED` before parameter interpretation.
 The count is per recognized macro, not cumulative across a profile or export.
 Unknown grammar is semantically uncapped, even at 1,001 array members, and stays
 opaque rather than being counted or interpreted.
 
-This is the owner-approved option A foundation: parsed exports can reach an
-ordered, version-independent model while unsupported data remains inspectable.
-It isn't full original Issue #42 support for legacy formats, arbitrary analog
-settings, turbo, or
-executable and matchable macros, and it doesn't satisfy product acceptance
-AC-003.
+These closed rows extend the ordered, version-independent model while
+unsupported data remains inspectable. They do not establish general Software
+2.x, legacy numeric, arbitrary Turbo/analog, or executable Macro support.
+Legacy conversion is deferred beyond v1 to
+[Issue #102](https://github.com/sh4869221b/azerlay/issues/102).
 
 ## CLI import, validation, and saved profiles
 
@@ -386,9 +412,9 @@ saved attribution. A missing or hash-mismatched original, corrupt index, or
 failed reconstruction is `ERR_PROFILE_STORAGE`; it never yields a partial
 result or reselects another source.
 
-Typed stick mode and direction data survive saving and reloading. Normalizer
-revision 2 invalidates revision-1 caches so saved originals are re-normalized in
-memory, including previously Unknown stick bindings. Storage and model schema
+Typed Turbo, Macro, and stick settings survive saving and reloading. Normalizer
+revision 3 invalidates revision-1/2 caches so saved originals are re-normalized
+in memory, including previously Unknown settings. Storage and model schema
 versions remain 1. A historical index can still use a current compatible cache;
 loading does not rewrite the index, cache, original, or selection.
 

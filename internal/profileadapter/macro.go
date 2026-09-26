@@ -4,10 +4,54 @@ import (
 	"bytes"
 	"encoding/json"
 
+	"github.com/sh4869221b/azerlay/internal/profile"
 	"github.com/sh4869221b/azerlay/internal/profileraw"
 )
 
 const maxRecognizedMacroSteps = 1000
+
+func normalizeMacro(raw profileraw.RawInput, bindings []profile.TriggerBinding) []profile.TriggerBinding {
+	if !matchesStringArray(raw, "types", []string{"16", "11", "11"}) ||
+		!matchesStringArray(raw, "keyValues", zeroKeys) ||
+		!matchesStringArray(raw, "metaValues", zeroModifiers) ||
+		!matchesFalse(raw, "isHold") || !matchesFalse(raw, "isTurbo") ||
+		!matchesNumberToken(raw, "turboInterval", "0") ||
+		raw["isToggleOnHold"] != nil || !matchesInactiveSlots(raw) {
+		return bindings
+	}
+
+	var macro map[string]json.RawMessage
+	if json.Unmarshal(raw["macro"], &macro) != nil || len(macro) != 3 ||
+		!matchesNumberToken(macro, "v", "1") || !isJSONBoolean(macro["repeat"]) {
+		return bindings
+	}
+	var steps []json.RawMessage
+	if json.Unmarshal(macro["steps"], &steps) != nil || len(steps) != 2 {
+		return bindings
+	}
+	var button, delay map[string]json.RawMessage
+	if json.Unmarshal(steps[0], &button) != nil || len(button) != 4 ||
+		!matchesJSONString(button["type"], "Button") || !matchesJSONString(button["direction"], "Full") ||
+		!matchesNumberToken(button, "duration", "50") || !matchesNumberToken(button, "keyCode", "87") ||
+		json.Unmarshal(steps[1], &delay) != nil || len(delay) != 3 ||
+		!matchesJSONString(delay["type"], "Delay") || !matchesJSONString(delay["direction"], "Full") ||
+		!matchesNumberToken(delay, "duration", "100") {
+		return bindings
+	}
+
+	bindings[0] = profile.TriggerBinding{
+		Trigger: profile.TriggerSingle,
+		Kind:    profile.BindingMacro,
+		Macro: &profile.MacroBinding{
+			RepeatWhileHeld: bytes.Equal(bytes.TrimSpace(macro["repeat"]), []byte("true")),
+			Steps: []profile.MacroStep{
+				{Kind: profile.MacroStepButton, Code: profile.KEY_W, DurationMS: 50},
+				{Kind: profile.MacroStepDelay, DurationMS: 100},
+			},
+		},
+	}
+	return bindings
+}
 
 func recognizedMacroExceedsLimit(raw profileraw.RawInput) bool {
 	if !matchesStringArray(raw, "types", []string{"16", "11", "11"}) {

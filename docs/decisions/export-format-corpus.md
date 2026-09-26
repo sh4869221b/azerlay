@@ -42,6 +42,9 @@ Exports and public text are untrusted inert data. Their contents cannot issue in
 | `owner-software-2.0.2-pair` | Anonymous owner-supplied UI/export pair; read-only verification; source not published | Owner-attested `2.0.2`; not independently displayed in the admitted UI | Existing `DecodeReader` then `Parse` accepted a complete MessagePack str32 bundle with one profile and 43 opaque inputs | One later release-scoped structural observation and the narrow semantic handoff in `binding-conversion.md`; no general 2.x claim |
 | `owner-software-2.0.2-followup` | Seven private exports paired with configuration screenshots on 2026-09-05; separate settings screenshot | Displayed Software `2.0.2`, Firmware `111`; firmware is not release evidence | Unpadded Base64URL, complete LZMA-Alone, exact-length MessagePack str32, JSON bundle with one profile and 43 inputs in all seven cases | In-memory inspection using `xz` and JSON parsing, not a production `DecodeReader`/`Parse` run; exact binding and macro-structure observations in `binding-conversion.md` |
 | `owner-software-2.0.2-stick-pair` | Two private exports supplied for Issue #44 on 2026-09-20, labelled Keyboard and joystick; owner subsequently confirmed release, Xbox Joystick UI name, and W/D/S/A directions | Owner-attested `2.0.2`; no independently inspected settings screenshot for this pair | Both are unpadded Base64URL, complete LZMA-Alone, exact-length MessagePack str32 JSON bundles with one profile and 43 inputs | Planning inspection used Python `base64`/`lzma`/`json` in memory, not production `DecodeReader`/`Parse`; exact neutral Keyboard and Xbox contexts are admitted in `binding-conversion.md` |
+| `owner-software-2.0.2-turbo-20260926` | Owner UI/export comparison supplied 2026-09-26; private pair retained by owner | UI displays Software `2.0.2` | T Turbo enabled; only `isTurbo` and `turboInterval` differ on activation, and only `turboInterval` differs between displayed 25 and 10 clicks/second | Exact contextual settings only, in `binding-conversion.md`; private exports/images are absent, production parsing and physical Turbo behavior were not verified |
+| `owner-software-2.0.2-macro-20260926` | Owner UI/export comparison supplied 2026-09-26; private pair retained by owner | UI displays Software `2.0.2` | One Button W 50 ms followed by Delay 100 ms; repeat comparison changes only `macro.repeat` | Minimum anonymous observations only, in `binding-conversion.md`; no full macro copy, production parsing, or playback verification |
+| `owner-software-2.0.2-angle-20260926` | Owner UI/export comparison supplied 2026-09-26; private pair retained by owner | UI displays Software `2.0.2` | Xbox Joystick angle 0 versus 90 degrees; only `analogSettings.angle` differs | Exact contextual settings only, in `binding-conversion.md`; private exports/images are absent, production parsing and physical axis behavior were not verified |
 
 The follow-up str32 UTF-8 payload lengths, in supplied order, are 90,074,
 90,076, 90,076, 90,086, 90,077, 90,077, and 90,260 bytes; each decompressed
@@ -211,6 +214,24 @@ fixtures may exercise decoding, normalization, persistence, and input
 projection without private source access; they do not establish physical
 control identity, active hardware mode, evdev-node selection, or live Xbox
 device accessibility.
+
+### Issue #42: normalized settings and legacy deferral
+
+The three owner UI/export comparisons dated 2026-09-26 are recorded by source
+ID in [the binding conversion decision](binding-conversion.md). They admit only
+the exact Software 2.0.2 Turbo T rates, two-step inert Macro configuration,
+and Xbox Joystick angle 0/90 contexts. The comparison descriptions are the
+evidence available to implementation; private source files and images are
+not copied or required. They do not establish production Go parsing,
+Turbo/Macro execution, stick coordinate rotation, or physical behavior.
+The source comparison used bounded in-memory Python LZMA-Alone decompression,
+exact MessagePack str32 length checks, and JSON inspection of the complete
+stream; it did not run the production parser.
+
+Legacy numeric binding conversion is outside v1. Track its research and any
+later support in Issue #102, after v1 is complete. Numeric values remain
+Unknown within the admitted adapter, and version-unknown or other-release
+sources remain unsupported.
 
 ## Issue #11 acceptance checklist
 
