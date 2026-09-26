@@ -37,7 +37,7 @@ func TestNativeWindow(t *testing.T) {
 		}
 		return
 	}
-	for _, mode := range []string{"lifecycle", "invalid-display"} {
+	for _, mode := range []string{"lifecycle", "region-failure", "invalid-display"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
@@ -72,6 +72,8 @@ func TestNativeWindow(t *testing.T) {
 			want := []string{"ready", "hidden", "missing", "restored", "explicit", "default-return", "hidden-return", "closed"}
 			if mode == "invalid-display" {
 				want = []string{"display-unavailable"}
+			} else if mode == "region-failure" {
+				want = []string{"failed", "recovered", "closed"}
 			}
 			for i, expected := range want {
 				if !scanner.Scan() {
@@ -86,7 +88,7 @@ func TestNativeWindow(t *testing.T) {
 					wait()
 					t.Fatalf("child state = %q; want %q; stderr=%s", line, expected, stderr.String())
 				}
-				if mode == "lifecycle" && i < len(want)-1 {
+				if mode != "invalid-display" && i < len(want)-1 {
 					command := "continue"
 					if i == len(want)-2 {
 						command = "quit"

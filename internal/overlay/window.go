@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 
+	"github.com/diamondburned/gotk4/pkg/cairo"
 	"github.com/diamondburned/gotk4/pkg/gdk/v4"
 	"github.com/diamondburned/gotk4/pkg/gio/v2"
 	"github.com/diamondburned/gotk4/pkg/glib/v2"
@@ -41,6 +42,41 @@ type Window struct {
 	closed         bool
 	pending        glib.SourceHandle
 	placePending   glib.SourceHandle
+	region         *cairo.Region
+	newRegion      func() (*cairo.Region, error)
+	applied        bool
+	diagnostic     string
+	observer       func(State)
+	lastState      State
+}
+
+type State struct {
+	Mapped             bool
+	InputRegionApplied bool
+	Diagnostic         string
+}
+
+func (w *Window) State() State {
+	mapped := w.surface != nil && w.surface.Mapped()
+	return State{Mapped: mapped, InputRegionApplied: mapped && w.applied, Diagnostic: w.diagnostic}
+}
+
+func (w *Window) SetObserver(observer func(State)) {
+	w.observer = observer
+	if observer != nil && !w.closed {
+		w.lastState = w.State()
+		observer(w.lastState)
+	}
+}
+
+func (w *Window) publish() {
+	state := w.State()
+	if state != w.lastState {
+		w.lastState = state
+		if w.observer != nil && !w.closed {
+			w.observer(state)
+		}
+	}
 }
 
 func New(overlay config.Overlay) (*Window, error) {
@@ -57,7 +93,7 @@ func New(overlay config.Overlay) (*Window, error) {
 	if display == nil {
 		return nil, ErrDisplayUnavailable
 	}
-	w := &Window{display: display, monitors: display.Monitors()}
+	w := &Window{display: display, monitors: display.Monitors(), newRegion: cairo.RegionCreate}
 	if err := w.ApplyConfig(overlay); err != nil {
 		w.Close()
 		return nil, err
@@ -82,6 +118,9 @@ func (w *Window) ApplyConfig(overlay config.Overlay) error {
 
 func (w *Window) SetVisible(visible bool) error {
 	w.requested = visible
+	if !visible && w.diagnostic == "OVERLAY_MONITOR_UNAVAILABLE" {
+		w.diagnostic = ""
+	}
 	return w.reconcile()
 }
 
@@ -90,6 +129,7 @@ func (w *Window) Close() {
 		return
 	}
 	w.closed = true
+	w.observer = nil
 	if w.pending != 0 {
 		glib.SourceRemove(w.pending)
 		w.pending = 0
@@ -116,14 +156,24 @@ func (w *Window) reconcile() error {
 	if !resolved {
 		w.disconnectMonitor()
 		w.destroyWindow()
+		if w.requested {
+			w.diagnostic = "OVERLAY_MONITOR_UNAVAILABLE"
+		} else if w.diagnostic == "OVERLAY_MONITOR_UNAVAILABLE" {
+			w.diagnostic = ""
+		}
+		w.publish()
 		return nil
+	}
+	if w.diagnostic == "OVERLAY_MONITOR_UNAVAILABLE" {
+		w.diagnostic = ""
 	}
 	if w.widget == nil || w.invalidated || (w.selector != "" && !sameMonitor(w.monitor, target)) {
 		w.disconnectMonitor()
 		w.destroyWindow()
 		w.invalidated = false
 		if err := w.createWindow(); err != nil {
-			return err
+			w.fail("ERR_OVERLAY_PLACEMENT")
+			return nil
 		}
 	}
 	if w.selector != "" {
@@ -132,16 +182,35 @@ func (w *Window) reconcile() error {
 	if w.surface != nil && w.surface.Mapped() {
 		w.schedulePlace()
 	} else if err := w.place(); err != nil {
-		return err
+		w.fail("ERR_OVERLAY_PLACEMENT")
+		return nil
 	}
 	if w.requested {
+		if w.region == nil {
+			region, err := w.newRegion()
+			if err != nil || region == nil {
+				w.fail("ERR_OVERLAY_INPUT_REGION")
+				return nil
+			}
+			w.region = region
+		}
 		if !w.widget.Visible() {
-			w.widget.Present()
+			w.widget.SetVisible(true)
 		}
 	} else {
 		w.widget.SetVisible(false)
 	}
+	w.publish()
 	return nil
+}
+
+func (w *Window) fail(code string) {
+	w.diagnostic = code
+	w.applied = false
+	if w.widget != nil {
+		w.widget.SetVisible(false)
+	}
+	w.publish()
 }
 
 func (w *Window) createWindow() error {
@@ -155,7 +224,8 @@ func (w *Window) createWindow() error {
 		w.disconnectSurface()
 		surface, err := layershell.Surface(w.widget)
 		if err != nil || surface == nil {
-			w.widget.SetVisible(false)
+			w.invalidated = true
+			w.fail("ERR_OVERLAY_SURFACE")
 			return
 		}
 		w.surface = surface
@@ -172,12 +242,27 @@ func (w *Window) createWindow() error {
 
 func (w *Window) surfaceChanged() {
 	if w.surface == nil || !w.surface.Mapped() {
+		w.applied = false
+		w.publish()
 		return
 	}
+	if w.region == nil {
+		w.fail("ERR_OVERLAY_INPUT_REGION")
+		return
+	}
+	w.applyInputRegion()
 	if w.selector == "" {
 		w.observeMonitor(w.display.MonitorAtSurface(w.surface))
 	}
 	w.schedulePlace()
+}
+
+func (w *Window) applyInputRegion() {
+	w.surface.SetInputRegion(w.region)
+	w.widget.QueueDraw()
+	w.applied = true
+	w.diagnostic = ""
+	w.publish()
 }
 
 func (w *Window) schedulePlace() {
@@ -190,8 +275,10 @@ func (w *Window) schedulePlace() {
 			return
 		}
 		if err := w.place(); err != nil {
-			w.widget.SetVisible(false)
+			w.fail("ERR_OVERLAY_PLACEMENT")
+			return
 		}
+		w.applyInputRegion()
 	})
 }
 
@@ -220,7 +307,9 @@ func (w *Window) place() error {
 }
 
 func (w *Window) disconnectSurface() {
+	w.applied = false
 	if w.surface == nil {
+		w.publish()
 		return
 	}
 	for _, handle := range w.surfaceHandles {
@@ -228,6 +317,7 @@ func (w *Window) disconnectSurface() {
 	}
 	w.surfaceHandles = nil
 	w.surface = nil
+	w.publish()
 }
 
 func (w *Window) destroyWindow() {

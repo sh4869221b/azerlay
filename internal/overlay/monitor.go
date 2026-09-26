@@ -43,7 +43,7 @@ func (w *Window) disconnectMonitorList() {
 
 func (w *Window) selectionChanged() {
 	if err := w.reconcile(); err != nil {
-		w.Close()
+		w.fail("ERR_OVERLAY_PLACEMENT")
 	}
 }
 
@@ -127,7 +127,7 @@ func (w *Window) observeMonitor(monitor *gdk.Monitor) {
 				w.pending = glib.IdleAdd(func() {
 					w.pending = 0
 					if err := w.reconcile(); err != nil {
-						w.Close()
+						w.fail("ERR_OVERLAY_PLACEMENT")
 					}
 				})
 			}
