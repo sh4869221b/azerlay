@@ -67,6 +67,12 @@ func TestProfileDetailsPrivacy(t *testing.T) {
 	bundle := profile.ProfileBundle{Profiles: []profile.Profile{
 		{Controls: []profile.ControlBinding{{Label: stringPointer("UNSELECTED_LABEL")}}}, selectedProfile(),
 	}}
+	bundle.Profiles[1].Controls = append(bundle.Profiles[1].Controls, profile.ControlBinding{
+		Bindings: []profile.TriggerBinding{{Trigger: profile.TriggerSingle, Kind: profile.BindingMacro, Macro: &profile.MacroBinding{
+			RepeatWhileHeld: true,
+			Steps:           []profile.MacroStep{{Kind: profile.MacroStepButton, Code: profile.KEY_W, DurationMS: 50}, {Kind: profile.MacroStepDelay, DurationMS: 100}},
+		}}},
+	})
 	for _, include := range []bool{false, true} {
 		for _, jsonMode := range []bool{false, true} {
 			var details *ProfileDetails
@@ -80,6 +86,11 @@ func TestProfileDetailsPrivacy(t *testing.T) {
 			for _, secret := range []string{"PRIVATE_ID", "PRIVATE_NAME", "PRIVATE_MACRO", "PRIVATE_FIELD", "UNSELECTED_LABEL"} {
 				if strings.Contains(output.String(), secret) {
 					t.Fatalf("include=%v json=%v disclosed %s", include, jsonMode, secret)
+				}
+			}
+			for _, detail := range []string{"KEY_W", "repeat_while_held", "duration_ms"} {
+				if strings.Contains(output.String(), detail) {
+					t.Fatalf("include=%v json=%v disclosed Macro detail %s", include, jsonMode, detail)
 				}
 			}
 			if strings.Contains(output.String(), "CHOSEN_LABEL") != include || strings.Contains(output.String(), "KEY_U") != include {

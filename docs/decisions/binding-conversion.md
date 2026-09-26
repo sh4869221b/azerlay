@@ -39,6 +39,9 @@ cannot be broader than this exact release and source scope.
 | `owner-software-2.0.2-pair` | Anonymous owner-supplied Software 2.0.2 UI/export pair | Release-scoped root, field, key, timing, and regular-release observations listed here | The export, images, labels, IDs, and complete macro content are private and are not normative dependencies or reproduced artifacts. Release attribution is owner attested, not independently displayed. |
 | `owner-software-2.0.2-followup` | Seven exports paired in message order with seven configuration images on 2026-09-05, plus a settings image displaying Software 2.0.2 | Empty key field, single U/P, left Ctrl+U, long U, double I, and macro structure below | The owner explicitly confirmed left Ctrl. Full exports, images, labels, IDs, and the complete macro sequence remain private. |
 | `owner-software-2.0.2-stick-pair` | Two private exports supplied for Issue #44 on 2026-09-20; owner-confirmed Software 2.0.2, Keyboard versus Xbox Joystick, and up=W/right=D/down=S/left=A | Exact neutral left-stick mode and directional tuples below | Release, UI mode names, and directions are owner attested, not independently inspected settings screenshots. Python inspection did not run production `DecodeReader`/`Parse`. No live Xbox-device or physical-control mapping is established. |
+| `owner-software-2.0.2-turbo-20260926` | Owner UI/export comparison supplied 2026-09-26 | Exact T Turbo settings at two displayed rates below | Private inputs are not included; no production Go parsing or physical Turbo behavior was verified. |
+| `owner-software-2.0.2-macro-20260926` | Owner UI/export comparison supplied 2026-09-26 | Exact two-step macro setting and repeat toggle below | Only minimum anonymous step observations are recorded; no private full macro, production Go parsing, or playback behavior is included. |
+| `owner-software-2.0.2-angle-20260926` | Owner UI/export comparison supplied 2026-09-26 | Exact Xbox Joystick angle 0 and 90 contexts below | Private inputs are not included; no production Go parsing or physical axis behavior was verified. |
 | `local-linux-uapi` | Local `/usr/include/linux/input-event-codes.h`, inspected 2026-09-05 | `KEY_W` 17, `KEY_U` 22, `KEY_I` 23, `KEY_P` 25, `KEY_LEFTCTRL` 29, `KEY_LEFTSHIFT` 42 | Constants establish Linux names and values, not Azeron numeric namespaces. |
 | `linux-uapi-654ae5d` | [Linux input event codes at commit 654ae5d](https://github.com/torvalds/linux/blob/654ae5d73c05bd2943d65636ce6cd0aa46e62f18/include/uapi/linux/input-event-codes.h) | Canonical names and values `KEY_U` 22, `KEY_P` 25, and `KEY_L` 38 | Linux constants do not prove an Azeron raw mapping by numeric equality. |
 | `linux-events-654ae5d` | [Linux input event semantics at commit 654ae5d](https://github.com/torvalds/linux/blob/654ae5d73c05bd2943d65636ce6cd0aa46e62f18/Documentation/input/event-codes.rst) | The `EV_KEY` keyboard namespace uses `KEY_<name>` | It does not establish source symbols or physical controls. |
@@ -252,30 +255,62 @@ assignments that produce the same canonical action remain two assignments.
 They are not keyed, sorted, or coalesced by canonical code. This says nothing
 about their physical origin, which remains outside Issue #40.
 
+## Issue #42 closed settings rows
+
+The sources are the three owner UI/export comparisons listed above, each
+showing Software 2.0.2. They admit only these exact contexts. No private
+originals, production Go parsing, Turbo execution, macro playback, or physical
+axis behavior is claimed. All rows require trusted metadata
+`SoftwareRelease="2.0.2"`, `SourceScope="azeron-software-export"`,
+`isToggleOnHold` absent, and these shared inactive-slot values: long/double
+key arrays each four string `"0"` values; long/double meta arrays each three
+string `"0"` values; `isHoldLong`, `isHoldDouble`, `isTurboLong`,
+`isTurboDouble` are boolean `false`; `turboIntervalLong` and
+`turboIntervalDouble` are number token `0`. Missing, null, and wrong-typed
+values do not match. These exact values define no defaults.
+
+| Case and source | Additional exact predicate | UI observation and admitted result | Exclusions |
+| --- | --- | --- | --- |
+| Turbo T, `owner-software-2.0.2-turbo-20260926` | `types:["1","11","11"]`; `keyValues:["KeyT","0","0","0"]`; `metaValues:["0","0","0"]`; `isHold:false`, `isTurbo:true`; `turboInterval` number token `20` or `50` | UI shows 25 or 10 clicks/second. Map to `TriggerSingle`, kind `turbo`, code `KEY_T`, rate 25 or 10 respectively; no Actions or other payload. | No `500/x` rule, units conversion, arbitrary rate, rounding, release behavior, or execution. Non-Turbo T remains Unknown because Regular was not shown. |
+| Macro, `owner-software-2.0.2-macro-20260926` | `types:["16","11","11"]`; key/meta arrays are four/three string zeroes; `isHold:false`, `isTurbo:false`; `turboInterval` number token `0`; shared inactive slots. `macro` has exactly `v` number token `1`, boolean `repeat`, and two steps only: `{type:"Button",direction:"Full",duration:50,keyCode:87}`, then `{type:"Delay",direction:"Full",duration:100}`; no extra step fields. | UI shows W Button 50 ms then Delay 100 ms; repeat is the displayed Repeat (while held down) toggle. Map to `TriggerSingle`, kind `macro`, `repeat_while_held` from `repeat`, and ordered steps `{button,KEY_W,50}`, `{delay,"",100}`; no Actions or other payload. | 87 maps contextually to `KEY_W` only here. Other directions, keys, modifiers, durations, or step shapes keep the whole binding Unknown. No execution or scheduling meaning is inferred for `Full`. |
+| Xbox angle, `owner-software-2.0.2-angle-20260926` | `types:["21","11","11"]`; `subType` absent; `keyValues:["87","0","0","0"]`; `metaValues:["0","0","3"]`; `isHold:false`, `isTurbo:false`; `turboInterval` number token `0`; shared inactive slots. `analogSettings.angle` token 0 or 90; limits tokens 0; right-analog, inversion, combined, eight-direction, hold, smoothing, angle-lock flags all false; sensitivity 0, mouseSensitivity 5, analogThrottle 0, triggerMagnitude 4, combinedAnalogMagnitude 6, holdMagnitude 9, holdType `"1"`, rotateStickButtonId 0, lockZoneAngle 70, lockZoneSize 30, with exact JSON types. | UI shows Xbox Joystick at 0 or 90 degrees. Map to `TriggerSingle`, kind `stick`, mode `xbox`, that `AngleDegrees`, empty directions and Actions. | Arrays are contextual predicates, not keyboard assignment or legacy support. No global semantics, physical orientation, or coordinate rotation is inferred. |
+
+The comparisons found only `isTurbo` and `turboInterval` changing for Turbo
+activation, only `turboInterval` changing between the two displayed rates,
+only `macro.repeat` changing between repeat states, and only
+`analogSettings.angle` changing between the two Xbox settings. All unrelated
+fields stay opaque. Matchers do not use input index, ID, label, pin, private
+profile name, or filename. Preserve a near match as whole-binding Unknown
+with raw fields intact. A nonzero-angle projection remains `Known=false` with
+a zero vector; this records configuration without claiming transformation.
+
 ## Family dispositions
 
 | Family | Software 2.0.2 admitted source scope | Other releases |
 | --- | --- | --- |
 | `types` | Only the exact original and follow-up contexts above are admitted. No generic discriminant table is established. | `unsupported_generation` |
-| Modern keyboard symbols | Contextual `KeyU`, `KeyP`, `KeyL`, and `KeyI` only. No prefix conversion is allowed. | `unsupported_generation` |
+| Modern keyboard symbols | Contextual `KeyU`, `KeyP`, `KeyL`, `KeyI`, and Turbo `KeyT` only. No prefix conversion is allowed. | `unsupported_generation` |
 | Modifiers and `metaValues*` | Exact no-modifier predicates and the single left Ctrl+U row only. Other modifiers, combinations, masks, enums, ordering, and general zero semantics remain unresolved. | `unsupported_generation` |
-| Legacy numeric `keyValues` and `metaValues` | Unknown if encountered in the admitted adapter. No numeric namespace, number/string coercion, or Linux numeric equivalence is established. | `unsupported_generation` |
+| Legacy numeric `keyValues` and `metaValues` | Unknown except the exact Xbox stick context above. The macro step's `keyCode:87` is likewise contextual only. No numeric namespace, number/string coercion, or Linux numeric equivalence is established. | `unsupported_generation` |
 | Other keyboard, mouse, and `BTN_*` symbols | Unknown. No additional source symbol or namespace is correlated. | `unsupported_generation` |
-| Single trigger | Exact U, P, and left Ctrl+U rows with regular release, plus the two exact stick contexts above; empty-setting observation does not establish a generic unassigned rule. | `unsupported_generation` |
+| Single trigger | Exact U, P, and left Ctrl+U regular rows; neutral Keyboard/Xbox and observed Xbox angle stick rows; exact T Turbo and two-step Macro settings above. Empty-setting observation does not establish a generic unassigned rule. | `unsupported_generation` |
 | Long trigger | Exact U rows at 500 ms and 1278 ms with their respective type contexts and regular tuples. Other values or combinations are Unknown. | `unsupported_generation` |
 | Double trigger | Exact ordered P plus L at 150 ms and I at 123 ms, each in its own context. Other values or combinations are Unknown. | `unsupported_generation` |
-| Macro, sequence, macro hold, macro delay, and repeat | The follow-up admits `macro.v:1`, `steps`, Button/Delay shapes, and limited parameter correlations. Full macro semantics remain Unknown. | `unsupported_generation` |
-| Turbo | Unknown except that the complete false/false/false tuple participates in the exact regular long row. Enabled encoding, rate, units, and interactions are unresolved. | `unsupported_generation` |
-| Gamepad | Only the exact Xbox Joystick mode context above is admitted. Button namespaces and other gamepad modes remain Unknown. | `unsupported_generation` |
-| Analog and Keyboard stick | Only the exact neutral left-stick Keyboard/WASD and Xbox Joystick contexts above are admitted. Axis namespace, range, sign, nonzero dead-zone/rotation semantics, and live-device mapping remain unresolved. No `ABS_*` result is inferred from the export. | `unsupported_generation` |
+| Macro, sequence, macro hold, macro delay, and repeat | The Issue #40 follow-up admits structure and limited correlations; Issue #42 admits only the exact inert two-step setting above. Other shapes and playback remain Unknown. | `unsupported_generation` |
+| Turbo | Issue #42 admits only the exact T settings above. Other keys, rates, release semantics, and execution remain Unknown. | `unsupported_generation` |
+| Gamepad | Only the exact neutral and observed-angle Xbox Joystick contexts above are admitted. Button namespaces and other gamepad modes remain Unknown. | `unsupported_generation` |
+| Analog and Keyboard stick | Only the exact neutral Keyboard/WASD context, neutral Xbox context, and observed Xbox angle 0/90 contexts above are admitted. Axis namespace, range, sign, coordinate rotation, and live-device mapping remain unresolved. No `ABS_*` result is inferred from the export. | `unsupported_generation` |
 | Defaults and unused slots | No general meaning. The observed `"0"` entries remain parts of exact predicates only. | `unsupported_generation` |
 | Physical controls, pins, device, and firmware | Not decided here. No physical guess is permitted. | Not Issue #40 scope |
 
-## Future machine-readable fixture contract
+## Illustrative machine-readable fixture vocabulary
 
-Issue #42 must express table-driven cases as UTF-8 JSON records. This is a
-future fixture requirement, not a production API, schema, registry, or loader.
-Each record has these fields:
+Issue #42's implemented regression goldens are the synthetic
+`v1-settings.input.json` and literal `v1-settings.expected.json` projection,
+alongside existing adapter fixtures. The following record shape is an
+illustrative documentation example, not the format of those golden files or a
+production API, schema, registry, or loader. Its fields describe how a
+standalone case could record the same evidence:
 
 | Field | Requirement |
 | --- | --- |
@@ -500,8 +535,8 @@ literal boundaries:
 | One macro with exactly 1,001 identified steps | `invalid`, reason `macro step limit exceeded`; reject before interpreting step 1 |
 | Any array length under an unknown grammar, including 2, 1,000, or 1,001 | `unknown` with raw and context preserved; do not count or interpret it as steps |
 
-The follow-up now supplies an actual `macro.v:1` container and Button/Delay
-step representation. Issue #42 can construct synthetic 1,000 and 1,001 step
+The follow-up supplies an actual `macro.v:1` container and Button/Delay
+step representation. Issue #42 tests synthetic 1,000 and 1,001 step
 records using these observed shapes, differing only in literal step count.
 Count recognized steps before interpreting key codes, durations, directions,
 or repeat behavior, even when final semantics remain Unknown. Unknown
@@ -509,7 +544,9 @@ containers or step shapes do not authorize guessing a grammar. This ceiling
 is semantic admission policy, not a new generic array cap or proof that the
 Software produces such large macros.
 
-No adapter, fixture file, registry, fingerprint, provenance token system, or
-schema is introduced by this decision. Issue #42 may implement only the closed
-rows above and the required Unknown behavior. Extending any family or release
+The decision introduces no registry, fingerprint, provenance token system, or
+schema. Issue #42 implements only the closed rows above and the required
+Unknown behavior. The adapter's normalizer revision is 3 while storage and
+model schema versions remain 1. Revision-1/2 caches reconstruct in memory
+from retained originals without writes. Extending any family or release
 requires another release/export/known-meaning chain and a new reviewed row.

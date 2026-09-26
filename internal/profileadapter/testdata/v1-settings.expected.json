@@ -1,0 +1,416 @@
+{
+  "schema_version": 1,
+  "source": {
+    "SoftwareRelease": "2.0.2",
+    "SourceScope": "azeron-software-export"
+  },
+  "root_kind": "single",
+  "profiles": [
+    {
+      "id": "settings",
+      "name": "",
+      "controls": [
+        {
+          "label": "turbo",
+          "bindings": [
+            {
+              "trigger": "single",
+              "kind": "turbo",
+              "turbo": {
+                "Code": "KEY_T",
+                "ClicksPerSecond": 25
+              }
+            },
+            {
+              "trigger": "long",
+              "kind": "unknown",
+              "unknown": {
+                "Reason": "unmapped_binding"
+              }
+            },
+            {
+              "trigger": "double",
+              "kind": "unknown",
+              "unknown": {
+                "Reason": "unmapped_binding"
+              }
+            }
+          ],
+          "raw": {
+            "root_kind": "single",
+            "profile_index": 0,
+            "input_index": 0,
+            "fields": {
+              "label": "\"turbo\"",
+              "types": "[\"1\",\"11\",\"11\"]",
+              "keyValues": "[\"KeyT\",\"0\",\"0\",\"0\"]",
+              "metaValues": "[\"0\",\"0\",\"0\"]",
+              "isHold": "false",
+              "isTurbo": "true",
+              "turboInterval": "20",
+              "keyValuesLong": "[\"0\",\"0\",\"0\",\"0\"]",
+              "metaValuesLong": "[\"0\",\"0\",\"0\"]",
+              "isHoldLong": "false",
+              "isTurboLong": "false",
+              "turboIntervalLong": "0",
+              "keyValuesDouble": "[\"0\",\"0\",\"0\",\"0\"]",
+              "metaValuesDouble": "[\"0\",\"0\",\"0\"]",
+              "isHoldDouble": "false",
+              "isTurboDouble": "false",
+              "turboIntervalDouble": "0"
+            }
+          }
+        },
+        {
+          "label": "turbo",
+          "bindings": [
+            {
+              "trigger": "single",
+              "kind": "turbo",
+              "turbo": {
+                "Code": "KEY_T",
+                "ClicksPerSecond": 10
+              }
+            },
+            {
+              "trigger": "long",
+              "kind": "unknown",
+              "unknown": {
+                "Reason": "unmapped_binding"
+              }
+            },
+            {
+              "trigger": "double",
+              "kind": "unknown",
+              "unknown": {
+                "Reason": "unmapped_binding"
+              }
+            }
+          ],
+          "raw": {
+            "root_kind": "single",
+            "profile_index": 0,
+            "input_index": 1,
+            "fields": {
+              "label": "\"turbo\"",
+              "types": "[\"1\",\"11\",\"11\"]",
+              "keyValues": "[\"KeyT\",\"0\",\"0\",\"0\"]",
+              "metaValues": "[\"0\",\"0\",\"0\"]",
+              "isHold": "false",
+              "isTurbo": "true",
+              "turboInterval": "50",
+              "keyValuesLong": "[\"0\",\"0\",\"0\",\"0\"]",
+              "metaValuesLong": "[\"0\",\"0\",\"0\"]",
+              "isHoldLong": "false",
+              "isTurboLong": "false",
+              "turboIntervalLong": "0",
+              "keyValuesDouble": "[\"0\",\"0\",\"0\",\"0\"]",
+              "metaValuesDouble": "[\"0\",\"0\",\"0\"]",
+              "isHoldDouble": "false",
+              "isTurboDouble": "false",
+              "turboIntervalDouble": "0"
+            }
+          }
+        },
+        {
+          "label": "",
+          "bindings": [
+            {
+              "trigger": "single",
+              "kind": "macro",
+              "macro": {
+                "RepeatWhileHeld": false,
+                "Steps": [
+                  {
+                    "Kind": "button",
+                    "Code": "KEY_W",
+                    "DurationMS": 50
+                  },
+                  {
+                    "Kind": "delay",
+                    "Code": "",
+                    "DurationMS": 100
+                  }
+                ]
+              }
+            },
+            {
+              "trigger": "long",
+              "kind": "unknown",
+              "unknown": {
+                "Reason": "unmapped_binding"
+              }
+            },
+            {
+              "trigger": "double",
+              "kind": "unknown",
+              "unknown": {
+                "Reason": "unmapped_binding"
+              }
+            }
+          ],
+          "raw": {
+            "root_kind": "single",
+            "profile_index": 0,
+            "input_index": 2,
+            "fields": {
+              "label": "\"\"",
+              "types": "[\"16\",\"11\",\"11\"]",
+              "keyValues": "[\"0\",\"0\",\"0\",\"0\"]",
+              "metaValues": "[\"0\",\"0\",\"0\"]",
+              "isHold": "false",
+              "isTurbo": "false",
+              "turboInterval": "0",
+              "keyValuesLong": "[\"0\",\"0\",\"0\",\"0\"]",
+              "metaValuesLong": "[\"0\",\"0\",\"0\"]",
+              "isHoldLong": "false",
+              "isTurboLong": "false",
+              "turboIntervalLong": "0",
+              "keyValuesDouble": "[\"0\",\"0\",\"0\",\"0\"]",
+              "metaValuesDouble": "[\"0\",\"0\",\"0\"]",
+              "isHoldDouble": "false",
+              "isTurboDouble": "false",
+              "turboIntervalDouble": "0",
+              "macro": "{\"v\":1,\"repeat\":false,\"steps\":[{\"type\":\"Button\",\"direction\":\"Full\",\"duration\":50,\"keyCode\":87},{\"type\":\"Delay\",\"direction\":\"Full\",\"duration\":100}]}"
+            }
+          }
+        },
+        {
+          "label": null,
+          "bindings": [
+            {
+              "trigger": "single",
+              "kind": "macro",
+              "macro": {
+                "RepeatWhileHeld": true,
+                "Steps": [
+                  {
+                    "Kind": "button",
+                    "Code": "KEY_W",
+                    "DurationMS": 50
+                  },
+                  {
+                    "Kind": "delay",
+                    "Code": "",
+                    "DurationMS": 100
+                  }
+                ]
+              }
+            },
+            {
+              "trigger": "long",
+              "kind": "unknown",
+              "unknown": {
+                "Reason": "unmapped_binding"
+              }
+            },
+            {
+              "trigger": "double",
+              "kind": "unknown",
+              "unknown": {
+                "Reason": "unmapped_binding"
+              }
+            }
+          ],
+          "raw": {
+            "root_kind": "single",
+            "profile_index": 0,
+            "input_index": 3,
+            "fields": {
+              "types": "[\"16\",\"11\",\"11\"]",
+              "keyValues": "[\"0\",\"0\",\"0\",\"0\"]",
+              "metaValues": "[\"0\",\"0\",\"0\"]",
+              "isHold": "false",
+              "isTurbo": "false",
+              "turboInterval": "0",
+              "keyValuesLong": "[\"0\",\"0\",\"0\",\"0\"]",
+              "metaValuesLong": "[\"0\",\"0\",\"0\"]",
+              "isHoldLong": "false",
+              "isTurboLong": "false",
+              "turboIntervalLong": "0",
+              "keyValuesDouble": "[\"0\",\"0\",\"0\",\"0\"]",
+              "metaValuesDouble": "[\"0\",\"0\",\"0\"]",
+              "isHoldDouble": "false",
+              "isTurboDouble": "false",
+              "turboIntervalDouble": "0",
+              "macro": "{\"v\":1,\"repeat\":true,\"steps\":[{\"type\":\"Button\",\"direction\":\"Full\",\"duration\":50,\"keyCode\":87},{\"type\":\"Delay\",\"direction\":\"Full\",\"duration\":100}]}"
+            }
+          }
+        },
+        {
+          "label": "stick",
+          "bindings": [
+            {
+              "trigger": "single",
+              "kind": "stick",
+              "stick": {
+                "Mode": "xbox",
+                "KeyboardDirections": {
+                  "Up": "",
+                  "Right": "",
+                  "Down": "",
+                  "Left": ""
+                },
+                "AngleDegrees": 0
+              }
+            },
+            {
+              "trigger": "long",
+              "kind": "unknown",
+              "unknown": {
+                "Reason": "unmapped_binding"
+              }
+            },
+            {
+              "trigger": "double",
+              "kind": "unknown",
+              "unknown": {
+                "Reason": "unmapped_binding"
+              }
+            }
+          ],
+          "raw": {
+            "root_kind": "single",
+            "profile_index": 0,
+            "input_index": 4,
+            "fields": {
+              "label": "\"stick\"",
+              "types": "[\"21\",\"11\",\"11\"]",
+              "keyValues": "[\"87\",\"0\",\"0\",\"0\"]",
+              "metaValues": "[\"0\",\"0\",\"3\"]",
+              "isHold": "false",
+              "isTurbo": "false",
+              "turboInterval": "0",
+              "keyValuesLong": "[\"0\",\"0\",\"0\",\"0\"]",
+              "metaValuesLong": "[\"0\",\"0\",\"0\"]",
+              "isHoldLong": "false",
+              "isTurboLong": "false",
+              "turboIntervalLong": "0",
+              "keyValuesDouble": "[\"0\",\"0\",\"0\",\"0\"]",
+              "metaValuesDouble": "[\"0\",\"0\",\"0\"]",
+              "isHoldDouble": "false",
+              "isTurboDouble": "false",
+              "turboIntervalDouble": "0",
+              "analogSettings": "{\"angle\":0,\"lowerLimit\":0,\"upperLimit\":0,\"isRightAnalog\":false,\"invertXAxis\":false,\"invertYAxis\":false,\"isCombinedAnalog\":false,\"isEightDirectionalTrigger\":false,\"isHoldTrigger\":false,\"isAnalogSmoothing\":false,\"isAngleLock\":false,\"sensitivity\":0,\"mouseSensitivity\":5,\"analogThrottle\":0,\"triggerMagnitude\":4,\"combinedAnalogMagnitude\":6,\"holdMagnitude\":9,\"holdType\":\"1\",\"rotateStickButtonId\":0,\"lockZoneAngle\":70,\"lockZoneSize\":30}"
+            }
+          }
+        },
+        {
+          "label": "stick",
+          "bindings": [
+            {
+              "trigger": "single",
+              "kind": "stick",
+              "stick": {
+                "Mode": "xbox",
+                "KeyboardDirections": {
+                  "Up": "",
+                  "Right": "",
+                  "Down": "",
+                  "Left": ""
+                },
+                "AngleDegrees": 90
+              }
+            },
+            {
+              "trigger": "long",
+              "kind": "unknown",
+              "unknown": {
+                "Reason": "unmapped_binding"
+              }
+            },
+            {
+              "trigger": "double",
+              "kind": "unknown",
+              "unknown": {
+                "Reason": "unmapped_binding"
+              }
+            }
+          ],
+          "raw": {
+            "root_kind": "single",
+            "profile_index": 0,
+            "input_index": 5,
+            "fields": {
+              "label": "\"stick\"",
+              "types": "[\"21\",\"11\",\"11\"]",
+              "keyValues": "[\"87\",\"0\",\"0\",\"0\"]",
+              "metaValues": "[\"0\",\"0\",\"3\"]",
+              "isHold": "false",
+              "isTurbo": "false",
+              "turboInterval": "0",
+              "keyValuesLong": "[\"0\",\"0\",\"0\",\"0\"]",
+              "metaValuesLong": "[\"0\",\"0\",\"0\"]",
+              "isHoldLong": "false",
+              "isTurboLong": "false",
+              "turboIntervalLong": "0",
+              "keyValuesDouble": "[\"0\",\"0\",\"0\",\"0\"]",
+              "metaValuesDouble": "[\"0\",\"0\",\"0\"]",
+              "isHoldDouble": "false",
+              "isTurboDouble": "false",
+              "turboIntervalDouble": "0",
+              "analogSettings": "{\"angle\":90,\"lowerLimit\":0,\"upperLimit\":0,\"isRightAnalog\":false,\"invertXAxis\":false,\"invertYAxis\":false,\"isCombinedAnalog\":false,\"isEightDirectionalTrigger\":false,\"isHoldTrigger\":false,\"isAnalogSmoothing\":false,\"isAngleLock\":false,\"sensitivity\":0,\"mouseSensitivity\":5,\"analogThrottle\":0,\"triggerMagnitude\":4,\"combinedAnalogMagnitude\":6,\"holdMagnitude\":9,\"holdType\":\"1\",\"rotateStickButtonId\":0,\"lockZoneAngle\":70,\"lockZoneSize\":30}"
+            }
+          }
+        },
+        {
+          "label": "near-match",
+          "bindings": [
+            {
+              "trigger": "single",
+              "kind": "unknown",
+              "unknown": {
+                "Reason": "unmapped_binding"
+              }
+            },
+            {
+              "trigger": "long",
+              "kind": "unknown",
+              "unknown": {
+                "Reason": "unmapped_binding"
+              }
+            },
+            {
+              "trigger": "double",
+              "kind": "unknown",
+              "unknown": {
+                "Reason": "unmapped_binding"
+              }
+            }
+          ],
+          "raw": {
+            "root_kind": "single",
+            "profile_index": 0,
+            "input_index": 6,
+            "fields": {
+              "label": "\"near-match\"",
+              "types": "[\"1\",\"11\",\"11\"]",
+              "keyValues": "[\"KeyT\",\"0\",\"0\",\"0\"]",
+              "metaValues": "[\"0\",\"0\",\"0\"]",
+              "isHold": "false",
+              "isTurbo": "true",
+              "turboInterval": "25",
+              "keyValuesLong": "[\"0\",\"0\",\"0\",\"0\"]",
+              "metaValuesLong": "[\"0\",\"0\",\"0\"]",
+              "isHoldLong": "false",
+              "isTurboLong": "false",
+              "turboIntervalLong": "0",
+              "keyValuesDouble": "[\"0\",\"0\",\"0\",\"0\"]",
+              "metaValuesDouble": "[\"0\",\"0\",\"0\"]",
+              "isHoldDouble": "false",
+              "isTurboDouble": "false",
+              "turboIntervalDouble": "0"
+            }
+          }
+        }
+      ],
+      "raw": {
+        "id": "\"settings\"",
+        "name": "\"\"",
+        "version": "null",
+        "unknown": null
+      }
+    }
+  ],
+  "raw": null
+}

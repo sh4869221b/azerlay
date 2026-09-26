@@ -47,7 +47,7 @@ type StickState struct {
 // The caller selects the control and source; no physical orientation is inferred.
 func ProjectStick(snapshot *Snapshot, binding profile.StickBinding, source StickSource) StickState {
 	state := StickState{Mode: binding.Mode, Connected: snapshot.Connected, Sequence: snapshot.Sequence, Generations: snapshot.Generations}
-	if !state.Connected {
+	if !state.Connected || binding.AngleDegrees != 0 {
 		return state
 	}
 	switch binding.Mode {

@@ -53,6 +53,22 @@ func TestProjectStickXbox(t *testing.T) {
 	}
 }
 
+func TestProjectStickNonzeroAngle(t *testing.T) {
+	t.Parallel()
+	r := newReducer(1, Generations{Device: 3, Profile: 7})
+	r.latest.axisInfo = []map[uint16]AxisInfo{{0: {Minimum: -100, Maximum: 100}, 1: {Minimum: -100, Maximum: 100}}}
+	applyPending(t, r, 0, Event{Type: EV_ABS, Code: 0, Value: 50}, Event{Type: EV_ABS, Code: 1, Value: -100})
+	snapshot := reportFrame(t, r, 0, 1)
+	source := StickSource{Xbox: XboxStickSource{Node: 0, X: 0, Y: 1}}
+	if got := ProjectStick(snapshot, profile.StickBinding{Mode: profile.StickModeXbox}, source); !got.Known || got.X != .5 || got.Y != -1 {
+		t.Fatalf("zero angle = %+v, want projected axes", got)
+	}
+	want := StickState{Mode: profile.StickModeXbox, Connected: snapshot.Connected, Sequence: snapshot.Sequence, Generations: snapshot.Generations}
+	if got := ProjectStick(snapshot, profile.StickBinding{Mode: profile.StickModeXbox, AngleDegrees: 90}, source); got != want {
+		t.Fatalf("nonzero angle = %+v, want metadata and unknown zero vector %+v", got, want)
+	}
+}
+
 func TestProjectStickAxisAvailability(t *testing.T) {
 	t.Parallel()
 	r := newReducer(1, Generations{})

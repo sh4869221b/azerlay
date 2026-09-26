@@ -14,11 +14,72 @@ import (
 )
 
 const (
-	buttonStep = `{"type":"Button","direction":"Full","duration":25,"keyCode":"KeyQ"}`
-	delayStep  = `{"type":"Delay","direction":"Full","duration":10}`
+	buttonStep    = `{"type":"Button","direction":"Full","duration":25,"keyCode":"KeyQ"}`
+	delayStep     = `{"type":"Delay","direction":"Full","duration":10}`
+	observedMacro = `{"types":["16","11","11"],"keyValues":["0","0","0","0"],"metaValues":["0","0","0"],"isHold":false,"isTurbo":false,"turboInterval":0,"keyValuesLong":["0","0","0","0"],"metaValuesLong":["0","0","0"],"isHoldLong":false,"isTurboLong":false,"turboIntervalLong":0,"keyValuesDouble":["0","0","0","0"],"metaValuesDouble":["0","0","0"],"isHoldDouble":false,"isTurboDouble":false,"turboIntervalDouble":0,"macro":{"v":1,"repeat":false,"steps":[{"type":"Button","direction":"Full","duration":50,"keyCode":87},{"type":"Delay","direction":"Full","duration":100}]}}`
 )
 
 func TestNormalizeMacro(t *testing.T) {
+	t.Run("observed configuration", func(t *testing.T) {
+		for _, repeat := range []bool{false, true} {
+			t.Run(strconv.FormatBool(repeat), func(t *testing.T) {
+				input := observedMacro
+				if repeat {
+					input = strings.Replace(input, `"repeat":false`, `"repeat":true`, 1)
+				}
+				bundle, err := profileadapter.Normalize(parseExport(t, singleWithInputs(input)), admittedSource)
+				if err != nil {
+					t.Fatalf("Normalize() error = %v", err)
+				}
+				control := bundle.Profiles[0].Controls[0]
+				want := profile.TriggerBinding{
+					Trigger: profile.TriggerSingle,
+					Kind:    profile.BindingMacro,
+					Macro: &profile.MacroBinding{RepeatWhileHeld: repeat, Steps: []profile.MacroStep{
+						{Kind: profile.MacroStepButton, Code: profile.KEY_W, DurationMS: 50},
+						{Kind: profile.MacroStepDelay, DurationMS: 100},
+					}},
+				}
+				if !reflect.DeepEqual(control.Bindings[0], want) {
+					t.Fatalf("single binding = %#v, want %#v", control.Bindings[0], want)
+				}
+				assertUnknownBindings(t, control.Bindings[1:])
+				assertLiteralRaw(t, control.Raw.Fields, json.RawMessage(input))
+			})
+		}
+	})
+
+	t.Run("observed near-matches stay whole Unknown", func(t *testing.T) {
+		for _, test := range []struct {
+			name, old, replacement string
+		}{
+			{"changed direction", `"direction":"Full","duration":50`, `"direction":"Down","duration":50`},
+			{"changed key", `"keyCode":87`, `"keyCode":88`},
+			{"changed button duration", `"duration":50`, `"duration":51`},
+			{"changed delay duration", `"duration":100`, `"duration":101`},
+			{"changed order", `{"type":"Button","direction":"Full","duration":50,"keyCode":87},{"type":"Delay","direction":"Full","duration":100}`, `{"type":"Delay","direction":"Full","duration":100},{"type":"Button","direction":"Full","duration":50,"keyCode":87}`},
+			{"extra step field", `"keyCode":87`, `"keyCode":87,"extra":true`},
+			{"missing toggle predicate", `"isTurbo":false`, `"isTurbo":false,"isToggleOnHold":false`},
+			{"null repeat", `"repeat":false`, `"repeat":null`},
+			{"string key", `"keyCode":87`, `"keyCode":"87"`},
+			{"decimal duration", `"duration":50`, `"duration":50.0`},
+		} {
+			t.Run(test.name, func(t *testing.T) {
+				input := strings.Replace(observedMacro, test.old, test.replacement, 1)
+				bundle, err := profileadapter.Normalize(parseExport(t, singleWithInputs(input)), admittedSource)
+				if err != nil {
+					t.Fatalf("Normalize() error = %v", err)
+				}
+				control := bundle.Profiles[0].Controls[0]
+				assertMacroUnknown(t, control)
+				if got := control.Bindings[0]; !reflect.DeepEqual(got, profile.TriggerBinding{Trigger: profile.TriggerSingle, Kind: profile.BindingUnknown, Unknown: &profile.UnknownBinding{Reason: "unmapped_binding"}}) {
+					t.Fatalf("single near-match gained partial semantics: %#v", got)
+				}
+				assertLiteralRaw(t, control.Raw.Fields, json.RawMessage(input))
+			})
+		}
+	})
+
 	t.Run("recognized_boundaries_stay_unknown", func(t *testing.T) {
 		for _, count := range []int{0, 1000} {
 			t.Run(strconv.Itoa(count), func(t *testing.T) {

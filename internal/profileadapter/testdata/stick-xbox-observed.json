@@ -1,0 +1,24 @@
+{
+  "id": "synthetic-stick",
+  "inputs": [{
+    "types": ["21", "11", "11"],
+    "keyValues": ["87", "0", "0", "0"], "metaValues": ["0", "0", "3"],
+    "isHold": false, "isTurbo": false, "turboInterval": 0,
+    "keyValuesLong": ["0", "0", "0", "0"], "metaValuesLong": ["0", "0", "0"],
+    "isHoldLong": false, "isTurboLong": false, "turboIntervalLong": 0,
+    "keyValuesDouble": ["0", "0", "0", "0"], "metaValuesDouble": ["0", "0", "0"],
+    "isHoldDouble": false, "isTurboDouble": false, "turboIntervalDouble": 0,
+    "analogSettings": {
+      "angle": 0, "lowerLimit": 0, "upperLimit": 0,
+      "isRightAnalog": false, "invertXAxis": false, "invertYAxis": false,
+      "isCombinedAnalog": false, "isEightDirectionalTrigger": false,
+      "isHoldTrigger": false, "isAnalogSmoothing": false, "isAngleLock": false,
+      "sensitivity": 0, "mouseSensitivity": 5, "analogThrottle": 0,
+      "triggerMagnitude": 4, "combinedAnalogMagnitude": 6, "holdMagnitude": 9,
+      "holdType": "1", "rotateStickButtonId": 0,
+      "lockZoneAngle": 70, "lockZoneSize": 30,
+      "analogKeys": {"left": {"dormant": [1, 2, 3]}}
+    },
+    "future": {"opaque": true}
+  }]
+}

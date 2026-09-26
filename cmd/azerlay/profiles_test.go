@@ -92,6 +92,31 @@ func TestImportPersists(t *testing.T) {
 	}
 }
 
+func TestImportSettingsAndProfilesShow(t *testing.T) {
+	root := isolateCLI(t)
+	input := cliRead(t, "../../internal/profileadapter/testdata/v1-settings.input.json")
+	var stdout, stderr bytes.Buffer
+	status := run([]string{"import", "--json", "--software-release", "2.0.2", "--text", string(input)}, &observedReader{}, &stdout, &stderr)
+	if status != 0 || stderr.Len() != 0 {
+		t.Fatalf("settings import status=%d stderr=%q", status, stderr.String())
+	}
+	assertJSONEqual(t, stdout.String(), cliSuccess("import", cliSelected(settingsResult, 1)))
+	before := cliTree(t, root)
+	stdout.Reset()
+	status = run([]string{"profiles", "show", "--json"}, &observedReader{}, &stdout, &stderr)
+	if status != 0 || stderr.Len() != 0 {
+		t.Fatalf("settings show status=%d stderr=%q", status, stderr.String())
+	}
+	assertJSONEqual(t, stdout.String(), cliSuccess("profiles show", cliSelected(settingsResult, 1)))
+	if !reflect.DeepEqual(before, cliTree(t, root)) {
+		t.Fatal("settings show changed disk")
+	}
+	selected, err := profilesource.NewImportedSource(filepath.Join(root, "data")).Selected(t.Context())
+	if err != nil || selected.ProfileIndex != 1 {
+		t.Fatalf("settings selection = %+v, %v", selected, err)
+	}
+}
+
 func TestProfilesShow(t *testing.T) {
 	for _, jsonMode := range []bool{false, true} {
 		t.Run(fmt.Sprint(jsonMode), func(t *testing.T) {
