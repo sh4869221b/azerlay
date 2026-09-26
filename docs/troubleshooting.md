@@ -1,5 +1,49 @@
 # Device and permission troubleshooting
 
+## Overlay click-through and monitor recovery
+
+`show`, `hide`, and `toggle` report accepted requested visibility; GTK applies
+the request asynchronously. Use `azerlay status --json` to compare `visible`
+with `overlay.mapped` and `overlay.input_region_applied`. The last field means
+the empty GDK input-region call was issued for the mapped surface. GDK does not
+report compositor acknowledgement, so the field alone cannot prove that input
+reaches another application. Device input monitoring and profile rendering are
+not implemented.
+
+If status contains `OVERLAY_MONITOR_UNAVAILABLE` at stage `overlay`, an
+explicitly configured monitor is absent or ambiguous. The request is retained
+while the surface remains unmapped. Restore the same selected output or hide
+the overlay; status should then clear the diagnostic. Azerlay does not silently
+move an explicit selection to another monitor. `ERR_OVERLAY_SURFACE`,
+`ERR_OVERLAY_INPUT_REGION`, and `ERR_OVERLAY_PLACEMENT` describe other
+recoverable overlay failures. After correcting the condition, issue `show` or
+apply a successful monitor configuration and check status again.
+
+### Verified on 2026-09-26
+
+On Hyprland 0.56.2 with GTK 4.22.5 and gtk4-layer-shell 1.3.0, a test-only GTK
+receiver overlapped the actual Azerlay-owned layer surface. With the production
+empty region active, click, scroll, and motion events reached the lower
+receiver. Repeating at the same overlap with a full input region stopped
+pointer delivery; keyboard focus and a key event remained with the lower
+window. Pointer and keyboard delivery also continued after hide/show remapping
+and surface recreation. The production content-free surface separately mapped
+at 200 by 200 pixels after `show`, appeared in `hyprctl layers -j`, and was
+absent from the layer list after `hide`; status reported those mapping changes.
+
+In a nested Hyprland headless-output test, removing the explicitly selected
+output kept the `visible` request true, unmapped the surface, and reported
+`OVERLAY_MONITOR_UNAVAILABLE`; returning an output with the same name restored
+the mapping and applied the input region. A second run hid the overlay before
+output return and stayed hidden afterward. This headless test required a
+task-local GBM allocation `LD_PRELOAD` workaround in the nested compositor.
+It qualifies that isolated run only, not generic unmodified-headless operation.
+Physical output hotplug and remapping initiated independently by the
+compositor remain unverified. Niri is outside the v1 target and unverified;
+Sway provides an isolated test fixture only.
+
+## Device discovery and permissions
+
 Start with `azerlay devices list`. Use `azerlay devices inspect` to include
 excluded candidates, or `azerlay devices inspect /dev/input/eventN --json` to
 examine one current event path. Inspect can disclose the device serial, name,

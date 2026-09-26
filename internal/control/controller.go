@@ -11,22 +11,25 @@ import (
 
 // Controller owns requested visibility and the session-only active profile.
 type Controller struct {
-	manager          *config.Manager
-	source           *profilesource.ImportedSource
-	started          time.Time
-	imported         bool
-	mu               sync.Mutex
-	visible          bool
-	generation       uint64
-	active           *activeSelection
-	selectionFailure *Error
+	manager           *config.Manager
+	source            *profilesource.ImportedSource
+	started           time.Time
+	imported          bool
+	mu                sync.Mutex
+	visible           bool
+	visibilityChanges chan struct{}
+	overlay           *OverlayStatus
+	overlayDiagnostic *Diagnostic
+	generation        uint64
+	active            *activeSelection
+	selectionFailure  *Error
 }
 
 func NewController(ctx context.Context, manager *config.Manager, source *profilesource.ImportedSource) (*Controller, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	c := &Controller{manager: manager, source: source, started: time.Now(), generation: 1}
+	c := &Controller{manager: manager, source: source, started: time.Now(), generation: 1, visibilityChanges: make(chan struct{}, 1)}
 	settings := manager.Snapshot().Config.Profile
 	c.imported = settings.Source != "local"
 	selected, p, err := ResolveConfiguredProfile(ctx, source, settings)
@@ -79,9 +82,33 @@ func (c *Controller) Dispatch(ctx context.Context, request Request) Response {
 			c.visible = visible
 			c.generation++
 		}
+		select {
+		case c.visibilityChanges <- struct{}{}:
+		default:
+		}
 		return SuccessResponse(request, VisibilityResult{Visible: c.visible})
 	default:
 		return FailureResponse(&request.ID, NewError(ERR_CONTROL_METHOD))
+	}
+}
+
+func (c *Controller) VisibilityChanges() <-chan struct{} { return c.visibilityChanges }
+
+func (c *Controller) RequestedVisible() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.visible
+}
+
+func (c *Controller) SetOverlayStatus(status OverlayStatus, diagnostic *Diagnostic) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.overlay = &status
+	if diagnostic == nil {
+		c.overlayDiagnostic = nil
+	} else {
+		copy := *diagnostic
+		c.overlayDiagnostic = &copy
 	}
 }
 

@@ -2,15 +2,77 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/sh4869221b/azerlay/internal/control"
 )
+
+func TestControlOverlayStatusReport(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		overlay *control.OverlayStatus
+		mapped  string
+		region  string
+	}{
+		{"unattached", nil, "", ""},
+		{"hidden", &control.OverlayStatus{}, "Overlay mapped: false", "Input region applied: false"},
+		{"mapped", &control.OverlayStatus{Mapped: true, InputRegionApplied: true}, "Overlay mapped: true", "Input region applied: true"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			status := control.Status{SchemaVersion: 1, Visible: true, Overlay: tc.overlay, EventNodes: []string{}, Generation: 2, DegradedReasons: []control.Diagnostic{{Code: "ERR_OVERLAY_INPUT_REGION", Stage: "overlay", Reason: "Input region is unavailable."}}}
+			report := controlReport{SchemaVersion: 1, Command: "status", OK: true, Result: status}
+			var stdout, stderr bytes.Buffer
+			if code := writeControlReport(report, false, &stdout, &stderr); code != 0 || stderr.Len() != 0 {
+				t.Fatalf("text code=%d stderr=%q", code, &stderr)
+			}
+			if !strings.Contains(stdout.String(), "Requested visibility: true") || !strings.Contains(stdout.String(), "Degraded: ERR_OVERLAY_INPUT_REGION (overlay): Input region is unavailable.") {
+				t.Fatalf("text contract: %q", &stdout)
+			}
+			for _, line := range []string{tc.mapped, tc.region} {
+				if line != "" && !strings.Contains(stdout.String(), line) {
+					t.Fatalf("missing %q in %q", line, &stdout)
+				}
+			}
+			if tc.overlay == nil && strings.Contains(stdout.String(), "Overlay mapped:") {
+				t.Fatalf("unattached state appeared: %q", &stdout)
+			}
+			stdout.Reset()
+			if code := writeControlReport(report, true, &stdout, &stderr); code != 0 || stderr.Len() != 0 {
+				t.Fatalf("JSON code=%d stderr=%q", code, &stderr)
+			}
+			var decoded struct {
+				Result struct {
+					Visible         bool                       `json:"visible"`
+					Overlay         map[string]json.RawMessage `json:"overlay"`
+					DegradedReasons []control.Diagnostic       `json:"degraded_reasons"`
+				} `json:"result"`
+			}
+			if err := json.Unmarshal(stdout.Bytes(), &decoded); err != nil {
+				t.Fatal(err)
+			}
+			if !decoded.Result.Visible || decoded.Result.DegradedReasons[0].Stage != "overlay" {
+				t.Fatalf("JSON status: %+v", decoded.Result)
+			}
+			if tc.overlay == nil {
+				if decoded.Result.Overlay != nil {
+					t.Fatalf("unattached JSON overlay: %+v", decoded.Result.Overlay)
+				}
+				return
+			}
+			if len(decoded.Result.Overlay) != 2 || string(decoded.Result.Overlay["mapped"]) != strconv.FormatBool(tc.overlay.Mapped) || string(decoded.Result.Overlay["input_region_applied"]) != strconv.FormatBool(tc.overlay.InputRegionApplied) {
+				t.Fatalf("JSON overlay types and values: %+v", decoded.Result.Overlay)
+			}
+		})
+	}
+}
 
 func TestControlGrammar(t *testing.T) {
 	t.Setenv("XDG_RUNTIME_DIR", "PRIVATE_INVALID_RUNTIME")

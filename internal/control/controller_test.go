@@ -159,6 +159,86 @@ func TestControlController(t *testing.T) {
 	}
 }
 
+func TestControlOverlayObservation(t *testing.T) {
+	t.Parallel()
+	m, _ := controllerManager(t, "")
+	source := profilesource.NewImportedSource(t.TempDir())
+	importControllerProfiles(t, source, controllerBundle)
+	c, err := NewController(t.Context(), m, source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if controllerStatus(t, c).Overlay != nil {
+		t.Fatal("unattached backend reported an observation")
+	}
+	if response := c.Dispatch(t.Context(), controllerRequest(MethodShow, "")); !response.OK {
+		t.Fatal(response.Error)
+	}
+	diagnostic := Diagnostic{Code: "ERR_OVERLAY_INPUT_REGION", Stage: "overlay", Reason: "Input region is unavailable."}
+	c.SetOverlayStatus(OverlayStatus{Mapped: false, InputRegionApplied: false}, &diagnostic)
+	diagnostic.Reason = "changed by caller"
+	status := controllerStatus(t, c)
+	if !status.Visible || status.Overlay == nil || status.Overlay.Mapped || status.Overlay.InputRegionApplied || status.Generation != 2 {
+		t.Fatalf("requested and observed state: %+v", status)
+	}
+	if got := status.DegradedReasons[len(status.DegradedReasons)-1]; got.Reason != "Input region is unavailable." || got.Stage != "overlay" {
+		t.Fatalf("diagnostic was not copied: %+v", got)
+	}
+	status.Overlay.Mapped = true
+	c.SetOverlayStatus(OverlayStatus{Mapped: true, InputRegionApplied: true}, nil)
+	status = controllerStatus(t, c)
+	if !status.Overlay.Mapped || !status.Overlay.InputRegionApplied || len(status.DegradedReasons) != 3 || status.Generation != 2 {
+		t.Fatalf("observation update changed request state: %+v", status)
+	}
+	status.Overlay.Mapped = false
+	if !controllerStatus(t, c).Overlay.Mapped {
+		t.Fatal("status caller mutated retained observation")
+	}
+}
+
+func TestControlVisibilityNotification(t *testing.T) {
+	t.Parallel()
+	m, _ := controllerManager(t, "")
+	c, err := NewController(t.Context(), m, profilesource.NewImportedSource(t.TempDir()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, method := range []Method{MethodShow, MethodShow} {
+		if response := c.Dispatch(t.Context(), controllerRequest(method, "")); !response.OK {
+			t.Fatal(response.Error)
+		}
+		select {
+		case <-c.VisibilityChanges():
+		default:
+			t.Fatalf("accepted %s did not wake the consumer", method)
+		}
+	}
+	if !c.RequestedVisible() || controllerStatus(t, c).Generation != 2 {
+		t.Fatal("idempotent show changed request generation")
+	}
+	var workers sync.WaitGroup
+	for range 20 {
+		workers.Go(func() {
+			c.Dispatch(t.Context(), controllerRequest(MethodToggle, ""))
+		})
+	}
+	workers.Wait()
+	c.Dispatch(t.Context(), controllerRequest(MethodHide, ""))
+	select {
+	case <-c.VisibilityChanges():
+	default:
+		t.Fatal("concurrent requests did not leave a notification")
+	}
+	if c.RequestedVisible() || controllerStatus(t, c).Visible {
+		t.Fatal("consumer did not observe latest requested visibility")
+	}
+	select {
+	case <-c.VisibilityChanges():
+		t.Fatal("coalesced channel held multiple notifications")
+	default:
+	}
+}
+
 func TestControlSelection(t *testing.T) {
 	t.Parallel()
 	t.Run("startup policy", func(t *testing.T) {

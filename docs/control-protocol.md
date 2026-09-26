@@ -83,12 +83,14 @@ response cannot fit even its error and ID, its replacement error also uses
 | `profile.select` | `{"selector":nonempty string}` | `{"active_profile":ProfileStatus,"generation":uint64}` |
 | `quit` | `{}` | `{"quitting":true}` |
 
-Visibility initially is false and represents requested state; no window is
-rendered yet. `config.reload` accepts work into the existing configuration
-manager and returns its request generation before parsing finishes. It does not
-promise successful application. Status exposes the eventual result while failed
-loads retain the last good configuration. Watcher and explicit reloads share
-the same manager.
+Visibility initially is false and represents requested state. `overlay.show`,
+`overlay.hide`, and `overlay.toggle` return that accepted request; the GTK owner
+applies it asynchronously on the locked main OS thread. The response does not
+mean that the window has mapped. `config.reload` accepts work into the existing
+configuration manager and returns its request generation before parsing
+finishes. It does not promise successful application. Status exposes the
+eventual result while failed loads retain the last good configuration. Watcher
+and explicit reloads share the same manager.
 
 `quit` attempts its response before stopping the control server, even if writing
 that response fails. Context cancellation and `Server.Close()` also stop
@@ -131,14 +133,15 @@ persisted selection, while `status` reports the active session selection.
 
 ## Status schema 1
 
-Status success means the server answered, including when degraded. All fields
-below are present:
+Status success means the server answered, including when degraded. Except for
+the optional `overlay` object, all fields below are present:
 
 | Field | Value and meaning |
 | --- | --- |
 | `schema_version` | `1`; independent of wire protocol and CLI report versions. |
 | `uptime_seconds` | Monotonic elapsed seconds since controller initialization. |
-| `visible` | Requested visibility, boolean. |
+| `visible` | Requested visibility, boolean; not proof that a surface is mapped. |
+| `overlay` | Optional object with exactly `mapped` and `input_region_applied` boolean fields. Absent or `null` means no overlay backend has published state. |
 | `active_profile` | `null` or `ProfileStatus`. |
 | `device` | `null`; device connection is unavailable. |
 | `event_nodes` | `[]`; no event nodes are monitored. |
@@ -164,7 +167,22 @@ parse clears the configuration failure, but not a watcher failure.
 Degraded reasons always include `DEVICE_UNAVAILABLE` at `device`,
 `INPUT_METRICS_UNAVAILABLE` at `input`, and `RENDERER_UNAVAILABLE` at `renderer`.
 Active-profile initialization, configuration, and watcher failures are included
-when present. Unavailable metrics are not reported as zero measurements.
+when present. Overlay lifecycle failures use stage `overlay` and the static
+codes `OVERLAY_MONITOR_UNAVAILABLE`, `ERR_OVERLAY_SURFACE`,
+`ERR_OVERLAY_INPUT_REGION`, or `ERR_OVERLAY_PLACEMENT`. An unavailable or
+ambiguous explicitly selected monitor keeps the request while the surface is
+hidden. A later matching monitor/configuration lifecycle or another accepted
+show request can recover the surface; a hide clears an obsolete missing-monitor
+diagnostic. Unavailable metrics are not reported as zero measurements.
+
+`overlay.input_region_applied` means Azerlay issued the empty GDK input-region
+call for the currently mapped surface. GDK exposes no result from that call, so
+this field is not compositor acknowledgement and does not itself prove pointer
+pass-through. It is false when the surface is unmapped or absent. Status is a
+snapshot and may briefly report a mapped surface before the input-region call
+has been applied. The status decoder accepts older schema-1 responses without
+`overlay`; older strict clients may reject the extension, so use matching
+client/server versions.
 
 ## Errors and CLI reports
 

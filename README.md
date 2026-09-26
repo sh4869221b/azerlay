@@ -31,9 +31,13 @@ change requested visibility, request configuration reloads, select an active
 profile for the session, report status, and stop the application. `run` starts
 the application in foreground, coordinates duplicate starts, and safely recovers
 stale control sockets.
-It owns a hidden GTK4 Layer Shell window and applies successful configuration
-reloads on the locked main OS thread. Rendering, click-through, device input,
-and control-command visibility changes are not connected to this window yet.
+It starts with a hidden GTK4 Layer Shell window and applies successful configuration
+reloads on the locked main OS thread. `show`, `hide`, and `toggle` control the
+live window; when mapped, its empty pointer input region lets pointer events
+reach the application below while keyboard focus remains below. Status reports
+requested visibility separately from whether the surface is mapped and whether
+the empty input-region call was applied. The call is not compositor
+acknowledgement. Profile rendering and device input remain unavailable.
 `doctor` reads configuration, the next-start profile selection, and live socket
 status without changing state; unavailable backend checks remain warnings.
 
@@ -56,7 +60,8 @@ sudo pacman -S --needed go gcc pkgconf gtk4 gtk4-layer-shell gobject-introspecti
 ```
 
 Sway and D-Bus provide the isolated headless test session. Run the launcher as a
-non-root user; Sway is a test fixture, not a qualified product target.
+non-root user; Sway is a test fixture, not a qualified product target. Hyprland
+is the v1 compositor target; Niri is deferred beyond v1 and remains unverified.
 
 ```sh
 scripts/test-wayland.sh go test -race -shuffle=on -count=1 ./...
@@ -206,10 +211,25 @@ azerlay quit
 ```
 
 Every control command supports `--json` and `--help`; help does not connect.
-`show`, `hide`, and `toggle` change requested visibility only; the GTK window
-remains hidden until the later visibility/rendering integration. Status reports
-device, input, and rendering capabilities as
-unavailable. A successful status response can still describe degraded state.
+`show`, `hide`, and `toggle` return the accepted requested visibility. GTK
+applies that request asynchronously on its main thread, so the response does
+not confirm that a surface has mapped. `status` keeps `visible` as the requested
+value and includes an `overlay` object with the observed `mapped` and
+`input_region_applied` booleans when the runtime overlay owner is available.
+The latter means the empty input-region call was applied to the currently
+mapped surface; it is not compositor acknowledgement or proof of pointer
+routing. If the configured monitor is unavailable, the request remains true,
+the surface stays hidden, and status reports an overlay diagnostic. Restore the
+same monitor or hide the overlay, then check status again. Device input and
+profile rendering remain unavailable. A successful status response can still
+describe degraded state.
+
+Use matching client and server versions for the extended status response.
+Older strict clients may reject the new `overlay` field. Sway is used only as
+an isolated test fixture; it is not a qualified product target. Click-through
+and monitor recovery were exercised on the Hyprland v1 target; see
+[overlay troubleshooting](docs/troubleshooting.md#overlay-click-through-and-monitor-recovery)
+for the scope and remaining limits.
 
 `reload` acknowledges acceptance; inspect `status` for the eventual configuration
 result. `profiles select` requires an exact, unique imported profile ID or name.
