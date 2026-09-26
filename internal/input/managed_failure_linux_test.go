@@ -72,7 +72,8 @@ func TestManagedCancellation(t *testing.T) {
 			nodes, _ := pipeNodes(t, 1)
 			nodes[0].Node = r.Nodes[0]
 			entered, exited := make(chan struct{}), make(chan struct{})
-			block := func() { close(entered); <-ctx.Done(); close(exited) }
+			release := make(chan struct{}, 1)
+			block := func() { close(entered); <-release; close(exited) }
 			states := make(chan ManagedSnapshot, 4)
 			ops := managedPipeOps(nodes, make(chan integrationObservation, 4))
 			ops.open = func(device.Group) ([]device.OpenedNode, error) {
@@ -105,9 +106,16 @@ func TestManagedCancellation(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			t.Cleanup(func() { _ = m.Close() })
+			t.Cleanup(func() {
+				cancel()
+				close(release)
+				_ = m.Close()
+			})
 			awaitRecovery(t, entered)
 			cancel()
+			// Parent Done closes before cancellation reaches the manager's child context.
+			// Resume setup only after cancel returns and propagation is complete.
+			release <- struct{}{}
 			awaitRecovery(t, m.Done())
 			awaitRecovery(t, exited)
 			if err := m.Close(); err != nil {
