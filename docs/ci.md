@@ -13,7 +13,7 @@ explicit versions without changing the application's `go.mod` or `go.sum`.
 | `fuzz` | Seven existing fuzz targets, each with a 10-second fuzz allocation | 10 minutes |
 | `container-build` | Build and run the binary in Arch | 15 minutes |
 | `cgo-smoke` | Compile the native binary, run version, and inspect shared libraries | GitHub default (360 minutes) |
-| `vulnerability` | Reachable Go vulnerability scan | 10 minutes |
+| `vulnerability` | Reachable Go vulnerability scan | 20 minutes |
 | `licenses` | Third-party Go dependency license CSV | 10 minutes |
 | `generated-files` | Regenerate both LZMA fixtures and reject differences | 15 minutes |
 
