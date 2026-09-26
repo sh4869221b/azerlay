@@ -18,8 +18,8 @@ save/reload; callers still explicitly select the input nodes. Other stick
 settings remain Unknown. The input library restores current key and axis state
 after `SYN_DROPPED` and offers a managed lifecycle for selected-device reconnect,
 including event-node renumbering and permission return. Input processing and
-recovery are not connected to `run`, the controller, or GTK yet; overlay
-functionality remains unimplemented. Export-to-input integration and recovery
+recovery are not connected to `run`, the controller, or GTK yet. Export-to-input
+integration and recovery
 are tested with synthetic exports, device metadata, ioctl responses, and OS
 pipes, not live Xbox or Cyborg II input. The two-second live reconnect target
 remains unmeasured. See [input recovery](docs/troubleshooting.md#internal-input-recovery)
@@ -31,22 +31,36 @@ change requested visibility, request configuration reloads, select an active
 profile for the session, report status, and stop the application. `run` starts
 the application in foreground, coordinates duplicate starts, and safely recovers
 stale control sockets.
+It owns a hidden GTK4 Layer Shell window and applies successful configuration
+reloads on the locked main OS thread. Rendering, click-through, device input,
+and control-command visibility changes are not connected to this window yet.
 `doctor` reads configuration, the next-start profile selection, and live socket
 status without changing state; unavailable backend checks remain warnings.
 
 The initial supported target is Linux/Wayland on x86-64 with left-hand Azeron
-Cyborg II, Hyprland, and a Bodycam game profile. Niri and right-hand Cyborg II
-are deferred beyond v1 and remain unverified. The overlay is not implemented
-yet; the [placement decision](docs/decisions/compositor-placement.md) records
+Cyborg II, Arch/CachyOS, Hyprland, and a Bodycam game profile. Niri and right-hand
+Cyborg II are deferred beyond v1 and remain unverified. Ubuntu is excluded from
+v1; implementation and qualification are tracked in
+[Issue #98](https://github.com/sh4869221b/azerlay/issues/98).
+The [placement decision](docs/decisions/compositor-placement.md) records
 the measured Hyprland scope and a successful same-name headless return on the
 tested host. The cause of an earlier compositor crash remains unresolved.
 
 ## Development
 
-Go 1.27.x is required.
+Go 1.27.x, CGo, a C compiler, `pkgconf`, GTK4, gtk4-layer-shell, and
+`gobject-introspection` development files are required. On Arch/CachyOS:
 
 ```sh
-go test ./...
+sudo pacman -S --needed go gcc pkgconf gtk4 gtk4-layer-shell gobject-introspection sway dbus
+```
+
+Sway and D-Bus provide the isolated headless test session. Run the launcher as a
+non-root user; Sway is a test fixture, not a qualified product target.
+
+```sh
+scripts/test-wayland.sh go test -race -shuffle=on -count=1 ./...
+CGO_ENABLED=1 go build -o /tmp/azerlay ./cmd/azerlay
 go run ./cmd/azerlay version
 ```
 
@@ -157,8 +171,9 @@ azerlay run --config config.toml --foreground
 Foreground execution is the default; omitting `--foreground` has the same effect.
 Without `--config`, the [default configuration path](docs/config.md#file-location)
 is used. Missing or invalid configuration is fatal; Azerlay does not create it.
-Startup requires nonempty `WAYLAND_DISPLAY`; this checks the environment only,
-not compositor connectivity or Layer Shell support.
+Startup requires a reachable Wayland display and Layer Shell support before it
+prints readiness. Display failure reports `ERR_RUNTIME_WAYLAND`; missing Layer
+Shell reports `ERR_LAYER_SHELL_UNAVAILABLE`. GTK is restricted to Wayland.
 
 `run` prints initial text status and stays running. With no saved profile, status
 has `active_profile:null` and degraded reasons, and startup prints guidance to
@@ -191,8 +206,9 @@ azerlay quit
 ```
 
 Every control command supports `--json` and `--help`; help does not connect.
-`show`, `hide`, and `toggle` change requested visibility only: there is no
-renderer yet. Status reports device, input, and rendering capabilities as
+`show`, `hide`, and `toggle` change requested visibility only; the GTK window
+remains hidden until the later visibility/rendering integration. Status reports
+device, input, and rendering capabilities as
 unavailable. A successful status response can still describe degraded state.
 
 `reload` acknowledges acceptance; inspect `status` for the eventual configuration

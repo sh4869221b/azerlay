@@ -8,10 +8,13 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 
+	"github.com/diamondburned/gotk4/pkg/glib/v2"
 	"github.com/sh4869221b/azerlay/internal/config"
 	"github.com/sh4869221b/azerlay/internal/control"
+	"github.com/sh4869221b/azerlay/internal/overlay"
 	"github.com/sh4869221b/azerlay/internal/profilesource"
 	"github.com/urfave/cli/v3"
 )
@@ -103,11 +106,21 @@ func runForeground(ctx context.Context, configPath string, stdout, stderr io.Wri
 	}
 	stopConfig := func() { managerCancel(); <-manager.Done() }
 	var server *control.Server
+	var window *overlay.Window
+	var stopEvents func() error
 	defer func() {
 		if server == nil {
 			stopConfig()
 		} else if err := server.Close(); err != nil {
 			status = writeRunError(err, stdout, stderr)
+		}
+		if stopEvents != nil {
+			if err := stopEvents(); err != nil {
+				status = writeRunError(err, stdout, stderr)
+			}
+		}
+		if window != nil {
+			window.Close()
 		}
 	}()
 	dataHome, err := profilesource.ResolveDataHome()
@@ -125,6 +138,11 @@ func runForeground(ctx context.Context, configPath string, stdout, stderr io.Wri
 	if !stopStartup() || ctx.Err() != nil {
 		return 0
 	}
+	initialConfig := manager.Snapshot()
+	window, err = overlay.New(initialConfig.Config.Overlay)
+	if err != nil {
+		return writeRunError(err, stdout, stderr)
+	}
 	server, err = owner.Start(ctx, controller, stopConfig)
 	if err != nil {
 		return runStartupFailure(ctx, err, stdout, stderr)
@@ -137,8 +155,74 @@ func runForeground(ctx context.Context, configPath string, stdout, stderr io.Wri
 			return 1
 		}
 	}
-	<-server.Done()
+	loop := glib.NewMainLoop(nil, false)
+	stopEvents = watchOverlay(manager, server, window, loop, initialConfig.Status.ConfigGeneration)
+	loop.Run()
 	return 0
+}
+
+func watchOverlay(manager *config.Manager, server *control.Server, window *overlay.Window, loop *glib.MainLoop, lastGeneration uint64) func() error {
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	var mu sync.Mutex
+	var pending glib.SourceHandle
+	var quitPending glib.SourceHandle
+	var applyError error
+	go func() {
+		defer close(done)
+		changes := manager.Changes()
+		for {
+			select {
+			case <-server.Done():
+				mu.Lock()
+				quitPending = glib.IdleAdd(func() {
+					mu.Lock()
+					quitPending = 0
+					mu.Unlock()
+					loop.Quit()
+				})
+				mu.Unlock()
+				return
+			case <-stop:
+				return
+			case _, ok := <-changes:
+				if !ok {
+					changes = nil
+					continue
+				}
+				mu.Lock()
+				if pending == 0 {
+					pending = glib.IdleAdd(func() {
+						mu.Lock()
+						pending = 0
+						mu.Unlock()
+						snapshot := manager.Snapshot()
+						if snapshot.Status.ConfigGeneration > lastGeneration {
+							lastGeneration = snapshot.Status.ConfigGeneration
+							if err := window.ApplyConfig(snapshot.Config.Overlay); err != nil {
+								applyError = err
+								loop.Quit()
+							}
+						}
+					})
+				}
+				mu.Unlock()
+			}
+		}
+	}()
+	return func() error {
+		close(stop)
+		<-done
+		mu.Lock()
+		if pending != 0 {
+			glib.SourceRemove(pending)
+		}
+		if quitPending != 0 {
+			glib.SourceRemove(quitPending)
+		}
+		mu.Unlock()
+		return applyError
+	}
 }
 
 func runStartupFailure(ctx context.Context, err error, stdout, stderr io.Writer) int {
@@ -149,6 +233,12 @@ func runStartupFailure(ctx context.Context, err error, stdout, stderr io.Writer)
 }
 
 func writeRunError(err error, stdout, stderr io.Writer) int {
+	if errors.Is(err, overlay.ErrDisplayUnavailable) {
+		return writeRunFailure(&reportError{"ERR_RUNTIME_WAYLAND", "runtime", "Wayland display is unavailable.", "Run in a Wayland session with WAYLAND_DISPLAY set."}, stdout, stderr)
+	}
+	if errors.Is(err, overlay.ErrLayerUnavailable) {
+		return writeRunFailure(&reportError{"ERR_LAYER_SHELL_UNAVAILABLE", "runtime", "Layer Shell is unavailable.", "Use a compositor with Layer Shell support."}, stdout, stderr)
+	}
 	var configError *config.Error
 	if errors.As(err, &configError) {
 		return writeRunFailure(&reportError{configError.Code, configError.Stage, configError.Reason, "Check the configuration file and use run --help."}, stdout, stderr)

@@ -15,7 +15,19 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
+    container: archlinux:base
+    defaults:
+      run:
+        shell: bash
+    env:
+      GOCACHE: /tmp/azerlay-go-build
+      GOMODCACHE: /tmp/azerlay-go-mod
     steps:
+      - name: Install native test dependencies
+        run: |
+          pacman -Syu --noconfirm --needed ca-certificates git curl tar gzip base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection sway dbus
+          setcap -r /usr/bin/sway
+
       - name: Check out repository
         uses: actions/checkout@v4
         with:
@@ -40,7 +52,9 @@ jobs:
           fi
 
       - name: Vet
-        run: go vet ./...
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          go vet ./...
 
       - name: Install Staticcheck
         run: go install honnef.co/go/tools/cmd/staticcheck@2026.2.1
@@ -49,7 +63,11 @@ jobs:
         run: staticcheck ./...
 
       - name: Test
-        run: go test -race -shuffle=on -count=1 ./...
+        run: |
+          useradd --create-home --user-group azerlay-test
+          mkdir -p "$GOCACHE" "$GOMODCACHE"
+          chown -R azerlay-test:azerlay-test "$GITHUB_WORKSPACE" "$GOCACHE" "$GOMODCACHE"
+          runuser -u azerlay-test -- env PATH="$PATH" GOCACHE="$GOCACHE" GOMODCACHE="$GOMODCACHE" scripts/test-wayland.sh go test -race -shuffle=on -count=1 ./...
 
       - name: Build
         run: go build ./cmd/azerlay
@@ -86,25 +104,13 @@ jobs:
   container-build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        image: [ubuntu:24.04, archlinux:base]
-    container:
-      image: ${{ matrix.image }}
+    container: archlinux:base
     defaults:
       run:
         shell: bash
     steps:
-      - name: Install Ubuntu build dependencies
-        if: matrix.image == 'ubuntu:24.04'
-        run: |
-          apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates git curl tar gzip build-essential
-
       - name: Install Arch build dependencies
-        if: matrix.image == 'archlinux:base'
-        run: pacman -Syu --noconfirm --needed ca-certificates git curl tar gzip base-devel
+        run: pacman -Syu --noconfirm --needed ca-certificates git curl tar gzip base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection
 
       - name: Check out repository
         uses: actions/checkout@v4
@@ -126,29 +132,47 @@ jobs:
 
   cgo-smoke:
     runs-on: ubuntu-latest
-    env:
-      GTK_BRIDGE_IMPLEMENTED: 'false'
-    steps:
-      - name: Explain missing GTK compile coverage
+    container: archlinux:base
+    defaults:
+      run:
         shell: bash
-        run: |
-          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
-          GTK/CGo compile smoke is **skipped** under Issue #36's documented exception:
-          no production GTK/gotk4/gtk4-layer-shell bridge exists yet.
-          When that bridge is introduced, replace the disabled step with native
-          dependency installation and actual compilation. This informational job
-          does not demonstrate native compile coverage.
-          EOF
+    steps:
+      - name: Install native build dependencies
+        run: pacman -Syu --noconfirm --needed ca-certificates git curl tar gzip base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection
 
-      # Issue #36 permits this skip until the production GTK/layer-shell bridge exists.
-      - name: GTK/CGo compile smoke (skipped - production bridge absent)
-        if: env.GTK_BRIDGE_IMPLEMENTED == 'true'
-        run: echo 'Replace with native dependency installation and bridge compilation.'
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.27.1
+          cache: true
+          cache-dependency-path: |
+            go.mod
+            go.sum
+
+      - name: Compile and inspect native binary
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          pkg-config --modversion gtk4 gtk4-layer-shell-0
+          CGO_ENABLED=1 go build -o /tmp/azerlay ./cmd/azerlay
+          /tmp/azerlay version
+          readelf -d /tmp/azerlay
 
   vulnerability:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    container: archlinux:base
+    defaults:
+      run:
+        shell: bash
     steps:
+      - name: Install native build dependencies
+        run: pacman -Syu --noconfirm --needed ca-certificates git curl tar gzip base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection
+
       - name: Check out repository
         uses: actions/checkout@v4
         with:
@@ -167,12 +191,21 @@ jobs:
         run: go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
 
       - name: Check reachable vulnerabilities
-        run: govulncheck ./...
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          govulncheck ./...
 
   licenses:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    container: archlinux:base
+    defaults:
+      run:
+        shell: bash
     steps:
+      - name: Install native build dependencies
+        run: pacman -Syu --noconfirm --needed ca-certificates git curl tar gzip base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection
+
       - name: Check out repository
         uses: actions/checkout@v4
         with:
@@ -191,7 +224,9 @@ jobs:
         run: go install github.com/google/go-licenses/v2@v2.0.1
 
       - name: Report dependency licenses
-        run: go-licenses report ./... --include_tests --ignore=github.com/sh4869221b/azerlay > "$RUNNER_TEMP/dependency-licenses.csv"
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          go-licenses report ./... --include_tests --ignore=github.com/sh4869221b/azerlay > "$RUNNER_TEMP/dependency-licenses.csv"
 
       - name: Upload dependency license report
         uses: actions/upload-artifact@v4

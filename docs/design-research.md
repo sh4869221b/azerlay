@@ -211,7 +211,7 @@ Azeron Cyborg II
 
 | 項目 | 要件 |
 |---|---|
-| OS | Linux |
+| OS | Linux（v1はArch/CachyOS。Ubuntuはv1後） |
 | Display server | Wayland |
 | Compositor | Hyprland（v1）。Niriはv1後、動作未検証 |
 | 入力API | Linux evdev |
@@ -235,6 +235,7 @@ Layer Shellを実装する以下の環境は、動作確認後に「準対応」
 - GNOME Shell Wayland: Layer Shellを標準サポートしないため正式非対応。
 - X11/XWayland専用セッション: オーバーレイ実装対象外。
 - Compositorを介さないDRM/KMS直接描画ゲーム。
+- Ubuntuはv1動作対象外。[Issue #98](https://github.com/sh4869221b/azerlay/issues/98)でv1後の実装・検証を扱う。
 
 ### 5.4 ターゲット実機
 
@@ -1774,21 +1775,9 @@ GTK、font cache、環境差があるため、CIだけでなくターゲット�
 
 `CGO_ENABLED=1`を必須とする。配布バイナリはglibc、GTK4、gtk4-layer-shell等のシステム共有ライブラリへ依存する。
 
-CGo wrapper例:
+本番bridgeは`internal/layershell`へ隔離し、`Init`/`Apply`とsurface取得をGoのGTK/GDK wrapperで公開する。C型を公開APIへ出さない。surfaceのtransfer-none参照はgotk4の所有権管理で保持し、動的marshalerのuintptr往復を避ける。gtk4-layer-shellをWayland client libraryより先にロードする。
 
-```go
-package layershell
-
-func Init(window NativeWindow) error
-func SetLayer(window NativeWindow, layer Layer)
-func SetAnchor(window NativeWindow, edge Edge, enabled bool)
-func SetMargin(window NativeWindow, edge Edge, margin int)
-func SetKeyboardMode(window NativeWindow, mode KeyboardMode)
-func SetNamespace(window NativeWindow, namespace string)
-func SetMonitor(window NativeWindow, monitor NativeMonitor)
-```
-
-C型を公開APIへ出さない。
+GTK ownerの生成・設定適用・破棄はlocked main OS threadで行う。現在の`run`はhidden windowのlifecycleまでを接続し、描画、click-through、入力、CLI要求による実表示切替は後続実装とする。
 
 ### 22.4 非採用
 
@@ -1934,10 +1923,11 @@ sudo pacman -S --needed \
   gcc \
   pkgconf \
   gtk4 \
-  gtk4-layer-shell
+  gtk4-layer-shell \
+  gobject-introspection
 ```
 
-実際のパッケージ名は各Distributionで異なる。
+native test fixtureには追加で`sway`と`dbus`が必要。非rootで`scripts/test-wayland.sh go test -race -shuffle=on -count=1 ./...`を実行する。SwayはCI用protocol fixtureであり、製品サポートの確認ではない。Ubuntuの導入・build手順はv1後のIssue #98で扱う。
 
 ### 24.2 ビルド
 
@@ -2131,10 +2121,9 @@ Niriはv1後の対象で、実機動作は未検証。v1の必須試験には含
 - `gofmt`差分なし
 - `go vet ./...`
 - `staticcheck ./...`
-- `go test ./...`
-- race detector（GTK/CGo非依存パッケージ）
+- `scripts/test-wayland.sh go test -race -shuffle=on -count=1 ./...`（native childを含む）
 - short fuzz smoke
-- Arch/Ubuntu build container
+- Arch native build container（Ubuntu distribution対応はv1後）
 - CGo/GTK/layer-shell compile smoke
 - license check
 - vulnerability scan

@@ -40,6 +40,30 @@ GTK objects stay on the locked main OS thread. Draw callbacks perform no I/O,
 parsing, or waiting. The gtk4-layer-shell CGo bridge remains isolated at the
 Layer Shell boundary.
 
+### GTK window lifecycle
+
+`internal/layershell` contains all application-owned CGo and exposes Go GTK/GDK
+wrappers. The bridge initializes namespace `azerlay`, the overlay layer, keyboard
+mode `none`, and exclusive zone `-1`. It replaces every anchor and margin on
+placement updates. Surface acquisition retains a transfer-none GObject reference
+through gotk4 without its dynamic pointer marshaler. The native load contract is
+gtk4-layer-shell before the Wayland client library.
+
+`internal/overlay` owns the window, monitor selection, and signal handlers on the
+locked main OS thread. Explicit selectors match a unique connector first, then
+a unique description; an absent or ambiguous selection stays hidden. Monitor
+invalidation hides synchronously, and reconciliation recreates the window only
+for the same resolved selection. Requested visibility is retained across this
+lifecycle. Empty selection delegates the output choice to the compositor.
+
+`run` creates this owner hidden before readiness and runs the GLib main loop.
+Background work posts main-context notifications; successful configuration
+generations apply on that thread, while failed reloads retain the previous
+placement. Shutdown joins control handlers and configuration work before
+removing notification sources, disconnecting handlers, and destroying the GTK
+window. Renderer, input, click-through, and CLI visibility integration remain
+separate work.
+
 ### Reader and reducer contract
 
 `internal/device.OpenGroup` revalidates only the selected nodes and transfers

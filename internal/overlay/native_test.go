@@ -1,0 +1,216 @@
+package overlay
+
+import (
+	"bufio"
+	"errors"
+	"fmt"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/diamondburned/gotk4/pkg/glib/v2"
+	"github.com/diamondburned/gotk4/pkg/gtk/v4"
+	"github.com/sh4869221b/azerlay/internal/config"
+	"github.com/sh4869221b/azerlay/internal/layershell"
+)
+
+func runNativeChild(mode string) int {
+	if mode == "qa" {
+		return runNativeQAChild()
+	}
+	config := config.Overlay{Anchor: "center"}
+	if mode == "invalid-display" {
+		_, err := New(config)
+		if !errors.Is(err, ErrDisplayUnavailable) {
+			fmt.Fprintln(os.Stderr, "unexpected display result:", err)
+			return 1
+		}
+		fmt.Println("display-unavailable")
+		return 0
+	}
+	if mode != "lifecycle" {
+		return 2
+	}
+	w, err := New(config)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	defer w.Close()
+	if w.requested || w.widget == nil || w.widget.Visible() {
+		fmt.Fprintln(os.Stderr, "initial window was not hidden")
+		return 1
+	}
+	attachTestContent(w.widget)
+	if err := w.SetVisible(true); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	loop := glib.NewMainLoop(nil, false)
+	commands := make(chan string)
+	go func() {
+		scanner := bufio.NewScanner(os.Stdin)
+		for scanner.Scan() {
+			commands <- strings.TrimSpace(scanner.Text())
+		}
+	}()
+	phase := 0
+	var previous *gtk.Window
+	var failure error
+	deadline := time.Now().Add(30 * time.Second)
+	glib.TimeoutAdd(10, func() bool {
+		if time.Now().After(deadline) {
+			failure = errors.New("native child timed out")
+			loop.Quit()
+			return false
+		}
+		if phase == 0 && mappedLayer(w) {
+			fmt.Println("ready")
+			phase = 1
+		}
+		if phase == 2 && (w.surface == nil || !w.surface.Mapped()) {
+			fmt.Println("hidden")
+			phase = 3
+		}
+		if phase == 6 && mappedLayer(w) {
+			if previous == w.widget {
+				failure = errors.New("window was not recreated")
+				loop.Quit()
+				return false
+			}
+			fmt.Println("restored")
+			phase = 7
+		}
+		if phase == 8 && mappedLayer(w) {
+			fmt.Println("explicit")
+			phase = 9
+		}
+		if phase == 10 && mappedLayer(w) && w.monitor != nil && w.placePending == 0 {
+			fmt.Println("default-return")
+			phase = 11
+		}
+		select {
+		case command := <-commands:
+			switch {
+			case phase == 1 && command == "continue":
+				previous = w.widget
+				if err := w.SetVisible(false); err != nil {
+					failure = err
+					loop.Quit()
+					return false
+				}
+				phase = 2
+			case phase == 3 && command == "continue":
+				config.Monitor = "azerlay-missing-monitor"
+				if err := w.ApplyConfig(config); err != nil {
+					failure = err
+					loop.Quit()
+					return false
+				}
+				if err := w.SetVisible(true); err != nil {
+					failure = err
+					loop.Quit()
+					return false
+				}
+				if w.widget != nil || w.surface != nil {
+					failure = errors.New("missing selector mapped")
+					loop.Quit()
+					return false
+				}
+				fmt.Println("missing")
+				phase = 5
+			case phase == 5 && command == "continue":
+				config.Monitor = ""
+				if err := w.ApplyConfig(config); err != nil {
+					failure = err
+					loop.Quit()
+					return false
+				}
+				attachTestContent(w.widget)
+				phase = 6
+			case phase == 7 && command == "continue":
+				monitor := w.display.MonitorAtSurface(w.surface)
+				if monitor == nil || monitor.Connector() == "" {
+					failure = errors.New("mapped output has no connector")
+					loop.Quit()
+					return false
+				}
+				config.Monitor = monitor.Connector()
+				if err := w.ApplyConfig(config); err != nil {
+					failure = err
+					loop.Quit()
+					return false
+				}
+				attachTestContent(w.widget)
+				phase = 8
+			case phase == 9 && command == "continue":
+				config.Monitor = ""
+				if err := w.ApplyConfig(config); err != nil {
+					failure = err
+					loop.Quit()
+					return false
+				}
+				attachTestContent(w.widget)
+				phase = 10
+			case phase == 11 && command == "continue":
+				if err := w.SetVisible(false); err != nil {
+					failure = err
+					loop.Quit()
+					return false
+				}
+				config.Monitor = "azerlay-missing-monitor"
+				if err := w.ApplyConfig(config); err != nil {
+					failure = err
+					loop.Quit()
+					return false
+				}
+				config.Monitor = ""
+				if err := w.ApplyConfig(config); err != nil {
+					failure = err
+					loop.Quit()
+					return false
+				}
+				if w.requested || w.widget == nil || w.widget.Visible() || w.surface != nil && w.surface.Mapped() {
+					failure = errors.New("hidden request became visible")
+					loop.Quit()
+					return false
+				}
+				fmt.Println("hidden-return")
+				phase = 12
+			case phase == 12 && command == "quit":
+				w.Close()
+				if w.widget != nil || w.surface != nil || w.monitor != nil {
+					failure = errors.New("Close retained live handles")
+				}
+				fmt.Println("closed")
+				loop.Quit()
+				return false
+			default:
+				failure = errors.New("unexpected child command")
+				loop.Quit()
+				return false
+			}
+		default:
+		}
+		return true
+	})
+	loop.Run()
+	if failure != nil {
+		fmt.Fprintln(os.Stderr, failure)
+		return 1
+	}
+	return 0
+}
+
+func attachTestContent(window *gtk.Window) {
+	window.SetDefaultSize(160, 80)
+	window.SetChild(gtk.NewLabel("Overlay native test"))
+}
+
+func mappedLayer(w *Window) bool {
+	if w.surface == nil || !w.surface.Mapped() {
+		return false
+	}
+	ok, err := layershell.IsWindow(w.widget)
+	return err == nil && ok
+}
