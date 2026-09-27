@@ -76,7 +76,7 @@ func TestImportedSettingsRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	index := storeIndex(t, home)
-	if index.Sources[0].NormalizerVersion != "3" {
+	if index.Sources[0].NormalizerVersion != "4" {
 		t.Fatalf("index normalizer revision = %q", index.Sources[0].NormalizerVersion)
 	}
 	cacheDir := filepath.Join(home, "azerlay/profiles", selection.Source.Hash)

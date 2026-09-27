@@ -54,6 +54,7 @@ func normalizeProfile(raw profileraw.RawProfile, rootKind profile.RootKind, prof
 		normalized.Controls[inputIndex].Bindings = normalizeTurbo(input, normalized.Controls[inputIndex].Bindings)
 		normalized.Controls[inputIndex].Bindings = normalizeMacro(input, normalized.Controls[inputIndex].Bindings)
 		normalized.Controls[inputIndex].Bindings = normalizeStick(input, normalized.Controls[inputIndex].Bindings)
+		normalized.Controls[inputIndex].Bindings = normalizeUnbound(input, normalized.Controls[inputIndex].Bindings)
 	}
 	return normalized, nil
 }

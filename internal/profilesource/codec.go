@@ -20,7 +20,7 @@ const (
 	modelSchemaVersion   = 1
 	// Parser/adapter semantic changes must bump the relevant interpretation revision.
 	decoderVersion    = "1"
-	normalizerVersion = "3"
+	normalizerVersion = "4"
 	maxIndexBytes     = 16 << 20
 	maxCacheBytes     = 512 << 20
 	// These mirror the existing admitted export structural bounds.
@@ -107,9 +107,16 @@ type diskProfileRaw struct {
 	Unknown diskRawFields `json:"unknown"`
 }
 type diskControl struct {
-	Label    *string        `json:"label"`
-	Bindings []diskTrigger  `json:"bindings"`
-	Raw      diskBindingRaw `json:"raw"`
+	Label          *string            `json:"label"`
+	SourceIdentity diskSourceIdentity `json:"source_identity"`
+	Bindings       []diskTrigger      `json:"bindings"`
+	Raw            diskBindingRaw     `json:"raw"`
+}
+type diskSourceIdentity struct {
+	InputID *int `json:"input_id"`
+	PinOne  *int `json:"pin_one"`
+	PinTwo  *int `json:"pin_two"`
+	Invalid bool `json:"invalid"`
 }
 type diskBindingRaw struct {
 	RootKind     profile.RootKind `json:"root_kind"`
@@ -247,7 +254,18 @@ func (v *diskProfileRaw) UnmarshalJSON(b []byte) error {
 }
 func (v *diskControl) UnmarshalJSON(b []byte) error {
 	type plain diskControl
-	return decodeObject(b, (*plain)(v), "label bindings raw")
+	return decodeObject(b, (*plain)(v), "label source_identity bindings raw")
+}
+func (v *diskSourceIdentity) UnmarshalJSON(b []byte) error {
+	type plain diskSourceIdentity
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(b, &fields); err != nil {
+		return err
+	}
+	if bytes.Equal(bytes.TrimSpace(fields["invalid"]), []byte("null")) {
+		return errCodecShape
+	}
+	return decodeObject(b, (*plain)(v), "input_id pin_one pin_two invalid")
 }
 func (v *diskBindingRaw) UnmarshalJSON(b []byte) error {
 	type plain diskBindingRaw
@@ -531,7 +549,7 @@ func profileToDisk(value profile.Profile) diskProfile {
 		result.Controls = make([]diskControl, len(value.Controls))
 	}
 	for i, control := range value.Controls {
-		out := diskControl{Label: control.Label, Raw: diskBindingRaw{RootKind: control.Raw.RootKind, ProfileIndex: diskPosition(control.Raw.ProfileIndex), InputIndex: diskPosition(control.Raw.InputIndex), Fields: fieldsToDisk(control.Raw.Fields)}}
+		out := diskControl{Label: control.Label, SourceIdentity: diskSourceIdentity{InputID: cloneInt(control.SourceIdentity.InputID), PinOne: cloneInt(control.SourceIdentity.PinOne), PinTwo: cloneInt(control.SourceIdentity.PinTwo), Invalid: control.SourceIdentity.Invalid}, Raw: diskBindingRaw{RootKind: control.Raw.RootKind, ProfileIndex: diskPosition(control.Raw.ProfileIndex), InputIndex: diskPosition(control.Raw.InputIndex), Fields: fieldsToDisk(control.Raw.Fields)}}
 		if control.Bindings != nil {
 			out.Bindings = make([]diskTrigger, len(control.Bindings))
 		}
@@ -570,7 +588,7 @@ func profileFromDisk(value diskProfile) profile.Profile {
 		result.Controls = make([]profile.ControlBinding, len(value.Controls))
 	}
 	for i, control := range value.Controls {
-		out := profile.ControlBinding{Label: control.Label, Raw: profile.RawBindingReference{RootKind: control.Raw.RootKind, ProfileIndex: int(control.Raw.ProfileIndex), InputIndex: int(control.Raw.InputIndex), Fields: fieldsFromDisk(control.Raw.Fields)}}
+		out := profile.ControlBinding{Label: control.Label, SourceIdentity: profile.SourceIdentity{InputID: cloneInt(control.SourceIdentity.InputID), PinOne: cloneInt(control.SourceIdentity.PinOne), PinTwo: cloneInt(control.SourceIdentity.PinTwo), Invalid: control.SourceIdentity.Invalid}, Raw: profile.RawBindingReference{RootKind: control.Raw.RootKind, ProfileIndex: int(control.Raw.ProfileIndex), InputIndex: int(control.Raw.InputIndex), Fields: fieldsFromDisk(control.Raw.Fields)}}
 		if control.Bindings != nil {
 			out.Bindings = make([]profile.TriggerBinding, len(control.Bindings))
 		}
@@ -629,6 +647,13 @@ func bundleFromDisk(bundle diskBundle) profile.ProfileBundle {
 	}
 	return result
 }
+func cloneInt(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	copy := *value
+	return &copy
+}
 func validTrigger(binding profile.TriggerBinding) bool {
 	if binding.Kind != profile.BindingStick && binding.Stick != nil ||
 		binding.Kind != profile.BindingTurbo && binding.Turbo != nil ||
@@ -663,6 +688,8 @@ func validTrigger(binding profile.TriggerBinding) bool {
 		}
 	case profile.BindingUnknown:
 		return binding.Actions == nil && binding.TriggerDelayMS == nil && binding.TriggerIntervalMS == nil && binding.ReleaseBehavior == nil && binding.Unknown != nil && binding.Unknown.Reason == "unmapped_binding"
+	case profile.BindingUnbound:
+		return binding.Trigger == profile.TriggerSingle && binding.Actions == nil && binding.Turbo == nil && binding.Macro == nil && binding.Stick == nil && binding.Unknown == nil && binding.TriggerDelayMS == nil && binding.TriggerIntervalMS == nil && binding.ReleaseBehavior == nil
 	case profile.BindingKeyboard:
 		if binding.Unknown != nil || len(binding.Actions) == 0 {
 			return false
@@ -704,6 +731,10 @@ func validProfile(value profile.Profile, root profile.RootKind, index int) bool 
 	}
 	for i, control := range value.Controls {
 		if control.Raw.RootKind != root || control.Raw.ProfileIndex != index || control.Raw.InputIndex != i {
+			return false
+		}
+		identity := control.SourceIdentity
+		if identity.InputID != nil && *identity.InputID <= 0 || identity.PinOne != nil && *identity.PinOne < 0 || identity.PinTwo != nil && *identity.PinTwo < 0 {
 			return false
 		}
 		switch len(control.Bindings) {
