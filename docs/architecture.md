@@ -198,6 +198,34 @@ retained snapshots remain unchanged, and disconnected snapshots expose no live
 known state. Unknown bindings are not sticks. Rendering and runtime device
 wiring remain separate from this implemented library projection.
 
+### Physical matching and snapshot projection
+
+`profileadapter` keeps version-specific source fields behind the normalized
+model. `matching.Build` consumes a selected normalized profile and a validated
+layout; it does not inspect opaque raw fields or input events. The caller must
+provide the model, hand, and applicability explicitly. Mapping is supported
+only for the evidenced left-hand Cyborg II Software 2.0.2 export, displayed
+firmware 111, unknown hardware revision, and Keyboard-stick mode. A missing
+source ID, invalid identity, conflicting present pin, or ID outside the layout
+leaves the control unresolved. A proven ID can map when a pin is absent; source
+array order and pins alone never establish a region.
+
+The index retains every known candidate for a canonical output, including
+unresolved controls and separate triggers. It exposes duplicate-control
+ambiguity, unresolved candidate coverage, Unknown bindings, and exact Unbound
+bindings separately. A single candidate is only one known possibility, not
+proof of the physical source. An empty candidate list does not rule out an
+Unknown binding's output.
+
+`input.ProjectMatching` combines that reusable static index with a committed
+snapshot and an explicit code-to-node selection. It reads only the selected
+node for each code. Missing selectors and unobserved keys remain unknown;
+known release remains distinct from unknown, and disconnection clears live
+known/down state. Connection, sequence, generations, control mapping, binding
+coverage, and all candidates are preserved in the result. A down output does
+not establish a physical press or long/double/macro trigger completion. This
+library projection is not wired into `run`, the controller, or a renderer.
+
 ## Repository growth
 
 Packages are added only when an issue introduces behavior that needs them.
