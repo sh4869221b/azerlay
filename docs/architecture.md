@@ -135,6 +135,18 @@ unsupported by this report contract. Static stick, trigger and assignment
 metadata remain intact. `NormalizeAxis` remains a standalone mathematical
 helper, but there is no axis reader, ioctl recovery or live stick projection.
 
+After [#108](https://github.com/sh4869221b/azerlay/issues/108), the qualified
+type57 report identifies the physical source directly, so the v1 physical
+projection does not need an output-sequence matcher ([#46](https://github.com/sh4869221b/azerlay/issues/46)).
+FR-064 keeps Long, Double and Macro as static assignments only. A reported
+physical press or release does not establish that one of those triggers fired,
+completed, or advanced output; counters and snapshot sequence numbers do not
+provide that evidence either. A future firing or progress display would first
+need an explicit product requirement and an independently justified signal.
+This reassessment does not implement a matcher or connect the projection to
+`run`, the controller or GTK. Physical state remains last-observed: it starts
+unknown, and an undetected terminal release loss can leave stale state.
+
 ### Physical matching and snapshot projection
 
 `profileadapter` keeps version-specific source fields behind the normalized

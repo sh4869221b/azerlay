@@ -375,6 +375,14 @@ Azeronを外すと「Disconnected」を表示し、読取goroutineを終了す�
 | FR-064 | 長押し・ダブル・マクロは静的割当表示のみとし、物理pressから発火・完了や実出力を推論しないこと。 |
 | FR-065 | 確認済み30 source IDのhidraw受動通知を使用する。evdev fallback、HID writes/Feature/Output/GET_INPUT要求を行わない。 |
 
+[#108](https://github.com/sh4869221b/azerlay/issues/108) の導入後に再評価し、現行v1では
+物理sourceをtype57通知から直接同定できるため、出力列を照合するsequence matcherは不要と判断した
+([#46](https://github.com/sh4869221b/azerlay/issues/46))。FR-064のLong/Double/Macroは静的割当表示のみで、
+press/releaseやcounter、snapshot Sequenceは発火・完了・出力進行の証拠にならない。matcherは実装せず、
+発火・進行表示は明示的な製品要件と別途根拠のある信号がある場合に限る。物理状態は初期unknownで、
+検出できない末尾release欠落ではstaleになり得る最終観測状態であり、runtime/GTKにも未接続である
+([構成境界](architecture.md#analog-and-output-state))。
+
 ### 7.6 オーバーレイ表示
 
 | ID | 要件 |
@@ -1799,7 +1807,7 @@ azerlay/
 │   │   ├── reducer.go
 │   │   ├── snapshot.go
 │   │   ├── axis.go
-│   │   └── matcher.go
+│   │   └── matching.go
 │   ├── layout/
 │   │   ├── model.go
 │   │   ├── load.go
@@ -1950,7 +1958,7 @@ WantedBy=graphical-session.target
 - label優先順位
 - axis normalize
 - duplicate binding候補
-- macro matcher
+- Macroを含む静的出力候補と、割当に依存しない物理状態の投影
 - config validation
 - layout validation
 - control protocol
