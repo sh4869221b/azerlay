@@ -50,7 +50,7 @@ func (w *Window) attachRender() {
 	w.widget.AddCSSClass("azerlay-render-window")
 	w.renderCSS = gtk.NewCSSProvider()
 	w.renderCSS.LoadFromString("window.azerlay-render-window { background: transparent; }")
-	w.widget.StyleContext().AddProvider(w.renderCSS, gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+	gtk.StyleContextAddProviderForDisplay(w.display, w.renderCSS, gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 	w.updateRenderSize()
 	w.widget.SetChild(area)
 }
@@ -103,7 +103,7 @@ func (w *Window) detachRender() {
 	w.renderWidth, w.renderHeight = 0, 0
 	if w.widget != nil {
 		w.widget.SetChild(nil)
-		w.widget.StyleContext().RemoveProvider(w.renderCSS)
+		gtk.StyleContextRemoveProviderForDisplay(w.display, w.renderCSS)
 		w.widget.RemoveCSSClass("azerlay-render-window")
 	}
 	w.renderCSS = nil

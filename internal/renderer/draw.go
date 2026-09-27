@@ -73,9 +73,6 @@ func drawGeometryLayer(cr *cairo.Context, frame *Frame) {
 	for _, shape := range frame.snapshot.definition.Decorations {
 		drawShape(cr, shape, frame.colors.idle, frame.colors.outline, 1, false)
 	}
-	for _, item := range frame.controls {
-		drawControlStyle(cr, item.region, item.style, frame.colors)
-	}
 }
 
 func drawShape(cr *cairo.Context, shape layout.Shape, fill, outline color, width float64, dashed bool) {

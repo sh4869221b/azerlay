@@ -143,6 +143,7 @@ func (frame *Frame) Draw(cr *cairo.Context) {
 	cr.PushGroup()
 	drawGeometryLayer(cr, frame)
 	for _, item := range frame.controls {
+		drawControlStyle(cr, item.region, item.style, frame.colors)
 		if len(item.lines) == 0 {
 			continue
 		}
