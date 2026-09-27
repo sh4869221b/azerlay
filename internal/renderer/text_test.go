@@ -103,8 +103,8 @@ func TestMultiTriggerPriority(t *testing.T) {
 	if got := textValues(controlText(control, Options{Mode: "detailed"})); !reflect.DeepEqual(got, want) {
 		t.Fatalf("trigger priority/source order: got %v, want %v", got, want)
 	}
-	definition := testTextDefinition(70, 40)
-	frame := Prepare(NewSnapshot(definition, Content{Controls: map[string]Control{"button": control}}), Options{Scale: 1, Opacity: 1, FontScale: 1, Mode: "detailed"}, 106, 76)
+	definition := testTextDefinition(70, 50)
+	frame := Prepare(NewSnapshot(definition, Content{Controls: map[string]Control{"button": control}}), Options{Scale: 1, Opacity: 1, FontScale: 1, Mode: "detailed"}, 106, 86)
 	if frame == nil || len(frame.controls[0].lines) != 1 || frame.controls[0].lines[0].text != "Primary" {
 		t.Fatalf("short control did not retain only primary action: %+v", frame.controls[0].lines)
 	}

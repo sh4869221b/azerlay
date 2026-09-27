@@ -129,9 +129,9 @@ func TestTextOverflow(t *testing.T) {
 	if minuscule == nil || len(minuscule.controls[0].lines) != 0 {
 		t.Fatal("text with less than one device pixel of height was retained")
 	}
-	wide := testTextDefinition(70, 100)
-	smallFont := Prepare(NewSnapshot(wide, content), Options{Scale: 1, Opacity: 1, FontScale: .25, Mode: "normal"}, 106, 136)
-	largeFont := Prepare(NewSnapshot(wide, content), Options{Scale: 1, Opacity: 1, FontScale: 4, Mode: "normal"}, 106, 136)
+	wide := testTextDefinition(70, 140)
+	smallFont := Prepare(NewSnapshot(wide, content), Options{Scale: 1, Opacity: 1, FontScale: .25, Mode: "normal"}, 106, 176)
+	largeFont := Prepare(NewSnapshot(wide, content), Options{Scale: 1, Opacity: 1, FontScale: 4, Mode: "normal"}, 106, 176)
 	if len(smallFont.controls[0].lines) != 2 || len(largeFont.controls[0].lines) != 1 || largeFont.controls[0].lines[0].height <= smallFont.controls[0].lines[0].height {
 		t.Fatalf("font scale changed line priority or was silently shrunk: small=%+v large=%+v", smallFont.controls[0].lines, largeFont.controls[0].lines)
 	}
