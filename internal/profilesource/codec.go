@@ -20,7 +20,7 @@ const (
 	modelSchemaVersion   = 1
 	// Parser/adapter semantic changes must bump the relevant interpretation revision.
 	decoderVersion    = "1"
-	normalizerVersion = "4"
+	normalizerVersion = "5"
 	maxIndexBytes     = 16 << 20
 	maxCacheBytes     = 512 << 20
 	// These mirror the existing admitted export structural bounds.
@@ -161,7 +161,8 @@ type diskKeyboardDirections struct {
 	Left  profile.CanonicalCode `json:"left"`
 }
 type diskUnknown struct {
-	Reason string `json:"reason"`
+	Reason     string `json:"reason"`
+	RawDisplay string `json:"raw_display,omitempty"`
 }
 type diskAction struct {
 	Kind      profile.ActionKind      `json:"kind"`
@@ -346,8 +347,33 @@ func (v *diskKeyboardDirections) UnmarshalJSON(b []byte) error {
 }
 func (v *diskUnknown) UnmarshalJSON(b []byte) error {
 	type plain diskUnknown
-	return decodeObject(b, (*plain)(v), "reason")
+	if err := decodeObject(b, (*plain)(v), "reason"); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(b, &fields); err != nil {
+		return err
+	}
+	if raw, ok := fields["raw_display"]; ok {
+		if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) || json.Unmarshal(raw, &v.RawDisplay) != nil {
+			return errCodecShape
+		}
+	}
+	return nil
 }
+
+func validRawDisplay(value string) bool {
+	if len(value) > 256 {
+		return false
+	}
+	for i := 0; i < len(value); i++ {
+		if value[i] < ' ' || value[i] > '~' {
+			return false
+		}
+	}
+	return true
+}
+
 func (v *diskAction) UnmarshalJSON(b []byte) error {
 	type plain diskAction
 	return decodeObject(b, (*plain)(v), "kind code modifiers")
@@ -568,7 +594,7 @@ func profileToDisk(value profile.Profile) diskProfile {
 				trigger.Stick = &diskStick{Mode: binding.Stick.Mode, KeyboardDirections: diskKeyboardDirections(binding.Stick.KeyboardDirections), AngleDegrees: binding.Stick.AngleDegrees}
 			}
 			if binding.Unknown != nil {
-				trigger.Unknown = &diskUnknown{Reason: binding.Unknown.Reason}
+				trigger.Unknown = &diskUnknown{Reason: binding.Unknown.Reason, RawDisplay: binding.Unknown.RawDisplay}
 			}
 			if binding.Actions != nil {
 				trigger.Actions = make([]diskAction, len(binding.Actions))
@@ -607,7 +633,7 @@ func profileFromDisk(value diskProfile) profile.Profile {
 				trigger.Stick = &profile.StickBinding{Mode: binding.Stick.Mode, KeyboardDirections: profile.KeyboardDirections(binding.Stick.KeyboardDirections), AngleDegrees: binding.Stick.AngleDegrees}
 			}
 			if binding.Unknown != nil {
-				trigger.Unknown = &profile.UnknownBinding{Reason: binding.Unknown.Reason}
+				trigger.Unknown = &profile.UnknownBinding{Reason: binding.Unknown.Reason, RawDisplay: binding.Unknown.RawDisplay}
 			}
 			if binding.Actions != nil {
 				trigger.Actions = make([]profile.Action, len(binding.Actions))
@@ -687,7 +713,7 @@ func validTrigger(binding profile.TriggerBinding) bool {
 			return false
 		}
 	case profile.BindingUnknown:
-		return binding.Actions == nil && binding.TriggerDelayMS == nil && binding.TriggerIntervalMS == nil && binding.ReleaseBehavior == nil && binding.Unknown != nil && binding.Unknown.Reason == "unmapped_binding"
+		return binding.Actions == nil && binding.TriggerDelayMS == nil && binding.TriggerIntervalMS == nil && binding.ReleaseBehavior == nil && binding.Unknown != nil && binding.Unknown.Reason == "unmapped_binding" && validRawDisplay(binding.Unknown.RawDisplay)
 	case profile.BindingUnbound:
 		return binding.Trigger == profile.TriggerSingle && binding.Actions == nil && binding.Turbo == nil && binding.Macro == nil && binding.Stick == nil && binding.Unknown == nil && binding.TriggerDelayMS == nil && binding.TriggerIntervalMS == nil && binding.ReleaseBehavior == nil
 	case profile.BindingKeyboard:

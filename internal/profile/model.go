@@ -154,7 +154,8 @@ type KeyboardDirections struct {
 
 // UnknownBinding records a stable reason for uninterpreted semantics.
 type UnknownBinding struct {
-	Reason string
+	Reason     string
+	RawDisplay string
 }
 
 // ActionKind identifies an action family.

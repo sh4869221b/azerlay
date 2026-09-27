@@ -55,6 +55,12 @@ func normalizeProfile(raw profileraw.RawProfile, rootKind profile.RootKind, prof
 		normalized.Controls[inputIndex].Bindings = normalizeMacro(input, normalized.Controls[inputIndex].Bindings)
 		normalized.Controls[inputIndex].Bindings = normalizeStick(input, normalized.Controls[inputIndex].Bindings)
 		normalized.Controls[inputIndex].Bindings = normalizeUnbound(input, normalized.Controls[inputIndex].Bindings)
+		for bindingIndex := range normalized.Controls[inputIndex].Bindings {
+			binding := &normalized.Controls[inputIndex].Bindings[bindingIndex]
+			if binding.Kind == profile.BindingUnknown {
+				binding.Unknown.RawDisplay = unknownDisplay(input, binding.Trigger)
+			}
+		}
 	}
 	return normalized, nil
 }

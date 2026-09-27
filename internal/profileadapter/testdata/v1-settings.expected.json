@@ -25,14 +25,16 @@
               "trigger": "long",
               "kind": "unknown",
               "unknown": {
-                "Reason": "unmapped_binding"
+                "Reason": "unmapped_binding",
+                "RawDisplay": "types[1]=\"11\""
               }
             },
             {
               "trigger": "double",
               "kind": "unknown",
               "unknown": {
-                "Reason": "unmapped_binding"
+                "Reason": "unmapped_binding",
+                "RawDisplay": "types[2]=\"11\""
               }
             }
           ],
@@ -76,14 +78,16 @@
               "trigger": "long",
               "kind": "unknown",
               "unknown": {
-                "Reason": "unmapped_binding"
+                "Reason": "unmapped_binding",
+                "RawDisplay": "types[1]=\"11\""
               }
             },
             {
               "trigger": "double",
               "kind": "unknown",
               "unknown": {
-                "Reason": "unmapped_binding"
+                "Reason": "unmapped_binding",
+                "RawDisplay": "types[2]=\"11\""
               }
             }
           ],
@@ -138,14 +142,16 @@
               "trigger": "long",
               "kind": "unknown",
               "unknown": {
-                "Reason": "unmapped_binding"
+                "Reason": "unmapped_binding",
+                "RawDisplay": "types[1]=\"11\""
               }
             },
             {
               "trigger": "double",
               "kind": "unknown",
               "unknown": {
-                "Reason": "unmapped_binding"
+                "Reason": "unmapped_binding",
+                "RawDisplay": "types[2]=\"11\""
               }
             }
           ],
@@ -201,14 +207,16 @@
               "trigger": "long",
               "kind": "unknown",
               "unknown": {
-                "Reason": "unmapped_binding"
+                "Reason": "unmapped_binding",
+                "RawDisplay": "types[1]=\"11\""
               }
             },
             {
               "trigger": "double",
               "kind": "unknown",
               "unknown": {
-                "Reason": "unmapped_binding"
+                "Reason": "unmapped_binding",
+                "RawDisplay": "types[2]=\"11\""
               }
             }
           ],
@@ -258,14 +266,16 @@
               "trigger": "long",
               "kind": "unknown",
               "unknown": {
-                "Reason": "unmapped_binding"
+                "Reason": "unmapped_binding",
+                "RawDisplay": "types[1]=\"11\""
               }
             },
             {
               "trigger": "double",
               "kind": "unknown",
               "unknown": {
-                "Reason": "unmapped_binding"
+                "Reason": "unmapped_binding",
+                "RawDisplay": "types[2]=\"11\""
               }
             }
           ],
@@ -316,14 +326,16 @@
               "trigger": "long",
               "kind": "unknown",
               "unknown": {
-                "Reason": "unmapped_binding"
+                "Reason": "unmapped_binding",
+                "RawDisplay": "types[1]=\"11\""
               }
             },
             {
               "trigger": "double",
               "kind": "unknown",
               "unknown": {
-                "Reason": "unmapped_binding"
+                "Reason": "unmapped_binding",
+                "RawDisplay": "types[2]=\"11\""
               }
             }
           ],
@@ -360,21 +372,24 @@
               "trigger": "single",
               "kind": "unknown",
               "unknown": {
-                "Reason": "unmapped_binding"
+                "Reason": "unmapped_binding",
+                "RawDisplay": "types[0]=\"1\", keyValues[0]=\"KeyT\""
               }
             },
             {
               "trigger": "long",
               "kind": "unknown",
               "unknown": {
-                "Reason": "unmapped_binding"
+                "Reason": "unmapped_binding",
+                "RawDisplay": "types[1]=\"11\""
               }
             },
             {
               "trigger": "double",
               "kind": "unknown",
               "unknown": {
-                "Reason": "unmapped_binding"
+                "Reason": "unmapped_binding",
+                "RawDisplay": "types[2]=\"11\""
               }
             }
           ],

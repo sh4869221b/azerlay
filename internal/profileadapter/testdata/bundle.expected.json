@@ -13,7 +13,7 @@
         {
           "label": "combo",
           "bindings": [
-            {"trigger":"single","kind":"unknown","actions":null,"trigger_delay_ms":null,"trigger_interval_ms":null,"release_behavior":null,"unknown":{"Reason":"unmapped_binding"}},
+            {"trigger":"single","kind":"unknown","actions":null,"trigger_delay_ms":null,"trigger_interval_ms":null,"release_behavior":null,"unknown":{"Reason":"unmapped_binding","RawDisplay":"types[0]=\"1\""}},
             {"trigger":"long","kind":"keyboard","actions":[{"kind":"keyboard","code":"KEY_U","modifiers":null}],"trigger_delay_ms":500,"trigger_interval_ms":null,"release_behavior":"regular","unknown":null},
             {"trigger":"double","kind":"keyboard","actions":[{"kind":"keyboard","code":"KEY_P","modifiers":null},{"kind":"keyboard","code":"KEY_L","modifiers":null}],"trigger_delay_ms":null,"trigger_interval_ms":150,"release_behavior":null,"unknown":null}
           ],
@@ -41,7 +41,7 @@
         {
           "label": "combo",
           "bindings": [
-            {"trigger":"single","kind":"unknown","actions":null,"trigger_delay_ms":null,"trigger_interval_ms":null,"release_behavior":null,"unknown":{"Reason":"unmapped_binding"}},
+            {"trigger":"single","kind":"unknown","actions":null,"trigger_delay_ms":null,"trigger_interval_ms":null,"release_behavior":null,"unknown":{"Reason":"unmapped_binding","RawDisplay":"types[0]=\"1\""}},
             {"trigger":"long","kind":"keyboard","actions":[{"kind":"keyboard","code":"KEY_U","modifiers":null}],"trigger_delay_ms":500,"trigger_interval_ms":null,"release_behavior":"regular","unknown":null},
             {"trigger":"double","kind":"keyboard","actions":[{"kind":"keyboard","code":"KEY_P","modifiers":null},{"kind":"keyboard","code":"KEY_L","modifiers":null}],"trigger_delay_ms":null,"trigger_interval_ms":150,"release_behavior":null,"unknown":null}
           ],
@@ -81,9 +81,9 @@
         {
           "label": null,
           "bindings": [
-            {"trigger":"single","kind":"unknown","actions":null,"trigger_delay_ms":null,"trigger_interval_ms":null,"release_behavior":null,"unknown":{"Reason":"unmapped_binding"}},
-            {"trigger":"long","kind":"unknown","actions":null,"trigger_delay_ms":null,"trigger_interval_ms":null,"release_behavior":null,"unknown":{"Reason":"unmapped_binding"}},
-            {"trigger":"double","kind":"unknown","actions":null,"trigger_delay_ms":null,"trigger_interval_ms":null,"release_behavior":null,"unknown":{"Reason":"unmapped_binding"}}
+            {"trigger":"single","kind":"unknown","actions":null,"trigger_delay_ms":null,"trigger_interval_ms":null,"release_behavior":null,"unknown":{"Reason":"unmapped_binding","RawDisplay":"types[0]=\"11\""}},
+            {"trigger":"long","kind":"unknown","actions":null,"trigger_delay_ms":null,"trigger_interval_ms":null,"release_behavior":null,"unknown":{"Reason":"unmapped_binding","RawDisplay":"types[1]=\"11\""}},
+            {"trigger":"double","kind":"unknown","actions":null,"trigger_delay_ms":null,"trigger_interval_ms":null,"release_behavior":null,"unknown":{"Reason":"unmapped_binding","RawDisplay":"types[2]=\"11\""}}
           ],
           "raw": {
             "root_kind":"bundle",

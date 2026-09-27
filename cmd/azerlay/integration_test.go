@@ -398,7 +398,7 @@ func TestCLIDuplicateStorage(t *testing.T) {
 			}
 			cliWrite(t, indexPath, bytes.Replace(cliRead(t, indexPath), []byte(metadata.ImportedAt), []byte("2000-01-01T00:00:00Z"), 1), 0o600)
 			first = cliIndex(t, app)
-			wantMetadata := fmt.Sprintf(`{"source_hash":%q,"software_release":"2.0.2","source_scope":"azeron-software-export","input_kind":"reader","origin":{"kind":"file","path":%q},"imported_at":"2000-01-01T00:00:00Z","decoder_version":"1","normalizer_version":"4","model_schema_version":1,"profile_count":2,"export_version":"1e+09"}`, hash, filepath.Join(root, "PRIVATE_PATH"))
+			wantMetadata := fmt.Sprintf(`{"source_hash":%q,"software_release":"2.0.2","source_scope":"azeron-software-export","input_kind":"reader","origin":{"kind":"file","path":%q},"imported_at":"2000-01-01T00:00:00Z","decoder_version":"1","normalizer_version":"5","model_schema_version":1,"profile_count":2,"export_version":"1e+09"}`, hash, filepath.Join(root, "PRIVATE_PATH"))
 			if !reflect.DeepEqual(parsedJSON(t, string(first.Sources[0])), parsedJSON(t, wantMetadata)) {
 				t.Fatalf("first metadata differs from known file attribution: %s", first.Sources[0])
 			}
