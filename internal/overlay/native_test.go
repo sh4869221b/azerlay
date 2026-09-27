@@ -19,6 +19,12 @@ func runNativeChild(mode string) int {
 	if mode == "qa" {
 		return runNativeQAChild()
 	}
+	if mode == "renderer" {
+		return runNativeRendererChild()
+	}
+	if mode == "render-qa" {
+		return runRenderQAChild()
+	}
 	if mode == "region-failure" {
 		return runRegionFailureChild()
 	}

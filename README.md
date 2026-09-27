@@ -235,8 +235,10 @@ Shell reports `ERR_LAYER_SHELL_UNAVAILABLE`. GTK is restricted to Wayland.
 
 `run` prints initial text status and stays running. With no saved profile, status
 has `active_profile:null` and degraded reasons, and startup prints guidance to
-import a supported profile and use `status` and `profiles select`. No device or
-renderer backend is available yet. A second `run` against a responsive instance
+import a supported profile and use `status` and `profiles select`. No device
+backend or live profile-to-renderer connection is available yet. The renderer
+can display a supplied snapshot, as described in [overlay appearance](docs/overlay.md).
+A second `run` against a responsive instance
 prints its status and exits 0 without loading the second invocation's config.
 
 From another terminal, inspect status and stop the application:

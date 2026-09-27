@@ -11,6 +11,7 @@ import (
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
 	"github.com/sh4869221b/azerlay/internal/config"
 	"github.com/sh4869221b/azerlay/internal/layershell"
+	"github.com/sh4869221b/azerlay/internal/renderer"
 )
 
 var (
@@ -48,6 +49,23 @@ type Window struct {
 	diagnostic     string
 	observer       func(State)
 	lastState      State
+
+	overlay                       config.Overlay
+	appearance                    config.Appearance
+	showAmbiguous                 bool
+	snapshot                      *renderer.OverlaySnapshot
+	area                          *gtk.DrawingArea
+	frame                         *renderer.Frame
+	renderWidth                   int
+	renderHeight                  int
+	scaleHandler                  glib.SignalHandle
+	resizeHandler                 glib.SignalHandle
+	fontHandler                   glib.SignalHandle
+	renderCSS                     *gtk.CSSProvider
+	renderSettings                *gtk.Settings
+	preparedSnapshot              *renderer.OverlaySnapshot
+	preparedOptions               renderer.Options
+	preparedWidth, preparedHeight int
 }
 
 type State struct {
@@ -113,7 +131,13 @@ func (w *Window) ApplyConfig(overlay config.Overlay) error {
 	w.invalidated = w.invalidated || w.selector != overlay.Monitor
 	w.selector, w.anchor = overlay.Monitor, overlay.Anchor
 	w.marginX, w.marginY = overlay.MarginX, overlay.MarginY
-	return w.reconcile()
+	w.overlay = overlay
+	if err := w.reconcile(); err != nil {
+		return err
+	}
+	w.prepareRender(false)
+	w.updateRenderSize()
+	return nil
 }
 
 func (w *Window) SetVisible(visible bool) error {
@@ -220,6 +244,7 @@ func (w *Window) createWindow() error {
 		w.widget = nil
 		return err
 	}
+	w.attachRender()
 	w.realize = w.widget.ConnectRealize(func() {
 		w.disconnectSurface()
 		surface, err := layershell.Surface(w.widget)
@@ -325,6 +350,7 @@ func (w *Window) destroyWindow() {
 		return
 	}
 	w.disconnectSurface()
+	w.detachRender()
 	w.widget.HandlerDisconnect(w.realize)
 	w.widget.HandlerDisconnect(w.unrealize)
 	w.widget.Destroy()
