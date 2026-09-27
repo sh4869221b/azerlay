@@ -41,8 +41,9 @@ func preserveProfile(raw profileraw.RawProfile, rootKind profile.RootKind, profi
 
 func preserveControl(raw profileraw.RawInput, rootKind profile.RootKind, profileIndex, inputIndex int) profile.ControlBinding {
 	return profile.ControlBinding{
-		Label:    decodeLabel(raw["label"]),
-		Bindings: unknownBindings(raw["types"]),
+		Label:          decodeLabel(raw["label"]),
+		SourceIdentity: decodeSourceIdentity(raw),
+		Bindings:       unknownBindings(raw["types"]),
 		Raw: profile.RawBindingReference{
 			RootKind:     rootKind,
 			ProfileIndex: profileIndex,

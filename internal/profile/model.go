@@ -49,9 +49,17 @@ type RawProfileReference struct {
 
 // ControlBinding is one source control and its trigger outcomes.
 type ControlBinding struct {
-	Label    *string
-	Bindings []TriggerBinding
-	Raw      RawBindingReference
+	Label          *string
+	SourceIdentity SourceIdentity
+	Bindings       []TriggerBinding
+	Raw            RawBindingReference
+}
+
+type SourceIdentity struct {
+	InputID *int
+	PinOne  *int
+	PinTwo  *int
+	Invalid bool
 }
 
 // RawBindingReference identifies and retains an opaque source input.
@@ -80,6 +88,7 @@ const (
 	BindingTurbo    BindingKind = "turbo"
 	BindingMacro    BindingKind = "macro"
 	BindingStick    BindingKind = "stick"
+	BindingUnbound  BindingKind = "unbound"
 	BindingUnknown  BindingKind = "unknown"
 )
 

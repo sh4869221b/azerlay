@@ -37,7 +37,7 @@ cannot be broader than this exact release and source scope.
 | Source ID | Public description | Admitted use | Limit |
 | --- | --- | --- | --- |
 | `owner-software-2.0.2-pair` | Anonymous owner-supplied Software 2.0.2 UI/export pair | Release-scoped root, field, key, timing, and regular-release observations listed here | The export, images, labels, IDs, and complete macro content are private and are not normative dependencies or reproduced artifacts. Release attribution is owner attested, not independently displayed. |
-| `owner-software-2.0.2-followup` | Seven exports paired in message order with seven configuration images on 2026-09-05, plus a settings image displaying Software 2.0.2 | Empty key field, single U/P, left Ctrl+U, long U, double I, and macro structure below | The owner explicitly confirmed left Ctrl. Full exports, images, labels, IDs, and the complete macro sequence remain private. |
+| `owner-software-2.0.2-followup` | Seven exports paired in message order with seven configuration images on 2026-09-05, plus a settings image displaying Software 2.0.2 | Complete anonymous empty setting, single U/P, left Ctrl+U, long U, double I, and macro structure below | The owner explicitly confirmed left Ctrl. Full exports, images, labels, IDs, and the complete macro sequence remain private. |
 | `owner-software-2.0.2-stick-pair` | Two private exports supplied for Issue #44 on 2026-09-20; owner-confirmed Software 2.0.2, Keyboard versus Xbox Joystick, and up=W/right=D/down=S/left=A | Exact neutral left-stick mode and directional tuples below | Release, UI mode names, and directions are owner attested, not independently inspected settings screenshots. Python inspection did not run production `DecodeReader`/`Parse`. No live Xbox-device or physical-control mapping is established. |
 | `owner-software-2.0.2-turbo-20260926` | Owner UI/export comparison supplied 2026-09-26 | Exact T Turbo settings at two displayed rates below | Private inputs are not included; no production Go parsing or physical Turbo behavior was verified. |
 | `owner-software-2.0.2-macro-20260926` | Owner UI/export comparison supplied 2026-09-26 | Exact two-step macro setting and repeat toggle below | Only minimum anonymous step observations are recorded; no private full macro, production Go parsing, or playback behavior is included. |
@@ -93,12 +93,67 @@ entries in these cases; those values alone do not authorize a conversion.
 | Long U | `types:["11","1","11"]`, `keyValuesLong:["KeyU","0","0","0"]`, `metaValuesLong:["0","0","0"]`, numeric `featureDelay:1278` | Long keyboard action `KEY_U` 22, `trigger_delay_ms:1278`, regular release |
 | Double I | `types:["11","11","1"]`, `keyValuesDouble:["KeyI","0","0","0"]`, `metaValuesDouble:["0","0","0"]`, numeric `doubleDelay:123` | Double keyboard action `KEY_I` 23, `trigger_interval_ms:123`; no release behavior is inferred from the double image |
 
-The first image has an empty keyboard field and Regular selected, correlated
-with `types:["11","11","11"]` and all three key/modifier arrays filled with
-string `"0"`. Preserve this exact empty-setting observation, but do not infer
-that every `"11"` or `"0"` means unassigned. In particular, the later long and
-double images retain indicators on other tabs even though their exported key
-arrays are empty. Tab indicators are not sufficient evidence of active actions.
+The first image has an empty SINGLE keyboard field and Regular selected. Its
+complete anonymous semantic setting is below. It excludes only `id`,
+`pinOne`, `pinTwo`, and `label`; those fields do not participate in this
+recognition. Under the admitted release/source metadata, this exact setting
+normalizes only the SINGLE slot to `kind:unbound` with no payload. LONG and
+DOUBLE stay Unknown. Object key order and insignificant whitespace are ignored;
+all semantic fields, JSON types and number tokens, and ordered arrays must
+match. Missing, null, changed, or additional semantic fields do not match this
+Unbound predicate; separately documented normalization predicates still apply.
+
+```json
+{
+  "types": ["11", "11", "11"],
+  "keyValues": ["0", "0", "0", "0"],
+  "metaValues": ["0", "0", "0"],
+  "keyValuesLong": ["0", "0", "0", "0"],
+  "metaValuesLong": ["0", "0", "0"],
+  "keyValuesDouble": ["0", "0", "0", "0"],
+  "metaValuesDouble": ["0", "0", "0"],
+  "layeringProfileId": "", "isBelkin": false, "isToggleOnHold": false,
+  "layeringProfileIdLong": "", "isBelkinLong": false, "isToggleOnHoldLong": false,
+  "layeringProfileIdDouble": "", "isBelkinDouble": false, "isToggleOnHoldDouble": false,
+  "macro": {"repeat": false, "steps": [], "v": 1},
+  "longMacro": {"repeat": false, "steps": [], "v": 1},
+  "doubleMacro": {"repeat": false, "steps": [], "v": 1},
+  "featureDelay": 500, "doubleDelay": 150, "subType": "11",
+  "x": 0, "y": 0, "interval": 0, "yInterval": 0,
+  "xLong": 0, "yLong": 0, "xDouble": 0, "yDouble": 0,
+  "isHold": false, "isHoldLong": false, "isHoldDouble": false,
+  "holdTime": 0, "holdTimeLong": 0, "holdTimeDouble": 0,
+  "isTurbo": false, "isTurboLong": false, "isTurboDouble": false,
+  "turboInterval": 0, "turboIntervalLong": 0, "turboIntervalDouble": 0,
+  "sequenceTriggerSettings": {"isPingPongLoop": false, "sequenceSteps": []},
+  "analogSettings": {
+    "angle": 0, "lowerLimit": 0, "upperLimit": 0, "sensitivity": 0,
+    "analogKeys": {
+      "left": {"up": [87,0,0], "right": [68,0,0], "down": [83,0,0], "left": [65,0,0]},
+      "right": {"up": ["ArrowUp",0,0], "right": ["ArrowRight",0,0], "down": ["ArrowDown",0,0], "left": ["ArrowLeft",0,0]}
+    },
+    "diagonalKeys": {
+      "left": {"up_right": ["Digit1",0,0], "up_left": ["Digit2",0,0], "down_left": ["Digit3",0,0], "down_right": ["Digit4",0,0]},
+      "right": {"up_right": ["Digit1",0,0], "up_left": ["Digit2",0,0], "down_left": ["Digit3",0,0], "down_right": ["Digit4",0,0]}
+    },
+    "analogCones": {"verticalCone": 45, "horizontalCone": 45},
+    "isEightDirectionalTrigger": false, "mouseSensitivity": 5, "analogThrottle": 0,
+    "isAnalogSmoothing": false, "triggerMagnitude": 4, "isCombinedAnalog": false,
+    "combinedAnalogMagnitude": 6, "isHoldTrigger": false, "holdMagnitude": 9,
+    "holdType": "1", "holdKeyValues": ["16","0","0"], "rotateStickButtonId": 0,
+    "isAngleLock": false, "lockZoneAngle": 70, "lockZoneSize": 30,
+    "isRightAnalog": false, "invertXAxis": false, "invertYAxis": false
+  },
+  "scrollSpeed": 1, "scrollThreshold": 10, "isSmoothScroll": false
+}
+```
+
+The paired SINGLE U export changes only `types` to `["1","11","11"]`
+and `keyValues` to `["KeyU","0","0","0"]` in that one input. This is an
+exact paired observation, not a general rule for type `"11"` or string `"0"`.
+The later long and double images retain indicators on other tabs even though
+their exported key arrays are empty; tab indicators do not establish active
+actions.
 
 The U-to-P comparison changes only the first key entry. Adding left Ctrl
 correlates with `ControlLeft` in the first modifier entry. No right Ctrl,
@@ -253,7 +308,9 @@ modifier list.
 Assignments are normalized independently and appended in source order. Two
 assignments that produce the same canonical action remain two assignments.
 They are not keyed, sorted, or coalesced by canonical code. This says nothing
-about their physical origin, which remains outside Issue #40.
+about their physical origin, which remains outside Issue #40. The separate
+Issue #30 candidate index uses typed identity and the evidenced layout scope;
+it does not alter these conversion predicates.
 
 ## Issue #42 closed settings rows
 
@@ -546,7 +603,7 @@ Software produces such large macros.
 
 The decision introduces no registry, fingerprint, provenance token system, or
 schema. Issue #42 implements only the closed rows above and the required
-Unknown behavior. The adapter's normalizer revision is 3 while storage and
-model schema versions remain 1. Revision-1/2 caches reconstruct in memory
+Unknown behavior. The adapter's normalizer revision is 4 while storage and
+model schema versions remain 1. Revision-1/2/3 caches reconstruct in memory
 from retained originals without writes. Extending any family or release
 requires another release/export/known-meaning chain and a new reviewed row.

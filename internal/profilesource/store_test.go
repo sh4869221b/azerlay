@@ -126,7 +126,7 @@ func TestImportedCommit(t *testing.T) {
 	if len(index.Sources) != 1 || index.Selected.ProfileIndex != 2 || index.Selected.SourceHash != hash {
 		t.Fatalf("index = %+v", index)
 	}
-	wantSource := diskSource{SourceHash: hash, SoftwareRelease: "2.0.2", SourceScope: "azeron-software-export", InputKind: "text", Origin: diskOrigin{Kind: "text"}, ImportedAt: "2026-09-08T01:02:03.123456789Z", DecoderVersion: "1", NormalizerVersion: "3", ModelSchemaVersion: 1, ProfileCount: 2, ExportVersion: tokenToDisk([]byte("1e+09"))}
+	wantSource := diskSource{SourceHash: hash, SoftwareRelease: "2.0.2", SourceScope: "azeron-software-export", InputKind: "text", Origin: diskOrigin{Kind: "text"}, ImportedAt: "2026-09-08T01:02:03.123456789Z", DecoderVersion: "1", NormalizerVersion: "4", ModelSchemaVersion: 1, ProfileCount: 2, ExportVersion: tokenToDisk([]byte("1e+09"))}
 	if !reflect.DeepEqual(index.Sources[0], wantSource) {
 		t.Fatalf("metadata = %+v", index.Sources[0])
 	}

@@ -234,6 +234,14 @@ order. Duplicate IDs, controls, and canonical actions stay separate. The
 position only. They don't identify a physical control, input ID, pin, device,
 or layout position.
 
+Each `ControlBinding.SourceIdentity` independently records numeric input ID and
+pins from the admitted 2.0.2 export. Missing fields are nil; a present null,
+wrong type, non-integer token, nonpositive ID, negative pin, or integer outside
+Go's `int` range sets `Invalid` without rejecting the profile. Other valid
+fields remain available. Pin `255` is an ordinary value. These pointers are
+result-owned, and the opaque raw fields remain unchanged. Physical mapping
+uses this typed identity only within the separately evidenced layout scope.
+
 String profile IDs and names become optional normalized strings without
 trimming, folding, or coercion. Labels follow the same string rule, so absent or
 non-string label, empty string, and nonempty string remain distinct. A null or
@@ -256,6 +264,16 @@ long, and double slots. Other values produce one `trigger:unknown` outcome. An
 unmatched slot has `kind:unknown`, no action, timing, or release fields, and
 reason `unmapped_binding`. Unknown is successful normalization, not a default
 unassigned value.
+
+The only recognized `unbound` outcome is the SINGLE slot of the complete
+anonymous empty-setting predicate in
+[binding-conversion.md](decisions/binding-conversion.md#follow-up-conversion-evidence).
+This predicate comparison ignores only `id`, `pinOne`, `pinTwo`, and `label`;
+every other semantic field, JSON type, number token, and array order must match. Object key order
+and insignificant whitespace do not matter. The result has no action, timing,
+release, Turbo, Macro, Stick, or Unknown payload. LONG and DOUBLE remain
+Unknown. A generic `"11"` type or string `"0"` is never interpreted as
+unassigned.
 
 ### Closed Software 2.0.2 keyboard rows
 
@@ -412,10 +430,11 @@ saved attribution. A missing or hash-mismatched original, corrupt index, or
 failed reconstruction is `ERR_PROFILE_STORAGE`; it never yields a partial
 result or reselects another source.
 
-Typed Turbo, Macro, and stick settings survive saving and reloading. Normalizer
-revision 3 invalidates revision-1/2 caches so saved originals are re-normalized
-in memory, including previously Unknown settings. Storage and model schema
-versions remain 1. A historical index can still use a current compatible cache;
+Typed source identity, Unbound, Turbo, Macro, and stick settings survive saving
+and reloading. Normalizer revision 4 invalidates revision-1/2/3 caches so saved
+originals are re-normalized in memory, including newly recognized settings.
+Storage and model schema versions remain 1. A historical index can still use a
+current compatible cache;
 loading does not rewrite the index, cache, original, or selection.
 
 The store is `$XDG_DATA_HOME/azerlay`, or `$HOME/.local/share/azerlay` when
