@@ -20,10 +20,20 @@ type Frame struct {
 	options               Options
 	width, height         float64
 	titleBand, statusBand float64
+	naturalTitleBand      float64
 	placement             geometryPlacement
 	colors                palette
 	controls              []preparedControl
 	title, status         *preparedLine
+}
+
+func (frame *Frame) NaturalSize() (float64, float64) {
+	if frame == nil {
+		return 0, 0
+	}
+	view := frame.snapshot.definition.ViewBox
+	return (view.Width + 2*geometryPadding) * frame.options.Scale,
+		(view.Height + 2*geometryPadding + frame.naturalTitleBand + frame.statusBand) * frame.options.Scale
 }
 
 // Prepare owns text measurement and must run on the drawing area's owner thread.
@@ -55,6 +65,7 @@ func Prepare(snapshot *OverlaySnapshot, options Options, width, height float64) 
 	if options.ShowProfileName && snapshot.content.ProfileName != "" {
 		line := prepareLine(context, textSpec{text: snapshot.content.ProfileName, size: 14}, options, bandWidth, frame.colors.primary)
 		frame.titleBand = line.height + 8
+		frame.naturalTitleBand = frame.titleBand
 		line.x = view.X + 4
 		line.y = view.Y - frame.titleBand + 4
 		frame.title = &line
