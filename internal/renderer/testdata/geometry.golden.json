@@ -1,0 +1,8 @@
+{
+  "ordered_ids": ["circle", "ellipse", "group", "line", "path", "polygon", "rect"],
+  "group_bounds": [70, 70, 100, 100],
+  "natural_size": [116, 116],
+  "view_origin_at_232x116": [66, 8],
+  "view_origin_with_bands_at_200x138": [50, 20],
+  "embedded_control_count": 31
+}
