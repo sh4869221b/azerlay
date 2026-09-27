@@ -71,7 +71,7 @@ func TestDevicesStrictGrammar(t *testing.T) {
 				if err := json.Unmarshal(out.Bytes(), &r); err != nil {
 					t.Fatal(err)
 				}
-				if errOut.Len() != 0 || r.SchemaVersion != 1 || r.OK || r.Command != tc.command || r.Result != nil || r.Error == nil || r.Error.Code != "ERR_CLI_USAGE" {
+				if errOut.Len() != 0 || r.SchemaVersion != 2 || r.OK || r.Command != tc.command || r.Result != nil || r.Error == nil || r.Error.Code != "ERR_CLI_USAGE" {
 					t.Fatalf("usage report: %+v stderr=%q", r, &errOut)
 				}
 			} else if out.Len() != 0 || !strings.Contains(errOut.String(), "ERR_CLI_USAGE") {

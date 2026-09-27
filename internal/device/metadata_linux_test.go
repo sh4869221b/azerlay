@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 	"syscall"
 	"testing"
 )
@@ -18,7 +17,6 @@ func writeFile(t *testing.T, path, value string) {
 		t.Fatal(err)
 	}
 }
-
 func link(t *testing.T, target, path string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
@@ -28,171 +26,108 @@ func link(t *testing.T, target, path string) {
 		t.Fatal(err)
 	}
 }
-
 func fixtureCollector(t *testing.T) collector {
 	t.Helper()
 	root := t.TempDir()
-	c := collector{devRoot: filepath.Join(root, "dev/input"), sysRoot: filepath.Join(root, "sys"), stat: syscall.Stat, uid: 1000}
-	for _, dir := range []string{c.devRoot, filepath.Join(c.sysRoot, "bus/input"), filepath.Join(c.sysRoot, "bus/usb")} {
-		if err := os.MkdirAll(dir, 0700); err != nil {
+	c := collector{devRoot: filepath.Join(root, "dev"), sysRoot: filepath.Join(root, "sys"), uid: 1000}
+	for _, name := range []string{c.devRoot, filepath.Join(c.sysRoot, "bus/usb"), filepath.Join(c.sysRoot, "class/hidraw")} {
+		if err := os.MkdirAll(name, 0700); err != nil {
 			t.Fatal(err)
 		}
 	}
+	c.stat = func(path string, st *syscall.Stat_t) error {
+		n, ok := hidrawNumber(filepath.Base(path))
+		if !ok {
+			return syscall.ENOENT
+		}
+		st.Mode = syscall.S_IFCHR
+		st.Rdev = 240<<8 | n
+		return nil
+	}
+	c.probe = func(Node) probeResult { return probeResult{access: "readable"} }
 	return c
 }
-
-func fixtureNode(t *testing.T, c collector, device string, number, iface int) string {
+func fixtureNode(t *testing.T, c collector, unit string, n, iface int) string {
 	t.Helper()
-	parent := filepath.Join(c.sysRoot, "devices/hub", device)
-	writeFile(t, filepath.Join(parent, "uevent"), "DEVTYPE=usb_device\n")
-	writeFile(t, filepath.Join(parent, "idVendor"), "16d0\n")
-	writeFile(t, filepath.Join(parent, "idProduct"), "12f7\n")
-	writeFile(t, filepath.Join(parent, "bcdDevice"), "0111\n")
-	writeFile(t, filepath.Join(parent, "serial"), "synthetic-serial\n")
+	parent := filepath.Join(c.sysRoot, "devices", unit)
+	for key, value := range map[string]string{"uevent": "DEVTYPE=usb_device\n", "idVendor": "16d0", "idProduct": "12f7", "bcdDevice": "0111", "serial": "synthetic"} {
+		writeFile(t, filepath.Join(parent, key), value)
+	}
 	if _, err := os.Lstat(filepath.Join(parent, "subsystem")); os.IsNotExist(err) {
 		link(t, filepath.Join(c.sysRoot, "bus/usb"), filepath.Join(parent, "subsystem"))
 	}
-	intf := filepath.Join(parent, fmt.Sprintf("interface-%d", iface))
-	writeFile(t, filepath.Join(intf, "uevent"), "DEVTYPE=usb_interface\n")
+	intf := filepath.Join(parent, fmt.Sprintf("interface-%d-%d", iface, n))
 	link(t, filepath.Join(c.sysRoot, "bus/usb"), filepath.Join(intf, "subsystem"))
-	writeFile(t, filepath.Join(intf, "bInterfaceNumber"), fmt.Sprintf("%02x", iface))
-	writeFile(t, filepath.Join(intf, "bInterfaceClass"), "03")
-	subclass, protocol := "00", "00"
-	if iface == 2 {
-		subclass, protocol = "01", "02"
+	for key, value := range map[string]string{"uevent": "DEVTYPE=usb_interface\n", "bInterfaceNumber": fmt.Sprintf("%02x", iface), "bInterfaceClass": "03", "bInterfaceSubClass": "00", "bInterfaceProtocol": "00"} {
+		writeFile(t, filepath.Join(intf, key), value)
 	}
-	writeFile(t, filepath.Join(intf, "bInterfaceSubClass"), subclass)
-	writeFile(t, filepath.Join(intf, "bInterfaceProtocol"), protocol)
-	input := filepath.Join(intf, "hid/input", fmt.Sprintf("input%d", number))
-	writeFile(t, filepath.Join(input, "name"), "Synthetic Cyborg II")
-	writeFile(t, filepath.Join(input, "phys"), "synthetic/input0")
-	for field, value := range map[string]string{"bustype": "0003", "vendor": "16d0", "product": "12f7", "version": "0111"} {
-		writeFile(t, filepath.Join(input, "id", field), value)
-	}
-	caps := map[string]string{"ev": "f", "key": "40000000", "rel": "40", "abs": "3", "msc": "0", "sw": "0", "led": "0", "ff": "0", "snd": "0"}
-	if iface == 2 {
-		caps["ev"], caps["key"], caps["rel"], caps["abs"] = "7", "10000 0 0 0 0", "3", "0"
-	}
-	if iface == 3 {
-		caps["ev"], caps["key"], caps["rel"] = "b", "100000000 0 0 0 0", "0"
-	}
-	for family, value := range caps {
-		writeFile(t, filepath.Join(input, "capabilities", family), value)
-	}
-	event := fmt.Sprintf("event%d", number)
-	eventDir := filepath.Join(input, event)
-	writeFile(t, filepath.Join(eventDir, "dev"), fmt.Sprintf("13:%d", 64+number))
-	link(t, filepath.Join(c.sysRoot, "bus/input"), filepath.Join(eventDir, "subsystem"))
-	link(t, input, filepath.Join(eventDir, "device"))
-	link(t, eventDir, filepath.Join(c.sysRoot, "class/input", event))
-	link(t, eventDir, filepath.Join(c.sysRoot, "dev/char", fmt.Sprintf("13:%d", 64+number)))
-	path := filepath.Join(c.devRoot, event)
+	hid := filepath.Join(intf, "hid")
+	writeFile(t, filepath.Join(hid, "report_descriptor"), physicalDescriptor)
+	writeFile(t, filepath.Join(hid, "uevent"), "HID_NAME=Synthetic device\nHID_PHYS=synthetic/usb\n")
+	name := fmt.Sprintf("hidraw%d", n)
+	node := filepath.Join(hid, "hidraw", name)
+	writeFile(t, filepath.Join(node, "dev"), fmt.Sprintf("240:%d", n))
+	link(t, filepath.Join(c.sysRoot, "class/hidraw"), filepath.Join(node, "subsystem"))
+	link(t, hid, filepath.Join(node, "device"))
+	link(t, node, filepath.Join(c.sysRoot, "class/hidraw", name))
+	link(t, node, filepath.Join(c.sysRoot, "dev/char", fmt.Sprintf("240:%d", n)))
+	path := filepath.Join(c.devRoot, name)
 	writeFile(t, path, "")
 	return path
 }
-
-func TestMetadataTopology(t *testing.T) {
-	t.Parallel()
-	c := fixtureCollector(t)
-	for i := 1; i <= 3; i++ {
-		path := fixtureNode(t, c, "unit", i, i)
-		m := c.metadata(path, filepath.Base(path))
-		if len(m.findings) != 0 {
-			t.Fatalf("findings: %+v", m.findings)
-		}
-		if m.node.InputID == nil || *m.node.InputID != (InputID{3, 0x16d0, 0x12f7, 0x111}) || m.node.USBID == nil || *m.node.USBID != (USBID{0x16d0, 0x12f7, 0x111}) {
-			t.Fatalf("IDs: %+v", m.node)
-		}
-		if *m.node.USBParent != filepath.Join(c.sysRoot, "devices/hub/unit") || m.node.Interface.Number != uint8(i) || *m.node.PhysicalPath != "synthetic/input0" {
-			t.Fatalf("ancestry: %+v", m.node)
-		}
-	}
-	codes, err := parseBitmap("8000000000000001 8000000000000001")
-	if err != nil || !reflect.DeepEqual(codes, []int{0, 63, 64, 127}) {
-		t.Fatalf("bitmap: %v %v", codes, err)
-	}
-}
-
-func TestMetadataFailures(t *testing.T) {
-	for _, tc := range []struct {
-		name, field, value string
-		remove             bool
-	}{
-		{"malformed ID", "id/vendor", "oops", false}, {"malformed bitmap", "capabilities/key", "zz", false}, {"missing role", "capabilities/ev", "", true},
-	} {
+func TestRawDiscoveryAdmission(t *testing.T) {
+	for _, tc := range []struct{ name, field, value string }{{"supported", "", ""}, {"release", "bcdDevice", "0112"}, {"vendor", "idVendor", "1234"}, {"descriptor", "report_descriptor", "unsupported"}, {"interface", "bInterfaceNumber", "03"}} {
 		t.Run(tc.name, func(t *testing.T) {
 			c := fixtureCollector(t)
-			path := fixtureNode(t, c, "unit", 1, 1)
-			m := c.metadata(path, filepath.Base(path))
-			field := filepath.Join(*m.node.SysfsPath, tc.field)
-			if tc.remove {
-				if err := os.Remove(field); err != nil {
-					t.Fatal(err)
+			path := fixtureNode(t, c, "unit", 2, 4)
+			m := c.metadata(path, "hidraw2")
+			if tc.field != "" {
+				root := *m.node.USBParent
+				if tc.field == "report_descriptor" {
+					root = *m.node.SysfsPath
 				}
-			} else {
-				writeFile(t, field, tc.value)
+				if tc.field == "bInterfaceNumber" {
+					root = filepath.Dir(*m.node.SysfsPath)
+				}
+				writeFile(t, filepath.Join(root, tc.field), tc.value)
 			}
-			m = c.metadata(path, filepath.Base(path))
-			if len(m.findings) == 0 || m.node.Admission != "indeterminate" {
-				t.Fatalf("accepted malformed metadata: %+v", m)
+			calls := 0
+			c.probe = func(n Node) probeResult {
+				calls++
+				if n.Path != path {
+					t.Fatal("unexpected open")
+				}
+				return probeResult{access: "readable"}
 			}
-			if tc.field == "id/vendor" && m.node.InputID != nil {
-				t.Fatal("fabricated input ID")
+			r, d := c.collect("")
+			if d != nil {
+				t.Fatal(d)
+			}
+			if tc.name == "supported" {
+				if !r.OK() || calls != 1 || len(r.Groups) != 1 || !r.Groups[0].Complete {
+					t.Fatalf("%+v calls=%d", r, calls)
+				}
+			} else if r.OK() || calls != 0 {
+				t.Fatalf("unsupported opened: %+v %d", r, calls)
 			}
 		})
 	}
 }
-
-func TestMetadataNoAncestorBorrowing(t *testing.T) {
-	t.Parallel()
+func TestRawInspectAliasAndEventRejection(t *testing.T) {
 	c := fixtureCollector(t)
-	path := fixtureNode(t, c, "unit", 1, 1)
-	parent := filepath.Join(c.sysRoot, "devices/hub/unit")
-	writeFile(t, filepath.Join(parent, "idVendor"), "1234")
-	hub := filepath.Dir(parent)
-	link(t, filepath.Join(c.sysRoot, "bus/usb"), filepath.Join(hub, "subsystem"))
-	writeFile(t, filepath.Join(hub, "uevent"), "DEVTYPE=usb_device")
-	writeFile(t, filepath.Join(hub, "idVendor"), "16d0")
-	m := c.metadata(path, filepath.Base(path))
-	if *m.node.USBParent != parent || m.node.USBID.Vendor != 0x1234 {
-		t.Fatalf("borrowed hub: %+v", m.node)
+	fixtureNode(t, c, "unit", 2, 4)
+	c.stat = func(_ string, st *syscall.Stat_t) error { st.Mode = syscall.S_IFCHR; st.Rdev = 240<<8 | 2; return nil }
+	r, d := c.collect("relative-alias")
+	if d != nil || !r.OK() || r.Nodes[0].Path != "relative-alias" {
+		t.Fatalf("alias=%+v %v", r, d)
 	}
-	if err := os.Remove(filepath.Join(parent, "serial")); err != nil {
-		t.Fatal(err)
-	}
-	m = c.metadata(path, filepath.Base(path))
-	if m.node.Serial != nil || len(m.findings) > 0 {
-		t.Fatal("missing serial rejected")
-	}
-}
-
-func TestMetadataExplicitResolver(t *testing.T) {
-	t.Parallel()
-	c := fixtureCollector(t)
-	path := fixtureNode(t, c, "unit", 1, 1)
-	if _, err := c.resolve(path); err == nil {
-		t.Fatal("regular file resolved")
-	}
-	c.stat = func(_ string, st *syscall.Stat_t) error { st.Mode = syscall.S_IFCHR; st.Rdev = 13<<8 | 65; return nil }
-	if event, err := c.resolve("synthetic-alias"); err != nil || event != "event1" {
-		t.Fatalf("alias: %q %v", event, err)
-	}
-	c.stat = func(_ string, st *syscall.Stat_t) error { st.Mode = syscall.S_IFCHR; st.Rdev = 1<<8 | 3; return nil }
-	if _, err := c.resolve("other-character-device"); err == nil {
-		t.Fatal("other device resolved")
-	}
-}
-
-func TestMetadataUnresolvedInput(t *testing.T) {
-	t.Parallel()
-	c := fixtureCollector(t)
-	path := fixtureNode(t, c, "unit", 1, 1)
-	deviceLink := filepath.Join(c.sysRoot, "class/input/event1/device")
-	if err := os.Remove(deviceLink); err != nil {
-		t.Fatal(err)
-	}
-	m := c.metadata(path, "event1")
-	if len(m.findings) != 1 || m.node.SysfsPath != nil || m.node.Admission != "indeterminate" {
-		t.Fatalf("unresolved input: %+v", m)
+	event := filepath.Join(c.sysRoot, "devices/event0")
+	writeFile(t, filepath.Join(event, "dev"), "13:64")
+	link(t, event, filepath.Join(c.sysRoot, "dev/char/13:64"))
+	c.stat = func(_ string, st *syscall.Stat_t) error { st.Mode = syscall.S_IFCHR; st.Rdev = 13<<8 | 64; return nil }
+	c.probe = func(Node) probeResult { t.Fatal("event node opened"); return probeResult{} }
+	r, d = c.collect("/dev/input/event0")
+	if r != nil || d == nil || d.Code != ERR_DEVICE_UNSUPPORTED {
+		t.Fatalf("%+v %v", r, d)
 	}
 }

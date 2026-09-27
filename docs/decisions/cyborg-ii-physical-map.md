@@ -21,6 +21,37 @@ It does not prove other firmware, hardware revisions, hands, or an
 evdev-to-control matching rule. No layout assets, rendering, or matching code
 are implemented by this document.
 
+## Raw physical notifications (Issue #108)
+
+Subsequent owner-operated passive acquisition established type57 source/state
+correspondence for all 30 buttons in the table below. Scope is the same
+left-hand Cyborg II, Software2.0.2, displayed firmware111, USB `16d0:12f7:0111`,
+unknown hardware revision, SOFTWARE mode. This adds raw physical identity to
+the earlier screen/export evidence; it does not qualify analog `stick.main`.
+
+The qualified interface04 descriptor is recorded in the
+[current identity contract](device-identity.md#identity-and-grouping-contract).
+Reports are unnumbered 64-byte packets: vendor type at byte2=57, counter byte3,
+declared payload length byte6=2, source ID byte7 and state byte8 (press1/release0).
+Padding is uninterpreted. Other types do not establish physical button state.
+The existing source-to-region mapping is reused without output/pin inference.
+Duplicate, unbound and unknown output assignments do not change physical identity.
+
+The accepted state contract is **last observed**, not continuously current.
+Initial/reopen/disconnect and detected invalidation leave controls unknown;
+a valid report establishes only its own control's observation. Counter wrap
+and reset semantics are unqualified. Conservative discontinuity invalidation
+cannot prove gap-free delivery, and an undetected final lost release can leave
+stale state indefinitely. Silence is neither a release nor initialization proof.
+No Feature/Output/GET_INPUT request or evdev fallback fills those gaps.
+
+Official Azeron Software in SOFTWARE mode is an explicit prerequisite. The
+opt-in production-reader test exercises two positions (source15/16), reconnect,
+new individual observations and close; synthetic mapping tests do not establish
+physical reconnect acceptance. Production hardware results must be recorded
+separately from the original 30-button acquisition. Analog/live output-key state
+and long/double/macro firing or completion remain unsupported.
+
 ## Evidence and limitations
 
 On 2026-09-20 the owner supplied a private export and UI screenshot and confirmed
@@ -253,3 +284,15 @@ met by S1's attributed export and owner-operated screen response, S2's direct
 position/ID mapping, and the explicit revision gaps above. This does not
 complete v1 or waive #29's asset, #30's matching, integration, compatibility,
 or release gates.
+
+### Production lifecycle observation, 2026-09-27
+
+The opt-in `TestPhysicalHardwareLifecycle` passed using the production reader:
+initial unknown, source15/16 press and release, physical USB disconnect with
+unknown state, reopened session with increased Device generation and
+unknown state, source15/16 press and release again, then closed/joined reader.
+The owner performed each operation. The official software stayed running;
+notifications resumed after reconnect without restarting it. The run took
+120.881 seconds including owner interaction; this is not a reconnect-latency
+measurement or a continuous-current-state guarantee. Analog, other firmware,
+right-hand hardware and least-privilege uaccess packaging remain unqualified.

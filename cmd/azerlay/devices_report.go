@@ -25,9 +25,9 @@ type devicesResult struct {
 }
 
 type devicesGroup struct {
-	USBParent  string   `json:"usb_parent"`
-	Complete   bool     `json:"complete"`
-	EventPaths []string `json:"event_paths"`
+	USBParent string   `json:"usb_parent"`
+	Complete  bool     `json:"complete"`
+	HIDPaths  []string `json:"hidraw_paths"`
 }
 
 type devicesNode struct {
@@ -42,21 +42,13 @@ type devicesNode struct {
 
 // Only inspect projection allocates details; list cannot encode these fields.
 type devicesDetails struct {
-	Name                *string           `json:"name"`
-	InputID             *devicesInputID   `json:"input_id"`
-	USBID               *devicesUSBID     `json:"usb_id"`
-	SysfsPath           *string           `json:"sysfs_path"`
-	PhysicalPath        *string           `json:"physical_path"`
-	Serial              *string           `json:"serial"`
-	InterfaceDescriptor *devicesInterface `json:"interface_descriptor"`
-	Capabilities        map[string][]int  `json:"capabilities"`
-}
-
-type devicesInputID struct {
-	Bus     string `json:"bus"`
-	Vendor  string `json:"vendor"`
-	Product string `json:"product"`
-	Version string `json:"version"`
+	Name                *string                  `json:"name"`
+	ReportDescriptor    *device.ReportDescriptor `json:"report_descriptor"`
+	USBID               *devicesUSBID            `json:"usb_id"`
+	SysfsPath           *string                  `json:"sysfs_path"`
+	PhysicalPath        *string                  `json:"physical_path"`
+	Serial              *string                  `json:"serial"`
+	InterfaceDescriptor *devicesInterface        `json:"interface_descriptor"`
 }
 
 type devicesUSBID struct {
@@ -72,14 +64,14 @@ type devicesInterface struct {
 }
 
 func projectDevicesReport(command string, result *device.Result, failure *device.Diagnostic) devicesReport {
-	r := devicesReport{SchemaVersion: 1, Command: command, Error: failure}
+	r := devicesReport{SchemaVersion: 2, Command: command, Error: failure}
 	if result == nil {
 		return r
 	}
 	r.OK = result.OK() && failure == nil
 	r.Result = &devicesResult{Groups: []devicesGroup{}, Nodes: []devicesNode{}, Diagnostics: append([]device.Diagnostic{}, result.Diagnostics...)}
 	for _, g := range result.Groups {
-		r.Result.Groups = append(r.Result.Groups, devicesGroup{g.USBParent, g.Complete, append([]string{}, g.EventPaths...)})
+		r.Result.Groups = append(r.Result.Groups, devicesGroup{g.USBParent, g.Complete, append([]string{}, g.HIDPaths...)})
 	}
 	for _, n := range result.Nodes {
 		if command == "devices list" && n.Admission != "admitted" {
@@ -91,11 +83,7 @@ func projectDevicesReport(command string, result *device.Result, failure *device
 			row.Interface = &value
 		}
 		if command == "devices inspect" {
-			d := &devicesDetails{Name: n.Name, SysfsPath: n.SysfsPath, PhysicalPath: n.PhysicalPath, Serial: n.Serial, Capabilities: n.Capabilities}
-			if n.InputID != nil {
-				id := n.InputID
-				d.InputID = &devicesInputID{fmt.Sprintf("%04x", id.Bus), fmt.Sprintf("%04x", id.Vendor), fmt.Sprintf("%04x", id.Product), fmt.Sprintf("%04x", id.Version)}
-			}
+			d := &devicesDetails{Name: n.Name, SysfsPath: n.SysfsPath, PhysicalPath: n.PhysicalPath, Serial: n.Serial, ReportDescriptor: n.ReportDescriptor}
 			if n.USBID != nil {
 				id := n.USBID
 				d.USBID = &devicesUSBID{fmt.Sprintf("%04x", id.Vendor), fmt.Sprintf("%04x", id.Product), fmt.Sprintf("%04x", id.Release)}
@@ -137,7 +125,7 @@ func writeDevicesReport(report devicesReport, jsonMode bool, stdout, stderr io.W
 	if report.Result != nil {
 		fmt.Fprintf(&output, "Groups: %d\n", len(report.Result.Groups))
 		for _, g := range report.Result.Groups {
-			fmt.Fprintf(&output, "  USB parent: %q; complete: %t; events: %q\n", g.USBParent, g.Complete, g.EventPaths)
+			fmt.Fprintf(&output, "  USB parent: %q; complete: %t; hidraw: %q\n", g.USBParent, g.Complete, g.HIDPaths)
 		}
 		for _, n := range report.Result.Nodes {
 			fmt.Fprintf(&output, "Node: %q; USB parent: %s; interface: %s; roles: %q; %s; %s\n", n.Path, deviceText(n.USBParent), deviceText(n.Interface), n.Roles, n.Admission, n.Access)
@@ -181,11 +169,6 @@ func renderDeviceDiagnostic(out *strings.Builder, d device.Diagnostic) {
 
 func renderDeviceDetails(out *strings.Builder, d *devicesDetails) {
 	fmt.Fprintf(out, "  Name: %s\n  Sysfs path: %s\n  Physical path: %s\n  Serial: %s\n", deviceText(d.Name), deviceText(d.SysfsPath), deviceText(d.PhysicalPath), deviceText(d.Serial))
-	if d.InputID != nil {
-		fmt.Fprintf(out, "  Input ID: %s:%s:%s:%s\n", d.InputID.Bus, d.InputID.Vendor, d.InputID.Product, d.InputID.Version)
-	} else {
-		out.WriteString("  Input ID: <unknown>\n")
-	}
 	if d.USBID != nil {
 		fmt.Fprintf(out, "  USB ID: %s:%s:%s\n", d.USBID.Vendor, d.USBID.Product, d.USBID.Release)
 	} else {
@@ -197,9 +180,9 @@ func renderDeviceDetails(out *strings.Builder, d *devicesDetails) {
 	} else {
 		out.WriteString("  Interface descriptor: <unknown>\n")
 	}
-	for _, family := range []string{"ev", "key", "rel", "abs", "msc", "sw", "led", "ff", "snd"} {
-		if codes, ok := d.Capabilities[family]; ok {
-			fmt.Fprintf(out, "  Capabilities %s: %v\n", family, codes)
-		}
+	if d.ReportDescriptor != nil {
+		fmt.Fprintf(out, "  Report descriptor: usage page %04x, usage %04x, %d bytes, numbered: %t\n", d.ReportDescriptor.UsagePage, d.ReportDescriptor.Usage, d.ReportDescriptor.ReportBytes, d.ReportDescriptor.Numbered)
+	} else {
+		out.WriteString("  Report descriptor: <unknown>\n")
 	}
 }

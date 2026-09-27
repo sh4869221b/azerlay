@@ -9,10 +9,10 @@ import (
 )
 
 func systemCollector() collector {
-	return collector{devRoot: "/dev/input", sysRoot: "/sys", probe: probeNode, stat: syscall.Stat, uid: os.Geteuid()}
+	return collector{devRoot: "/dev", sysRoot: "/sys", probe: probeNode, stat: syscall.Stat, uid: os.Geteuid()}
 }
 
-// Discover collects relevant metadata and probes only admitted event nodes.
+// Discover collects relevant metadata and probes only admitted hidraw nodes.
 func Discover() (*Result, *Diagnostic) { return systemCollector().collect("") }
 
 // Inspect examines only path when supplied; empty path examines all candidates.
@@ -32,7 +32,7 @@ func (c collector) collect(path string) (*Result, *Diagnostic) {
 		}
 		entries = []metadata{c.metadata(path, event)}
 	} else {
-		paths, err := c.events()
+		paths, err := c.hidraws()
 		if err != nil {
 			d := boundaryDiagnostic(err, "enumeration", nil)
 			return nil, &d

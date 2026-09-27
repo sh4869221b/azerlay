@@ -32,7 +32,7 @@ func TestExitCode(t *testing.T) {
 
 func TestReportCategoryOrder(t *testing.T) {
 	t.Parallel()
-	want := []string{"session", "libraries", "layer-shell", "monitor", "configuration", "profile-source", "device-discovery", "permissions", "evdev-capabilities", "control-socket"}
+	want := []string{"session", "libraries", "layer-shell", "monitor", "configuration", "profile-source", "device-discovery", "permissions", "hidraw-capabilities", "control-socket"}
 	checks := []Check{{Category: "configuration", Code: "first", Severity: SeverityOK}}
 	for i := len(want) - 1; i >= 0; i-- {
 		checks = append(checks, Check{Category: want[i], Code: "second", Severity: SeverityOK})

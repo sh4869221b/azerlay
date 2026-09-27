@@ -22,7 +22,7 @@
 | 実装言語 | Go 1.27.x |
 | GUI | GTK4 / gotk4 |
 | Overlay | gtk4-layer-shellを小型CGo bridgeから利用 |
-| 入力 | Linux evdev、read-only、非grab、非inject |
+| 入力 | 限定interface04 hidraw、受動read-only、非grab、非inject |
 | 描画 | GTK4 DrawingArea + Cairo |
 | プロファイル入力 | Azeron exportの厳密import、およびAzeron Softwareローカル設定のread-only取得 |
 | 確認済みexport pipeline | Base64URL → LZMA-Alone → MessagePack String → UTF-8 JSON |
@@ -32,7 +32,7 @@
 | ネットワーク | 使用しない。テレメトリーなし |
 | 公開ライセンス | MPL-2.0推奨。公開前に最終確認 |
 
-設計上の最大の不確定要素は、Azeron Software 2.xの完全なexport型対応表、Cyborg IIのinput IDと物理ボタン位置の対応、Linux版Azeron Softwareローカル保存形式、機器改版ごとのVID/PIDとevent node構成、gotk4とgtk4-layer-shellの実機ABI連携である。これらは本書の「要調査事項」でリリース阻害範囲を明記する。
+設計上の最大の不確定要素は、Azeron Software 2.xの完全なexport型対応表、Cyborg IIのinput IDと物理ボタン位置の対応、Linux版Azeron Softwareローカル保存形式、機器改版ごとのVID/PIDとHID report構成、gotk4とgtk4-layer-shellの実機ABI連携である。これらは本書の「要調査事項」でリリース阻害範囲を明記する。
 
 ---
 
@@ -104,7 +104,7 @@ Azeronプロファイルとリアルタイム入力を表示するLinux/Wayland�
 
 - オープンソースとして利用・改変・再配布しやすい。
 - ファイル単位のコピーレフトであり、派生物の改善を還元させつつ利用側への制約を過度に増やさない。
-- GTK、gotk4、gtk4-layer-shell、go-evdev等の依存関係と組み合わせやすい。
+- GTK、gotk4、gtk4-layer-shell等の依存関係と組み合わせやすい。
 
 公開前に依存ライセンス一覧、NOTICE、SBOMを生成し、ライセンス互換性を再確認する。これは公開リリース前の必須確認である。
 
@@ -124,7 +124,7 @@ of their respective owner.
 
 ## 3. 製品概要
 
-Azerlayは、Azeron Softwareからエクスポートしたプロファイル、またはローカルに保存されたAzeron Software設定を読み取り、各物理ボタンの割当をCyborg IIの模式図上へ表示する。AzeronのLinux入力デバイスから`evdev`イベントを読み、押下中のボタン、スティック方向、マウス・キーボード・ゲームパッド出力をリアルタイムにハイライトする。
+Azerlayは、Azeron Softwareからエクスポートしたプロファイル、またはローカルに保存されたAzeron Software設定を読み取り、各物理ボタンの割当をCyborg IIの模式図上へ表示する。確認済みinterface04 hidrawのtype57通知から30物理ボタンの最終観測状態を得る。analog・live出力キー・trigger発火完了は未対応で、入力からrenderer/runへの接続は別作業とする。
 
 オーバーレイはWayland Layer Shellの`overlay`層に配置し、キーボードフォーカスを取得せず、ポインター入力を透過する。ゲーム入力を横取り、再送、変換しない。
 
@@ -140,7 +140,7 @@ Azeron Cyborg II
       │                       ▼
       │                keybind definitions
       │
-      └── /dev/input/event*
+      └── /dev/hidrawN
                               │
                               ▼
                          live input state
@@ -214,7 +214,7 @@ Azeron Cyborg II
 | OS | Linux（v1はArch/CachyOS。Ubuntuはv1後） |
 | Display server | Wayland |
 | Compositor | Hyprland（v1）。Niriはv1後、動作未検証 |
-| 入力API | Linux evdev |
+| 入力API | Linux hidraw（確認済み受動reportのみ） |
 | 対象機器 | Azeron Cyborg II 左手用（v1）。右手用はv1後の対応へ延期 |
 | CPU architecture | x86_64 |
 | UI toolkit | GTK4 |
@@ -351,15 +351,15 @@ Azeronを外すと「Disconnected」を表示し、読取goroutineを終了す�
 
 | ID | 要件 |
 |---|---|
-| FR-040 | `/dev/input/event*`を列挙し、名前だけでなくVID、PID、物理パス、USB親、シリアル、能力を用いてAzeronを識別すること。 |
-| FR-041 | 1台のAzeronが複数event nodeを公開する場合、同一USB親でグループ化すること。 |
-| FR-042 | 選択したAzeronに属するevent nodeだけを読むこと。システム全体のキーボードを監視しないこと。 |
-| FR-043 | `EV_KEY`、`EV_ABS`、必要に応じて`EV_REL`、`EV_MSC`を処理すること。 |
-| FR-044 | 押下、解放、オートリピートを区別すること。 |
-| FR-045 | ABS軸はカーネルから取得したminimum、maximum、flat、fuzzを用いて`-1.0..1.0`へ正規化すること。 |
-| FR-046 | `SYN_REPORT`単位で入力スナップショットを確定すること。 |
-| FR-047 | `SYN_DROPPED`検出時は次の`SYN_REPORT`まで差分処理を停止し、ioctlで現在状態を再取得して同期すること。 |
-| FR-048 | USB抜差し、event node番号変更、アクセス権変更から自動復帰すること。 |
+| FR-040 | sysfs class/hidrawとUSB ancestryからVID/PID/release、interface04、確認済みreport descriptorを照合すること。名前だけで同定しない。 |
+| FR-041 | 同一USB device親でグループ化し、一意にadmittedなinterface04だけをcompleteとすること。 |
+| FR-042 | 選択したAzeronのinterface04 hidrawだけを読み、devices/doctor/reconnectを含めevdevをopenしないこと。 |
+| FR-043 | 確認済み64-byte vendor type57、宣言長2のsource/stateだけを解釈し、他typeとpaddingを解釈しないこと。 |
+| FR-044 | 確認済みsourceのstate1/0を最終観測press/releaseとして扱い、repeatを推測しないこと。 |
+| FR-045 | 未検証のanalog、live出力キー、trigger発火完了を生成しないこと。静的設定は保持する。 |
+| FR-046 | 受信した有効な物理reportごとに不変snapshotを確定すること。 |
+| FR-047 | 初期・disconnect・reopen・検出したloss・不正reportはunknownとし、個別の有効reportだけで観測を回復すること。末尾欠落未検出によるstale状態を制約として明示する。 |
+| FR-048 | 選択済みUSB identityを維持してhidraw番号変更・権限復帰を再試行すること。公式Softwareの通知復旧は別途実機確認する。 |
 | FR-049 | 入力デバイスをgrabしないこと。 |
 | FR-050 | 入力を注入・再送・加工しないこと。 |
 | FR-051 | root権限で実行しないこと。 |
@@ -369,11 +369,11 @@ Azeronを外すと「Disconnected」を表示し、読取goroutineを終了す�
 | ID | 要件 |
 |---|---|
 | FR-060 | Cyborg IIのプロファイル`input ID`を模式図上のPhysical Controlへ対応付けること。左右モデルを区別すること。 |
-| FR-061 | event出力とプロファイル割当から、押された可能性のあるPhysical Controlを求めること。 |
-| FR-062 | 同一出力を複数ボタンへ割当済みで物理元を一意に判定できない場合、全候補をハイライトすること。誤った1ボタンを選ばないこと。 |
-| FR-063 | 重複による曖昧性は診断状態として保持し、任意で小さな曖昧性マーカーを表示できること。 |
-| FR-064 | 長押し・ダブルタップ・マクロの出力列を時間窓内で照合できること。ただし一意に定まらない場合は候補表示へフォールバックすること。 |
-| FR-065 | `MSC_SCAN`または`hidraw`から物理ボタン固有情報を得られるか調査し、得られないことを前提とした動作を維持すること。 |
+| FR-061 | 確認済みtype57 source IDからPhysical Controlを求め、出力候補を物理元の推定に使わないこと。 |
+| FR-062 | 重複出力でも通知された物理controlだけをknownにし、通知のないcontrolを推測しないこと。 |
+| FR-063 | 静的な出力候補の重複・Unknown・Unbound情報を保持すること。 |
+| FR-064 | 長押し・ダブル・マクロは静的割当表示のみとし、物理pressから発火・完了や実出力を推論しないこと。 |
+| FR-065 | 確認済み30 source IDのhidraw受動通知を使用する。evdev fallback、HID writes/Feature/Output/GET_INPUT要求を行わない。 |
 
 ### 7.6 オーバーレイ表示
 
@@ -434,7 +434,7 @@ Azeronを外すと「Disconnected」を表示し、読取goroutineを終了す�
 | ID | 要件 |
 |---|---|
 | FR-110 | `azerlay doctor`を提供すること。 |
-| FR-111 | Waylandセッション、Layer Shell対応、GTK/共有ライブラリ、モニター、Azeron検出、event node権限、udev rule、プロファイル形式、設定、socket状態を検査すること。 |
+| FR-111 | Waylandセッション、Layer Shell対応、GTK/共有ライブラリ、モニター、Azeron検出、hidraw権限、udev rule、プロファイル形式、設定、socket状態を検査すること。 |
 | FR-112 | エラーコード、短い説明、対象パス、推奨修正コマンドを表示すること。 |
 | FR-113 | `--json`で機械可読な診断結果を出力できること。 |
 | FR-114 | 生のキーバインドや個人用ラベルを診断ログへ出す場合は明示オプションを必要とすること。 |
@@ -802,12 +802,10 @@ Azeronの`input ID`をそのまま公開API上の物理位置名にしない。�
 ```go
 type InputSnapshot struct {
     Sequence     uint64
-    Timestamp    time.Time
     Connected    bool
-    Keys         BitSet
-    Abs          map[CanonicalCode]float64
-    RawEvents    []CompactEvent
-    DroppedCount uint64
+    Generations  Generations
+    Availability Availability
+    Controls     map[PhysicalControlID]PhysicalState // Known, Down: last observed
 }
 
 type OverlaySnapshot struct {
@@ -815,13 +813,14 @@ type OverlaySnapshot struct {
     Layout        *LayoutDefinition
     Device        DeviceStatus
     Controls      map[PhysicalControlID]VisualControlState
-    Stick         []VisualAxisState
     Status        OverlayStatus
     Generation    uint64
 }
 ```
 
-描画は`OverlaySnapshot`以外へアクセスしない。
+これは概念モデルであり、入力の各物理controlは`Known`と`Down`を持つ最終観測状態とする。初期・切断・再open・検出した欠落や不正reportではunknownへ戻し、有効な通知はそのcontrolだけを更新する。未検出の末尾release欠落ではstaleが残り得る。実装のsnapshotは所有権を分離し、外部から変更させない。
+
+Stickの方向・入力量は将来機能であり、このraw通知経路では未検証・未対応。描画は将来の`OverlaySnapshot`以外へアクセスしない。
 
 ---
 
@@ -949,132 +948,71 @@ locale = "ja-JP"
 
 ## 12. デバイス検出と権限
 
-### 12.1 検出
+### 12.1 検出と選択
 
-`/dev/input/event*`ごとに次を取得する。
+sysfs `class/hidraw`、USB device親の`16d0:12f7:0111`、interface04
+(`03/00/00`)と28-byte descriptor
+`0601ff0a0101a1017508150026ff00954009018102954009029102c0`を照合する。
+これはusage page `ff01`、usage `0101`、unnumbered64-byte Input/Outputである。
+実際の読取・診断用openは`O_RDONLY|O_NONBLOCK|O_CLOEXEC`、fstatとOS保有の
+HID identity/descriptor gettersおよび再取得したsysfs metadataで確認する。
+診断はreportを消費せずcloseする。イベントノードは列挙対象・fallbackにしない。
 
-- `EVIOCGNAME`
-- `EVIOCGID`
-- capabilities
-- sysfs path
-- USB VID/PID
-- serial
-- physical path
-- parent USB device
+USB device親ごとにgroupを作り、一意にadmittedなinterface04をcompleteとする。
+再接続では既知serialが一意に一致する機器だけを選ぶ。serialなしは元USB親に
+限定し、同じポートでの物理個体同一性までは保証しない。複数候補を勝手に選ばない。
 
-デバイス名の部分一致だけでAzeronと判定しない。
+### 12.2 権限
 
-### 12.2 複数event node
+Issue #37の配布要件はhidraw subsystem、VID/PID/release、interface04限定の
+uaccessとする。恒久input-group加入、root、VIDだけの広いgrantは要求しない。
+この実装ではruleを作成・インストールしない。uaccess自体がread-onlyを強制する
+わけではなく、アプリのopen flagsと非書込契約で制限する。旧event-node ruleと
+既存hostの広い0666 grantは新経路の権限検証ではない。
 
-Azeronがキーボード、マウス、ゲームパッド等を別event nodeで公開する可能性がある。sysfsの同一USB parentでグループ化し、能力ごとにReaderを開始する。
+### 12.3 安全原則
 
-```text
-Azeron USB device
-├── event-kbd
-├── event-mouse
-└── event-joystick
-        │
-        └── DeviceGroup
-```
-
-実際のinterface topologyはモデル・ファームウェア・動作モードごとに調査する。
-
-### 12.3 udev rule
-
-利用者を`input`グループへ追加しない。Azeron対象だけへseat利用者アクセスを与える。
-
-概念例:
-
-```udev
-SUBSYSTEM=="input", KERNEL=="event*", ATTRS{idVendor}=="<VID>", ATTRS{idProduct}=="<PID>", TAG+="uaccess"
-```
-
-観測済みの `16d0:12f7` / USB release `0111` / interface `01/02/03` の識別条件と具体的なrule候補は[device identity decision](decisions/device-identity.md)に記録する。未観測の改版・左右・動作モードへの対応と配布時のseat ACL適用は未検証。汎用的すぎるruleを配布しない。
-
-### 12.4 安全原則
-
-- root実行時は警告または原則拒否する。
-- event nodeをread-onlyで開く。
-- `EVIOCGRAB`を呼ばない。
-- `/dev/uinput`を使用しない。
-- hidrawは1.0の通常実行パスで使用しない。
+- 一般キーボード、evdev、uinputを利用しない。
+- grab/remap/inject、HID write、Feature/Output/GET_INPUT要求を行わない。
+- 公式Azeron SoftwareのSOFTWARE modeを明示的前提とし、アプリ単独初期化しない。
+- USB identityからhand、Software mode、Hardware revisionを推定しない。
 
 ---
 
 ## 13. 入力処理
 
-### 13.1 Reader
+### 13.1 ReaderとReducer
 
-同一DeviceGroup内のevent nodeごとに1 goroutineを使用する。各Readerはイベントを中央Reducerへ送る。
+選択したhidrawに1 reader、順序付きreducerを使う。ボタンごとのgoroutineや
+汎用backend frameworkを作らない。vendor typeはbyte2=57、counterはbyte3、
+宣言payload lengthはbyte6=2、source/stateはbyte7/8である。64-byte reportの
+確認済み30 IDsとstate0/1だけを受理し、layout.LoadEmbeddedのsource→region対応を
+使う。stick.mainは未対応。他typeは無視し、paddingは解釈しない。
 
-```text
-reader(event-kbd) ─┐
-reader(event-mouse) ├─> reducer ─> immutable snapshot
-reader(event-js)  ──┘
-```
+### 13.2 最終観測状態
 
-ボタンごとにgoroutineを作らない。
+Snapshotは**最終観測状態**であり、連続した現在状態ではない。
+初期/reopenは全unknown・availability unconfirmed。有効reportでそのcontrolだけを
+knownにし、availability observedとする。不正物理reportは全unknownに戻す。
+counterの通常増分以外（wrap/resetを含む）は保守的なloss疑いとして過去の知識を
+破棄する。counterから無欠落・一周・連続性や完全復旧を保証しない。
+**検出できない末尾release欠落では古い観測が無期限に残り得る。**
+沈黙やtimeoutをrelease/unavailableの根拠にしない。
 
-### 13.2 Reducer
+読取失敗/disconnectは全unknown・unavailable。Managedは選択identityを保持し、
+250msごとに再取得する。旧reader/fdをclose/joinしてから新sessionを開始し、
+成功した置換でのみDevice generationを増やす。Profile generationと設定/profileの
+last-good状態を維持する。回復は新たな個別通知のみで、状態snapshot要求は行わない。
 
-Reducerは単一の順序付きイベント処理主体とし、次を保証する。
+### 13.3 表示への境界
 
-- event nodeごとの順序保持。
-- DeviceGroupの状態統合。
-- `SYN_REPORT`境界での確定。
-- プロファイル世代番号との整合。
-- disconnect時の全押下解除。
-- monotonic timestampの利用。
-
-### 13.3 UI通知
-
-入力イベントごとにGTKへ描画要求を送らない。Reducerがdirty状態を設定し、UI側のcoalescerが最大指定Hzで最新スナップショットだけを描画する。
-
-- 既定: 60 Hz
-- 選択肢: 30 / 60 / 120 Hz
-- 変化がないとき: periodic redrawなし
-- イベント滞留時: 古い中間状態を捨て、最新状態を優先
-
-### 13.4 スティック
-
-#### アナログモード
-
-```text
-normalized = clamp((raw - center) / usable_range, -1, 1)
-```
-
-- kernelのmin/max/flat/fuzzを考慮。
-- Azeronプロファイルのデッドゾーン・角度・反転設定を表示モデルに反映。
-- 入力処理そのものを変更しない。
-
-#### WASDモード
-
-W/A/S/D等の割当キー押下から方向を構成する。対角線を表示できる。
-
-### 13.5 長押し・ダブルタップ・マクロ
-
-AzerlayはAzeronが生成した出力イベントを観測するだけであり、物理トリガーを必ず直接観測できるとは限らない。
-
-- single、long、doubleの設定は表示する。
-- 出力シーケンスが固有なら候補トリガーを強調する。
-- シーケンス照合は有界バッファと有界時間窓で行う。
-- 一意でなければ複数候補を表示する。
-- マクロを再実行しない。
-
-### 13.6 重複割当の制約
-
-例:
-
-```text
-Input 3  → KEY_Q
-Input 17 → KEY_Q
-```
-
-evdev上で両者が同じ`KEY_Q`を出力する場合、出力イベントだけでは物理元を特定できない。AzerlayはInput 3または17を勝手に選ばず、双方を候補としてハイライトする。
-
-`MSC_SCAN`やhidraw reportで区別できる可能性は要調査。区別できなくても製品は正しく動作できるよう、この曖昧性フォールバックを必須とする。
-
----
+静的profile/layoutと出力候補は割当表示用に保持し、入力元の決定には使わない。
+ProjectMatchingは明示されたleft-hand Cyborg II、Software2.0.2、表示firmware111、
+unknown revision、keyboard-stick layoutおよびSOFTWARE modeで30領域を投影する。
+SOFTWARE modeとlayoutのkeyboard-stickは別条件である。非対応contextはunknown。
+analog/live出力キー/long・double・macro発火完了は未対応のままとする。
+入力libraryからrun/controller/GTKへの新規配線は今回行わない。今後のUI接続でも
+GTK main thread上の描画はI/Oや待機を行わず、最新immutable snapshotを使う。
 
 ## 14. レイアウトと描画
 
@@ -1213,7 +1151,7 @@ Azerlayは原則1プロセスで動作する。
 azerlay process
 ├── GTK main thread
 ├── device manager
-├── evdev reader(s)
+├── qualified hidraw reader
 ├── input reducer
 ├── source watcher
 ├── config watcher
@@ -1302,6 +1240,7 @@ serial = ""
 auto_reconnect = true
 
 [input]
+# Legacy accepted setting; unwired. The input library never starts evdev.
 source = "auto"
 refresh_hz = 60
 show_ambiguous = true
@@ -1392,10 +1331,10 @@ azerlay devices list [--json] [--help]
 azerlay devices inspect [path] [--json] [--help]
 ```
 
-These standalone commands collect metadata and probe admitted event nodes
-read-only for access and identification. They do not read input events, change
+These standalone commands collect metadata and probe admitted hidraw nodes
+read-only for access and identification. They do not consume HID reports, change
 permissions, or use configuration, profile storage, or the runtime socket.
-Runtime input and device checks within `doctor` are not implemented.
+Doctor uses the same passive identity/access boundary. Runtime input remains unwired to run/GTK.
 Admission and grouping follow the researched `16d0:12f7:0111`
 [identity contract](decisions/device-identity.md#identity-and-grouping-contract);
 no wider variant or release support is implied.
@@ -1410,7 +1349,7 @@ selects JSON even if other arguments are invalid.
 List returns admitted nodes and groups plus relevant candidate diagnostics.
 Inspect without a path also shows excluded relevant candidates; explicit
 inspect examines only the supplied node. Relative paths and symlinks must map
-by device number to an existing input event in sysfs. Explicit inspection does
+by device number to an existing hidraw node in sysfs. Explicit inspection does
 not bypass admission or open sibling nodes. Paths are transient locators.
 
 | Exit | Meaning |
@@ -1421,8 +1360,7 @@ not bypass admission or open sibling nodes. Paths are transient locators.
 
 Warnings alone do not fail a qualifying readable subset. Unsupported automatic
 candidates use warning-level `ERR_DEVICE_UNSUPPORTED`; explicit unsupported
-targets use error-level severity. Missing/excluded interfaces produce
-`WARN_DEVICE_INCOMPLETE`. Candidate metadata failures, denied access, and
+targets use error-level severity. Multiple admitted interface04 nodes produce `ERR_DEVICE_AMBIGUOUS`. Candidate metadata failures, denied access, and
 disconnections remain errors even when another node is readable. Root adds
 `WARN_DEVICE_ROOT` without changing the exit status: root access does not prove
 ordinary-user access. A successful open does not verify installed least-privilege
@@ -1433,7 +1371,7 @@ characters are escaped. JSON is one newline-terminated object on stdout, with
 no stderr when writing succeeds, including usage failures:
 
 ```text
-{schema_version: 1, command, ok, result, error}
+{schema_version: 2, command, ok, result, error}
 ```
 
 `command` is `devices list` or `devices inspect` (`devices` for parent usage).
@@ -1443,17 +1381,19 @@ resolution, or enumeration fails before a result exists. `error` is `null` or
 the first error diagnostic in output order. Diagnostics contain `code`,
 `severity`, `stage`, `summary`, nullable `target`, and `remediation`.
 
-Groups contain `usb_parent`, `complete`, and `event_paths`. Completeness means
-all three expected interfaces were admitted, not that all nodes are readable.
+Groups contain `usb_parent`, `complete`, and `hidraw_paths`. Completeness means
+exactly one interface04 was admitted, independently of read access.
 Node summaries contain `path`, nullable `usb_parent` and `interface`, `roles`,
 `admission` (`admitted`, `unsupported`, `indeterminate`), and `access`
 (`readable`, `denied`, `unavailable`, `not_checked`). Inspect adds `name`,
-`input_id`, `usb_id`, `sysfs_path`, `physical_path`, **`serial`**,
-`interface_descriptor`, and `capabilities`; list omits all these detail fields.
+`usb_id`, `sysfs_path`, `physical_path`, **`serial`**,
+`interface_descriptor`, and `report_descriptor`; list omits all these detail fields.
 Inspect may disclose serial even without a path. Unknown optional values are
-`null`. IDs use lowercase fixed-width hexadecimal strings; capabilities use
-sorted numeric code arrays by family. Groups sort by parent path, nodes by
-event number/path, and diagnostics by target then code.
+`null`. USB/interface IDs use lowercase fixed-width hexadecimal strings.
+Report descriptor summary contains numeric `usage_page`, `usage`, `report_bytes`
+and boolean `numbered`; raw descriptor bytes are never output. The obsolete
+`input_id` and `capabilities` fields are absent. Groups sort by parent path, nodes by
+hidraw number/path, and diagnostics by target then code.
 
 ### 17.2 `run`
 
@@ -1503,7 +1443,7 @@ configuration
 profile-source
 device-discovery
 permissions
-evdev-capabilities
+hidraw-capabilities
 control-socket
 ```
 
@@ -1515,15 +1455,22 @@ control-socket
 | `internal_error` | `3` |
 
 reportの終了コードは最大severityから決める。現在のbuildではlibraries、layer-shell、
-monitor、device-discovery、permissionsのdevice/udev検査、evdev-capabilitiesが未実装で、
+monitorが未実装で、
 `WARN_CHECK_NOT_IMPLEMENTED`になる。他の問題がない環境でも終了1であり、終了0や
 overlayの動作可能性を保証しない。sessionの成功は`WAYLAND_DISPLAY`が非空という
 environment確認だけで、compositor接続を検証しない。
+
+device-discoveryは対応groupの有無/曖昧性、permissionsはread-only open可否、
+hidraw-capabilitiesはdescriptor対応を検査する。reportは消費せず機器へrequestを
+送らない。成功は通知初期化を保証せず、公式SoftwareのSOFTWARE mode確認を案内する。
+serial/raw reportsを出さず、安全なnode targetと固定診断のみを投影する。
 
 主要な診断codeと分類:
 
 | 状態 | code / severity |
 | --- | --- |
+| 対応deviceなし・descriptor非対応 | `ERR_DEVICE_NOT_FOUND`・`ERR_DEVICE_UNSUPPORTED` / warning |
+| device曖昧・権限拒否・metadata失敗・切断 | 対応する`ERR_DEVICE_*` / error |
 | Wayland環境なし | `ERR_SESSION_WAYLAND_REQUIRED` / error |
 | 設定なし・無効 | `ERR_CONFIG_NOT_FOUND`・`ERR_CONFIG_INVALID` / error |
 | 設定の未知key | `WARN_CONFIG_UNKNOWN_KEY` / warning（key名や値を出さず集約） |
@@ -1539,13 +1486,14 @@ environment確認だけで、compositor接続を検証しない。
 | 内部診断エラー | `ERR_DOCTOR_INTERNAL` / internal_error |
 
 成功codeは`OK_SESSION_ENVIRONMENT`、`OK_CONFIGURATION`、`OK_PROFILE_SOURCE`、
-`OK_CONTROL_SOCKET`。socket成功もconnectivityだけを表し、live degraded reasonsを
+`OK_CONTROL_SOCKET`、`OK_DEVICE_DISCOVERY`、`OK_DEVICE_ACCESS`、
+`OK_HIDRAW_CAPABILITIES`。socket成功もconnectivityだけを表し、live degraded reasonsを
 省略しない。既知のdevice/input/renderer、profile、configのcodeだけを固定文言へ写像し、
 同じlive reason codeを重複表示しない。liveのconfig failureとprofile storage failureはerror、
 その他の既知degraded状態はwarningとする。remoteのreason/name/source_refや
 underlying errorはそのまま出力しない。timeoutや不正応答はstaleと判定しない。
 
-`--json`は改行終端のobjectをstdoutへ1件出す。トップレベルは`schema_version: 1`、
+`--json`は改行終端のobjectをstdoutへ1件出す。トップレベルは`schema_version: 2`、
 `command: "doctor"`、`exit_code`、`checks`で、既存control reportの`ok`/`result`/`error`
 envelopeは使わない。各checkは`category`、`code`、`summary`、`target`、`remediation`、
 `severity`を持つ。`target`は常に存在するstringまたはnullで、他はstringである。
@@ -1669,7 +1617,7 @@ ERR_INSTANCE_RUNNING
 
 - 悪意ある圧縮データによるメモリ枯渇。
 - 巨大JSON、深いnest、巨大macroによるDoS。
-- event node権限の過剰付与。
+- hidraw権限の過剰付与。
 - 全キーボード入力監視による機密情報取得。
 - 制御socketの他ユーザー操作。
 - AzeronローカルDBの破損。
@@ -1680,7 +1628,7 @@ ERR_INSTANCE_RUNNING
 - 圧縮・展開・JSON・配列・文字列の上限。
 - Azeron DeviceGroupだけを監視。
 - root、`input`グループ、grab、uinputを不使用。
-- udevで対象VID/PIDだけに`uaccess`。
+- udevで対象hidraw・VID/PID/release・interface04だけに`uaccess`。
 - socket 0600、同一UID確認。
 - ローカルAzeronデータはread-only。
 - データ保存0600、ディレクトリ0700。
@@ -1691,7 +1639,7 @@ ERR_INSTANCE_RUNNING
 
 ### 20.3 プライバシー
 
-AzerlayはAzeronデバイス由来のevent nodeのみを読み、一般キーボードの入力履歴を収集しない。入力イベントを永続保存しない。デバッグevent dumpは明示実行時だけで、自動削除または保存先明示を要求する。
+Azerlayは選択した確認済みinterface04 hidrawのみを読み、一般キーボードやevdevを監視しない。raw report全体、serial、private profileや入力streamをログ・永続保存しない。明示された実機検証では対象source/state・件数・最小の相対時刻と判定だけを記録する。
 
 ---
 
@@ -1710,14 +1658,14 @@ AzerlayはAzeronデバイス由来のevent nodeのみを読み、一般キーボ
 | 60 Hz描画中CPU | 1 core換算2%以下 |
 | RSS | 120 MiB以下 |
 | disconnect→reconnect復帰 | 2秒以内 |
-| 入力event loss | 0、loss検出時はresync |
+| 入力report loss | 検出時unknown。未検出末尾欠落のstale状態は制約として許容 |
 
 GTK、font cache、環境差があるため、CIだけでなくターゲット実機で測定する。
 
 ### 21.2 信頼性
 
 - 不正インポートでpanicしない。
-- event node切断でプロセス終了しない。
+- hidraw切断でプロセス終了しない。
 - 設定再読込失敗で正常状態を失わない。
 - 起動中のAzeron Softwareを妨害しない。
 - 24時間連続実行でgoroutine、fd、メモリが増え続けない。
@@ -1755,7 +1703,7 @@ GTK、font cache、環境差があるため、CIだけでなくターゲット�
 | 分野 | 採用技術 | 備考 |
 |---|---|---|
 | 言語 | Go 1.27.x | patch版をCIで固定 |
-| Linux入力 | `github.com/holoplot/go-evdev` | evdev read、Pure Go |
+| Linux入力 | 標準os/syscall + 限定hidraw decoder | 受動readとOS保有metadata getterのみ |
 | GUI | GTK4 + `github.com/diamondburned/gotk4` | branch 4系をcommit/pseudo-version固定 |
 | Overlay | `gtk4-layer-shell` 1.3.x | C APIへ薄いCGo bridge |
 | 描画 | Cairo / GTK4 DrawingArea | gotk4経由 |
@@ -1771,14 +1719,8 @@ GTK、font cache、環境差があるため、CIだけでなくターゲット�
 
 ### 22.2 条件付き依存
 
-`golang.org/x/sys/unix`は、go-evdevが次を十分に公開しない場合だけ直接依存する。
-
-- `SYN_DROPPED`後の状態再取得
-- peer credential
-- inotify/udev補助
-- 必要なioctl
-
-採用可否は実装前調査で決定する。
+入力移行ではproduction dependencyを追加しない。既存標準ライブラリの
+os/syscallとGo pollerでread-only lifecycleを実装する。
 
 ### 22.3 CGo方針
 
@@ -1853,9 +1795,9 @@ azerlay/
 │   │   └── permission.go
 │   ├── input/
 │   │   ├── reader.go
-│   │   ├── event.go
+│   │   ├── physical_report.go
 │   │   ├── reducer.go
-│   │   ├── resync.go
+│   │   ├── snapshot.go
 │   │   ├── axis.go
 │   │   └── matcher.go
 │   ├── layout/
@@ -2049,12 +1991,11 @@ FuzzLoadLayout
 
 ### 25.4 Integration Test
 
-- synthetic event deviceまたはuinputをテスト環境内だけで使用し、Azerlay本体はuinputを依存しない。
-- EV_KEY press/release/repeat
-- EV_ABS
-- multiple event nodes
-- disconnect/reconnect
-- `SYN_DROPPED` + resync
+- synthetic sysfs/hidraw metadataとOS pipeを使う。
+- type57の30 source ID press/release、malformed、padding非解釈
+- 初期unknown、counter loss疑い、切断とgeneration更新
+- selected identityのrenumber/reconnect、no event open、fd cleanup
+- opt-in production reader実機操作はsyntheticとは別に記録し、未実施をpassにしない。
 - permission denied
 - config atomic rename
 - source file partial write
@@ -2184,9 +2125,9 @@ trace
 - uptime
 - visible
 - active profile/source
-- active device/event nodes
+- active device identity（既存control schemaのevent_nodesは未接続の空配列を維持）
 - event rate
-- dropped/resync count
+- detected invalidation count（未検出のreport欠落を数えられるとは主張しない）
 - render rate
 - last reload result
 - current generation
@@ -2226,7 +2167,7 @@ v1は、[binding conversion decision](decisions/binding-conversion.md)に記載�
 
 ### AC-005 デバイス
 
-Cyborg IIを正しいevent node群として検出し、他の一般キーボードを監視しない。抜差し後2秒以内を目標に自動復帰する。
+Cyborg IIの確認済みinterface04だけを検出し、他機器・evdevを監視しない。再接続はidentityを維持しunknownから新通知を観測する。公式Software起動前提で実機確認し、2秒目標の測定と状態完全保証は別事項とする。
 
 ### AC-006 リアルタイム表示
 
@@ -2242,11 +2183,11 @@ Azerlay起動前後でBodycamのAzeron入力が欠落・二重化・遅延増大
 
 ### AC-009 曖昧性
 
-同じ出力へ複数ボタンが割り当てられている場合、全候補を表示し、誤った単一ボタンを断定しない。
+静的な割当候補の表示では、同じ出力へ複数ボタンが割り当てられている場合に全候補を示し、単一候補を断定しない。物理通知によるハイライトは通知されたsource IDに対応する1つのcontrolだけを更新し、出力の候補群へ伝播させない。
 
 ### AC-010 アナログ
 
-Thumbstickの方向・入力量を表示し、WASDモードとアナログモードを区別する。
+Thumbstickの方向・入力量とWASD/アナログモードのlive表示は延期する。type57による物理ボタン通知ではアナログ入力を解釈せず、対応を主張しない。
 
 ### AC-011 設定復旧
 
@@ -2284,7 +2225,7 @@ fuzz testでpanic、無制限メモリ確保、部分保存が発生しない。
 | R-002 | Cyborg II左手用の`input ID`/pin→物理位置対応と改版差（v1）。右手用はv1後の対応へ延期 | 正しい模式図ハイライト | Cyborg II左手用のv1正式対応。右手用はv1を阻害しない |
 | R-003 | Linux版Azeron Software 2.xのローカル保存パス、形式、locking | LocalSource実装 | ローカル自動読取 |
 | R-004 | active profile、favorite、software/on-board状態の保存方法 | 自動選択 | プロファイル自動追従 |
-| R-005 | Cyborg II各改版のVID/PID、USB interface、event node topology（[観測済み署名の決定](decisions/device-identity.md)あり、他の改版・左右・動作モードは未検証） | udevとDeviceGroup | 未観測範囲の自動検出・権限、配布時のACL検証 |
+| R-005 | Cyborg II各改版のVID/PID、USB interface、hidraw descriptor（[観測済み署名の決定](decisions/device-identity.md)あり、他の改版・左右・動作モードは未検証） | udevとDeviceGroup | 未観測範囲の自動検出・権限、配布時のACL検証 |
 | R-006 | gotk4 branch 4と対象GTK4版、native GtkWindow/GdkSurface pointer連携 | 安定したCGo bridge | Overlay起動 |
 | R-007 | [Hyprland v1配置の実測と決定](decisions/compositor-placement.md)：anchor、exclusive zone、monitor指定。Niriはv1後、動作未検証 | 正しい配置 | Overlay正式対応 |
 | R-008 | GDK empty input regionのmap/remap/hotplug後挙動（[アプリ起点のremap実測](decisions/overlay-abi.md)あり。compositor起点のremapと物理hotplugは未検証） | 完全click-through | Overlay正式対応 |
@@ -2299,10 +2240,10 @@ fuzz testでpanic、無制限メモリ確保、部分保存が発生しない。
 
 | ID | 調査内容 | フォールバック |
 |---|---|---|
-| R-020 | `MSC_SCAN`で重複割当の物理元を識別可能か | 全候補をハイライト |
-| R-021 | read-only hidrawで物理ボタンIDまたはactive on-board profileを取得可能か | 使用しない |
+| R-020 | 旧evdevの`MSC_SCAN`調査は終了し、確認済みtype57 source IDによる物理識別へ置換 | evdevへのfallbackなし。静的割当候補は物理通知と分離 |
+| R-021 | type57の30物理source IDは確認済み。last-observed契約を採用し、未検出末尾欠落はstaleになり得る | onboard profile/analog/連続現在状態保証は対象外 |
 | R-022 | Sway/KDE等の追加Compositor | 準対応扱い |
-| R-023 | AppImage/Flatpakでevdev、udev、Layer Shellを安全に配布可能か | tarball/Native package |
+| R-023 | AppImage/Flatpakでhidraw、udev、Layer Shellを安全に配布可能か | tarball/Native package |
 | R-024 | ゲームプロセス検出による自動プロファイル切替 | 手動選択 |
 
 ### 29.3 調査時に収集する資料
@@ -2328,13 +2269,13 @@ fuzz testでpanic、無制限メモリ確保、部分保存が発生しない。
 | 言語 | Go | 入力・設定監視・CLI・単一バイナリ構成が簡潔。性能上十分。 |
 | GUI | gotk4 / GTK4 | WaylandとLayer Shell統合が堅実。 |
 | Layer Shell | gtk4-layer-shell + 小型CGo | 現行GTK4対応を直接利用し、古いGTK3用Go wrapperを避ける。 |
-| 入力 | evdev | Linux標準input eventを直接、read-onlyで扱える。 |
+| 入力 | 限定hidraw | 確認済み物理source通知をread-onlyで扱える。 |
 | 描画 | Cairo | 小さな2D模式図にwgpu等は不要。 |
 | import parser | 厳密pipeline | `Base64URL→LZMA→MessagePack String→JSON`を実データで確認。ヒューリスティックを排除。 |
 | プロファイル | RawとNormalizedを分離 | Azeron形式更新をadapterへ閉じ込める。 |
 | UI制御 | CLI + TOML + Unix socket | Web UIや別デーモンなしで運用可能。 |
 | 権限 | udev uaccess | root・input groupを避ける。 |
-| 入力同定 | 候補集合 | 同じoutputを持つ物理ボタンはevdevだけで一意化できない。 |
+| 入力同定 | type57 source ID | 出力割当に依存せず30物理controlの最終観測状態を投影する。 |
 | 配布 | Native package/tarball | GTK/Layer Shell/udevとの統合を明確にする。 |
 | ネットワーク | なし | プライバシー、単純性、ゲーム中の安定性。 |
 
@@ -2370,7 +2311,7 @@ fuzz testでpanic、無制限メモリ確保、部分保存が発生しない。
 - GDK Surface input region: https://docs.gtk.org/gdk4/method.Surface.set_input_region.html
 - gtk4-layer-shell: https://github.com/wmww/gtk4-layer-shell
 - gotk4: https://github.com/diamondburned/gotk4
-- go-evdev: https://github.com/holoplot/go-evdev
+- Linux hidraw: https://docs.kernel.org/hid/hidraw.html
 - xz/lzma for Go: https://pkg.go.dev/github.com/ulikunitz/xz/lzma
 - fswatcher: https://github.com/fswatcher/fswatcher
 - go-toml/v2: https://github.com/pelletier/go-toml
@@ -2386,7 +2327,7 @@ Azerlay 1.0の中核構成は次で固定する。
 
 ```text
 Go 1.27.x
-+ go-evdev
++ qualified hidraw passive reader
 + gotk4 / GTK4
 + gtk4-layer-shell（小型CGo bridge）
 + Cairo

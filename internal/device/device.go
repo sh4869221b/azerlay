@@ -1,8 +1,16 @@
 package device
 
-// InputID is the kernel input_id, not a persistent device identity.
-type InputID struct {
-	Bus, Vendor, Product, Version uint16
+// RawID is the identity held by the kernel HID driver.
+type RawID struct {
+	Bus             uint32
+	Vendor, Product uint16
+}
+
+type ReportDescriptor struct {
+	UsagePage   uint16 `json:"usage_page"`
+	Usage       uint16 `json:"usage"`
+	ReportBytes int    `json:"report_bytes"`
+	Numbered    bool   `json:"numbered"`
 }
 
 type USBID struct {
@@ -14,26 +22,25 @@ type Interface struct {
 }
 
 type Node struct {
-	Path         string
-	USBParent    *string
-	Interface    *Interface
-	Roles        []string
-	Admission    string
-	Access       string
-	Name         *string
-	InputID      *InputID
-	USBID        *USBID
-	SysfsPath    *string
-	PhysicalPath *string
-	Serial       *string
-	Capabilities map[string][]int
-	deviceNumber uint64
+	Path             string
+	USBParent        *string
+	Interface        *Interface
+	Roles            []string
+	Admission        string
+	Access           string
+	Name             *string
+	ReportDescriptor *ReportDescriptor
+	USBID            *USBID
+	SysfsPath        *string
+	PhysicalPath     *string
+	Serial           *string
+	deviceNumber     uint64
 }
 
 type Group struct {
-	USBParent  string
-	Complete   bool
-	EventPaths []string
+	USBParent string
+	Complete  bool
+	HIDPaths  []string
 }
 
 type Result struct {

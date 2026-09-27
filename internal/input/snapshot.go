@@ -1,88 +1,38 @@
 package input
 
-import (
-	"slices"
-	"time"
+import "maps"
+
+type Generations struct{ Device, Profile uint64 }
+type Availability string
+
+const (
+	Unconfirmed Availability = "unconfirmed"
+	Observed    Availability = "observed"
+	Unavailable Availability = "unavailable"
 )
 
-// Snapshot contains committed node-local state and only the reporting node's
-// current frame. Its private storage is immutable; accessors return values or
-// defensive copies. Exported scalar fields belong to the receiving caller.
+type PhysicalState struct{ Down, Known bool }
+
+// Snapshot is the last received observation, not guaranteed current state.
+// Undetected terminal-report loss can leave an observation stale indefinitely.
 type Snapshot struct {
-	Sequence    uint64
-	Timestamp   time.Duration
-	Connected   bool
-	Generations Generations
-
-	nodes         []nodeState
-	axisInfo      []map[uint16]AxisInfo
-	reportingNode int
-	events        []Event
-	relative      map[uint16]int64
+	Sequence     uint64
+	Connected    bool
+	Generations  Generations
+	Availability Availability
+	Reason       string
+	controls     map[string]PhysicalState
+	observation  *PhysicalEvent
 }
 
-type nodeState struct {
-	keys     map[uint16]bool
-	absolute map[uint16]int32
-}
+func (s *Snapshot) Physical(region string) PhysicalState { return s.controls[region] }
+func (s *Snapshot) Controls() map[string]PhysicalState   { return maps.Clone(s.controls) }
 
-// Key reports the last observed committed state. known is false until a key is
-// observed; an unknown initial state must not be interpreted as released.
-func (s *Snapshot) Key(node int, code uint16) (down, known bool) {
-	if node < 0 || node >= len(s.nodes) {
-		return false, false
+// LastObservation identifies the report that produced this publication.
+// Initial, invalidated and disconnected snapshots have no observation.
+func (s *Snapshot) LastObservation() (PhysicalEvent, bool) {
+	if s.observation == nil {
+		return PhysicalEvent{}, false
 	}
-	down, known = s.nodes[node].keys[code]
-	return down, known
-}
-
-// Absolute returns the raw committed value, without normalization. known is
-// false until that node's axis is observed.
-func (s *Snapshot) Absolute(node int, code uint16) (value int32, known bool) {
-	if node < 0 || node >= len(s.nodes) {
-		return 0, false
-	}
-	value, known = s.nodes[node].absolute[code]
-	return value, known
-}
-
-// AxisInfo returns kernel metadata by value. Its presence does not mean an
-// absolute-axis value has been observed.
-func (s *Snapshot) AxisInfo(node int, code uint16) (info AxisInfo, present bool) {
-	if node < 0 || node >= len(s.axisInfo) {
-		return AxisInfo{}, false
-	}
-	info, present = s.axisInfo[node][code]
-	return info, present
-}
-
-// ReportingNode identifies the selected-path index whose SYN_REPORT published
-// this frame. Initial and terminal snapshots have no reporting node.
-func (s *Snapshot) ReportingNode() (node int, present bool) {
-	return s.reportingNode, s.reportingNode >= 0
-}
-
-// Relative returns the reporting frame's accumulated delta for one raw code.
-// Legacy and high-resolution wheel codes remain separate.
-func (s *Snapshot) Relative(code uint16) (delta int64, present bool) {
-	delta, present = s.relative[code]
-	return delta, present
-}
-
-// FrameEvents returns a copy of relevant events in the reporting frame's order.
-// It contains no SYN marker, other nodes' pending events, or previous frames.
-func (s *Snapshot) FrameEvents() []Event { return slices.Clone(s.events) }
-
-// KeyTransitions returns all press, release and repeat transitions in the
-// reporting frame, including multiple changes of a single key.
-func (s *Snapshot) KeyTransitions() []KeyTransition {
-	var transitions []KeyTransition
-	for _, event := range s.events {
-		if event.Type == EV_KEY {
-			transitions = append(transitions, KeyTransition{
-				Timestamp: event.Timestamp, Code: event.Code, Action: KeyAction(event.Value),
-			})
-		}
-	}
-	return transitions
+	return *s.observation, true
 }

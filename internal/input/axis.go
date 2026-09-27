@@ -26,14 +26,3 @@ func NormalizeAxis(raw int32, info AxisInfo) (float64, bool) {
 	}
 	return 0, true
 }
-
-// NormalizedAbsolute distinguishes an observed raw value from a usable
-// normalization. Missing observations or metadata leave valid false.
-func (s *Snapshot) NormalizedAbsolute(node int, code uint16) (raw int32, normalized float64, known, valid bool) {
-	raw, known = s.Absolute(node, code)
-	info, present := s.AxisInfo(node, code)
-	if known && present {
-		normalized, valid = NormalizeAxis(raw, info)
-	}
-	return
-}

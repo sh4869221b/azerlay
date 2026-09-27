@@ -63,7 +63,7 @@ func NewReport(checks []Check, details *ProfileDetails) Report {
 	ordered := append([]Check{}, checks...)
 	categories := []string{
 		"command", "session", "libraries", "layer-shell", "monitor", "configuration",
-		"profile-source", "device-discovery", "permissions", "evdev-capabilities", "control-socket",
+		"profile-source", "device-discovery", "permissions", "hidraw-capabilities", "control-socket",
 	}
 	slices.SortStableFunc(ordered, func(a, b Check) int {
 		return slices.Index(categories, a.Category) - slices.Index(categories, b.Category)
@@ -72,7 +72,7 @@ func NewReport(checks []Check, details *ProfileDetails) Report {
 	for _, check := range ordered {
 		exitCode = max(exitCode, severityExitCode(check.Severity))
 	}
-	return Report{SchemaVersion: 1, Command: "doctor", ExitCode: exitCode, Checks: ordered, ProfileDetails: details}
+	return Report{SchemaVersion: 2, Command: "doctor", ExitCode: exitCode, Checks: ordered, ProfileDetails: details}
 }
 
 func severityExitCode(severity Severity) int {

@@ -68,7 +68,7 @@ func TestCLIDevicesUsage(t *testing.T) {
 				if err := json.Unmarshal([]byte(output.stdout), &report); err != nil {
 					t.Fatal(err)
 				}
-				if report.SchemaVersion != 1 || report.Command != tc.command || report.OK || report.Result != nil || report.Error == nil || report.Error.Code != "ERR_CLI_USAGE" || report.Error.Stage != "usage" {
+				if report.SchemaVersion != 2 || report.Command != tc.command || report.OK || report.Result != nil || report.Error == nil || report.Error.Code != "ERR_CLI_USAGE" || report.Error.Stage != "usage" {
 					t.Fatalf("usage report=%+v", report)
 				}
 			})
@@ -87,7 +87,7 @@ func TestCLIDevicesInspectMissingPath(t *testing.T) {
 	if err := json.Unmarshal([]byte(output.stdout), &report); err != nil {
 		t.Fatal(err)
 	}
-	if report.SchemaVersion != 1 || report.Command != "devices inspect" || report.OK || report.Result != nil || report.Error == nil || report.Error.Code != "ERR_DEVICE_NOT_FOUND" || report.Error.Stage != "resolution" || report.Error.Target == nil || *report.Error.Target != path {
+	if report.SchemaVersion != 2 || report.Command != "devices inspect" || report.OK || report.Result != nil || report.Error == nil || report.Error.Code != "ERR_DEVICE_NOT_FOUND" || report.Error.Stage != "resolution" || report.Error.Target == nil || *report.Error.Target != path {
 		t.Fatalf("missing path report=%+v", report)
 	}
 }

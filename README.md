@@ -7,26 +7,27 @@ Wayland-native Azeron profile and live input overlay for Linux.
 Bootstrap phase. The CLI can validate and save Azeron Software 2.0.2 profile
 exports. A successful `import` saves the exact export and a one-based selected
 profile ordinal; `profiles show` reads that saved selection in a later process.
-`devices list` and `devices inspect` discover the researched Cyborg II signature
-and report access diagnostics without reading input events. An internal input
-package reads selected, verified nodes and publishes immutable raw input
-snapshots at node-local `SYN_REPORT` boundaries. It captures kernel axis ranges
-and derives normalized axes, stick direction, and intensity from committed
-snapshots. Confirmed Software 2.0.2 Keyboard/WASD, neutral Xbox Joystick, and
-observed Xbox angle 0/90 settings survive save/reload. A nonzero stick angle
-remains unprojected because its coordinate behavior is unverified. Confirmed T
-Turbo 25/10 clicks per second and two-step W/Delay Macro settings are retained
-as inert typed configuration; they do not execute or create input actions.
-Other settings remain Unknown. Callers still explicitly select the input nodes.
-The input library restores current key and axis state
-after `SYN_DROPPED` and offers a managed lifecycle for selected-device reconnect,
-including event-node renumbering and permission return. Input processing and
-recovery are not connected to `run`, the controller, or GTK yet. Export-to-input
-integration and recovery
-are tested with synthetic exports, device metadata, ioctl responses, and OS
-pipes, not live Xbox or Cyborg II input. The two-second live reconnect target
-remains unmeasured. See [input recovery](docs/troubleshooting.md#internal-input-recovery)
-for the selection policy and current limits. Normalization requires an explicitly
+`devices list` and `devices inspect` report qualified interface04 hidraw identity
+and read-only access without consuming reports. Their JSON schema is version2.
+The internal input library reads only USB `16d0:12f7:0111` and the qualified
+vendor descriptor, identifies 30 physical buttons independently of output
+assignments, and publishes immutable **last-observed** state. It never opens
+evdev nodes or sends device protocol requests. Official Azeron Software running
+in SOFTWARE mode is an explicit prerequisite; successful access does not prove
+notification initialization.
+
+Initial, disconnected, reopened and invalidated state is unknown. A valid report
+establishes only the reported button's state. Detected counter discontinuity is
+conservative loss suspicion, not continuity proof; an undetected final lost
+release can leave stale state indefinitely. No timeout fabricates release.
+Managed reconnect retains the selected serial or, without serial, the same USB
+parent, while allowing hidraw renumbering. Input is not wired into `run`, the
+controller or GTK. Live analog/output-key state and long/double/macro completion
+remain unsupported. Static profile labels, assignments, stick configuration and
+output candidates remain available. See [input recovery](docs/troubleshooting.md#internal-input-recovery)
+for lifecycle limits and the opt-in owner-operated hardware test.
+
+Normalization requires an explicitly
 attributed Software 2.0.2 export and the closed predicates in
 [binding conversion](docs/decisions/binding-conversion.md). Legacy numeric
 conversion is outside v1 and tracked in
@@ -134,36 +135,35 @@ content. The raw export version is reported metadata. It isn't the
 azerlay devices list
 azerlay devices list --json
 azerlay devices inspect
-azerlay devices inspect /dev/input/eventN --json
+azerlay devices inspect /dev/hidrawN --json
 azerlay devices inspect --help
 ```
 
-Replace `/dev/input/eventN` with a current path from `devices list`. Event paths
+Replace `/dev/hidrawN` with a current path from `devices list`. Hidraw paths
 are temporary locators and can change after reconnecting. Without a path,
 `inspect` includes relevant candidates and excluded siblings; with a path, it
 examines only that node. An explicit path never bypasses device matching.
 
-Support requires the observed USB signature `16d0:12f7:0111` and the interface
-descriptors and minimum capabilities in the
+Support requires USB `16d0:12f7:0111`, interface04 and the qualified HID
+report descriptor in the
 [device identity decision](docs/decisions/device-identity.md#identity-and-grouping-contract).
 Matching nodes are grouped by their current USB device parent. A qualifying
-subset remains visible when other interfaces are missing, unsupported, or
-unreadable; a complete group means all expected interfaces were admitted, not
-that all are readable. Other releases and Cyborg variants are not qualified.
+group remains visible when access is denied; a complete group means one
+interface04 was admitted, independently of read access. Other releases and Cyborg variants are not qualified.
 
 Exit `0` requires at least one admitted readable node and no error diagnostic;
 exit `1` covers discovery, access, or output failure; invalid arguments exit
 `2`. Warnings alone do not fail an otherwise successful scan. Text results and
 warnings go to stdout, while errors go to stderr. `--json` emits one
-newline-terminated schema-version-1 object on stdout, including for usage
+newline-terminated schema-version-2 object on stdout, including for usage
 errors, and retains partial results. See the
 [device CLI contract](docs/design-research.md#1711-devices-implemented) for fields.
 
 List output omits serial and detailed metadata. **Inspect output includes serial
 values when available**, even without a path; review it before sharing. These
 commands do not require a running instance or configuration and do not change
-permissions. Device checks in `doctor` and the runtime device backend remain
-unimplemented. See [device troubleshooting](docs/troubleshooting.md) for stable
+permissions. Doctor implements passive device checks; the input library is not yet wired
+into the runtime overlay. See [device troubleshooting](docs/troubleshooting.md) for stable
 diagnostic codes and the limits of access and uaccess packaging validation.
 
 ## Run and control CLI
@@ -274,10 +274,13 @@ no stderr output when writing succeeds. See the
 | `2` | Diagnostic errors or invalid command arguments. |
 | `3` | Internal diagnostic or output failure. |
 
-A healthy current installation still returns `1`: doctor checks for libraries,
-Layer Shell, monitors, device discovery, device/udev permissions, and evdev
-capabilities are not implemented. Use the separate `devices` CLI for discovery
-and access diagnostics. The session check examines `WAYLAND_DISPLAY` only, not
+A healthy current installation still returns `1`: library, Layer Shell and
+monitor checks are not implemented. Doctor schema version2 implements
+`device-discovery`, `permissions` and `hidraw-capabilities` through passive
+identity/access checks, without consuming reports. Missing devices and
+unsupported descriptors are warnings; ambiguous selection, permission and
+metadata failures are errors. Success does not confirm notification initialization.
+Use the official software in SOFTWARE mode. The session check examines `WAYLAND_DISPLAY` only, not
 compositor connectivity. If the default configuration is absent, `azerlay doctor --json`
 returns `2` with `ERR_CONFIG_NOT_FOUND`; create a valid configuration containing
 `schema_version = 1` before retrying.

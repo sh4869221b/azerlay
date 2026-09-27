@@ -7,8 +7,8 @@ import (
 )
 
 func comparePaths(a, b string) int {
-	an, aok := eventNumber(filepath.Base(a))
-	bn, bok := eventNumber(filepath.Base(b))
+	an, aok := hidrawNumber(filepath.Base(a))
+	bn, bok := hidrawNumber(filepath.Base(b))
 	if aok && bok {
 		if order := cmp.Compare(an, bn); order != 0 {
 			return order
@@ -27,17 +27,17 @@ func groupNodes(nodes []Node) ([]Group, []Diagnostic) {
 		}
 	}
 	for parent, members := range byParent {
-		g := Group{USBParent: parent, EventPaths: []string{}}
-		interfaces := map[uint8]bool{}
+		g := Group{USBParent: parent, HIDPaths: []string{}}
+
 		for _, n := range members {
-			g.EventPaths = append(g.EventPaths, n.Path)
-			interfaces[n.Interface.Number] = true
+			g.HIDPaths = append(g.HIDPaths, n.Path)
+
 		}
-		g.Complete = interfaces[1] && interfaces[2] && interfaces[3]
-		slices.SortFunc(g.EventPaths, comparePaths)
+		g.Complete = len(members) == 1
+		slices.SortFunc(g.HIDPaths, comparePaths)
 		groups = append(groups, g)
 		if !g.Complete {
-			findings = append(findings, diagnostic(WARN_DEVICE_INCOMPLETE, "grouping", &parent))
+			findings = append(findings, diagnostic(ERR_DEVICE_AMBIGUOUS, "grouping", &parent))
 		}
 	}
 	slices.SortFunc(groups, func(a, b Group) int { return cmp.Compare(a.USBParent, b.USBParent) })

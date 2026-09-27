@@ -1,5 +1,72 @@
 # Cyborg II device identity
 
+## Current raw-only contract (Issue #108)
+
+The current application uses only the qualified interface04 hidraw node.
+Discovery, diagnostics, session startup and reconnect never open evdev and never
+fall back to it. This supersedes the earlier event-node runtime and permission
+recommendations retained below. Those dated observations remain historical
+evidence, not the current admission or deployment contract.
+
+### Identity and grouping contract
+
+Admission requires resolved USB device ancestry `16d0:12f7`, release `0111`,
+interface04 with class/subclass/protocol `03/00/00`, and the exact 28-byte HID
+report descriptor:
+
+```text
+0601ff0a0101a1017508150026ff00954009018102954009029102c0
+```
+
+This is vendor usage page `ff01`, usage `0101`, unnumbered 64-byte Input/Output.
+The application only reads input reports. The presence of Output in the
+descriptor does not authorize writes. Node role is `physical-buttons`.
+Group by USB device parent; complete means exactly one admitted interface04,
+independently of access. Multiple candidates are ambiguous. Unrelated USB
+parents, interfaces, releases and descriptors are unsupported.
+
+Open uses `O_RDONLY|O_NONBLOCK|O_CLOEXEC`, fstat/device-number comparison,
+kernel-held HID identity and report descriptor getters, and fresh sysfs checks.
+A supplied path or alias never bypasses admission. Diagnostics close without
+consuming reports. Device name and serial are inspect-only detail fields.
+
+### Reconnect selection
+
+A selected target pins USB identity and a known serial, or the original USB
+parent when no serial exists. A known serial must match exactly one group,
+including unreadable candidates; no serial or duplicate serial cannot fall back
+to a port. Serial-free matching is limited to the same USB parent and cannot
+prove physical individual identity. Hidraw numbering may change. There are no
+event-node slots. Fresh opened metadata must still match the target, or the fd
+is closed before any report reader starts.
+
+### Permission contract
+
+Issue #37's current packaging requirement is narrowly targeted hidraw uaccess
+for `16d0:12f7:0111`, interface04. Event-node permissions, whole-USB access,
+permanent input-group membership and root are not requirements. Rule creation,
+installation, distribution-specific interface property imports, active-seat
+access and revocation remain packaging work. No new rule is supplied here.
+Uaccess grants do not themselves enforce read-only access; application behavior
+does. Existing host VID-wide `0666` rules do not qualify this narrower contract.
+
+### State and compatibility limits
+
+Qualified use is left-hand Cyborg II, Software2.0.2, displayed firmware111,
+unknown hardware revision, SOFTWARE mode. Hand/mode are explicit context, never
+inferred from USB identity. The official software's notification initialization
+is a prerequisite. A readable hidraw does not prove notifications or reconnect
+recovery. The library publishes last observed state, not authoritative current
+state; undetected final-report loss can leave stale state. See
+[physical mapping](cyborg-ii-physical-map.md#raw-physical-notifications-issue-108)
+and [input lifecycle](../architecture.md#reader-and-reducer-contract).
+
+## Historical research retained from 2026-09-20
+
+All remaining event-node predicates, udev candidate results and downstream
+handoffs below describe the earlier evdev implementation. They must not be used
+to grant or require event-node access for the current raw-only implementation.
+
 ## Scope and status
 
 This decision records the selected Cyborg II observation for
@@ -108,7 +175,7 @@ N1 is a single mixed keyboard/relative/absolute node despite its name and udev
 keyboard classification. Capability enumeration does not prove which physical
 controls produce those codes or which capabilities the current profile uses.
 
-## Identity and grouping contract
+## Historical evdev identity and grouping contract
 
 For [#27](https://github.com/sh4869221b/azerlay/issues/27), admit an input event
 node only when all of the following observable conditions hold:
@@ -164,7 +231,7 @@ one node with all its roles; it must not be duplicated into separate keyboard
 and joystick nodes. Group discovery does not authorize reading every group:
 runtime input remains restricted to the owner's selected qualifying group.
 
-### Reconnect selection
+### Historical evdev reconnect selection
 
 The internal `ReconnectTarget` pins the supported USB identity, original
 resolved USB device parent, optional nonempty serial, and selected interface
@@ -214,7 +281,7 @@ These results establish the documented predicate for the observed signature.
 They do not independently qualify unseen hardware revisions, right-hand units,
 or operating modes that happen to expose the same fields.
 
-## Permission contract
+## Historical event-node permission contract
 
 The candidate for [#37](https://github.com/sh4869221b/azerlay/issues/37) is
 `71-azerlay.rules`, placed after input/USB property imports and before seat ACL
@@ -262,7 +329,7 @@ no whole-USB, hidraw, `mouse*`, or `js*` access and changes no mode or group.
 It neither requires root/input-group membership for normal use nor removes
 access independently granted by existing system rules.
 
-## Permission validation
+## Historical event-node permission validation
 
 The exact candidate line above was placed in an owned temporary
 `.issue-13-71-azerlay.rules` outside the installed rule directories and checked
