@@ -242,8 +242,12 @@ direction tuples remain unadmitted. An unsupported contextual variant in
 the selected 2.0.2 adapter keeps the entire primary binding Unknown with raw
 data intact. Other releases remain `unsupported_generation`. Xbox identity
 is not generalized to DirectInput. No export field here establishes kernel
-axis codes, signs, ranges, dead-zone units, a selected evdev node, an active
+axis codes, signs, ranges, dead-zone units, a selected raw-input source, an active
 hardware profile, or successful live Xbox-device operation.
+
+Current input uses only the qualified physical-button hidraw path from #108;
+these static stick settings do not establish live analog support or authorize
+an evdev fallback.
 
 ### Minimal synthetic stick fixtures
 

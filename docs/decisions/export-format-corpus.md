@@ -212,8 +212,13 @@ combined/eight-direction settings, right-stick, DirectInput, nonzero
 transformations, and other Software releases remain unadmitted. Synthetic
 fixtures may exercise decoding, normalization, persistence, and input
 projection without private source access; they do not establish physical
-control identity, active hardware mode, evdev-node selection, or live Xbox
+control identity, active hardware mode, raw-input source selection, or live Xbox
 device accessibility.
+
+The evdev-based live stick projection originally implemented for #44 was
+superseded by #108. Configured stick metadata remains supported within its
+admitted export predicates; the current raw-only path does not provide live
+analog state.
 
 ### Issue #42: normalized settings and legacy deferral
 
