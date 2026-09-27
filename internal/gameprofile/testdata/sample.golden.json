@@ -1,0 +1,13 @@
+[
+  {"input_id":15,"trigger":"single","label":"Primary use","binding_display":"U"},
+  {"input_id":15,"trigger":"long","label":"Azeron label","binding_display":"U"},
+  {"input_id":15,"trigger":"double","label":"Azeron label","binding_display":"P, L"},
+  {"input_id":16,"trigger":"single","label":"Use","binding_display":"U"},
+  {"input_id":17,"trigger":"single","label":"Pause","binding_display":"P"},
+  {"input_id":18,"trigger":"single","label":"Left Ctrl+U","binding_display":"Left Ctrl+U"},
+  {"input_id":19,"trigger":"double","label":"P, L","binding_display":"P, L"},
+  {"input_id":20,"trigger":"single","label":"Unknown (types[0]=\"3\")","binding_display":"Unknown (types[0]=\"3\")"},
+  {"input_id":21,"trigger":"single","label":"Use","binding_display":"Turbo (U, 25/s)"},
+  {"input_id":22,"trigger":"single","label":"Left Stick (Xbox, 90 deg)","binding_display":"Left Stick (Xbox, 90 deg)"},
+  {"input_id":23,"trigger":"single","label":"Unbound","binding_display":"Unbound"}
+]

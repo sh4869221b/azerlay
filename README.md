@@ -129,6 +129,52 @@ include IDs, labels, bindings, macros, unknown fields, or other private export
 content. The raw export version is reported metadata. It isn't the
 `--software-release` attribution and doesn't establish Software support.
 
+## Game profile labels (internal library)
+
+Game profiles can supply display labels without changing the actual Azeron
+assignment. Put `.toml` files in `$XDG_CONFIG_HOME/azerlay/games/`. When
+`XDG_CONFIG_HOME` is unset, empty, or relative, the directory is
+`$HOME/.config/azerlay/games/`. The loader reads that directory without creating
+it. For example, this is the tested `internal/gameprofile/testdata/sample.toml`:
+
+```toml
+schema_version = 1
+id = "sample"
+name = "Synthetic Example"
+
+[bindings]
+KEY_U = "Use"
+KEY_P = "Pause"
+
+[controls]
+"input:15:single" = "Primary use"
+```
+
+`schema_version = 1`, `id`, and `name` are required. `locale` is optional and
+does not select a translation automatically. `[bindings]` uses case-sensitive
+`KEY_` or `BTN_` symbolic codes; a code in this file does not make an unsupported
+export binding convertible. `[controls]` uses a positive decimal input ID and
+the exact `single`, `long`, or `double` trigger. The filename does not set the
+ID. Unknown fields, invalid types, and invalid keys reject the complete file.
+
+A user file with the same ID as a built-in profile replaces that entire profile,
+including its name, locale, and mappings. Duplicate IDs among user files are
+invalid. Azerlay currently embeds only an empty `generic` profile; it includes
+no Bodycam bindings. A missing game ID provides no game mappings.
+
+For each normalized binding, a non-blank physical-control label wins first,
+then a non-empty Azeron label, then a non-blank game binding label, then the
+binding's human-readable assignment. Blank or whitespace-only game labels fall
+through; an Azeron label containing only whitespace remains a literal label.
+Game binding labels apply to single unmodified keys and Turbo codes, not to a
+key inside a chord, multi-action binding, or macro. `BindingDisplay` remains a
+separate description of the actual assignment, including for `Unknown` values.
+
+The library supports explicit synchronous reload while retaining the last good
+catalog after an invalid edit. `run` and GTK do not yet load or render these game
+labels; `profile.game` in application configuration does not activate this
+library at runtime.
+
 ## Device CLI
 
 ```sh
