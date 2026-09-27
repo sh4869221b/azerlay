@@ -7,22 +7,23 @@ import (
 	"unsafe"
 )
 
-// Linux input.h: _IOR('E', 0x02, struct input_id) and EVIOCGNAME(len).
+// Linux hidraw.h: kernel-held identity, name and report descriptor getters.
 const (
-	eviocgid   = uintptr(0x80084502)
-	eviocgname = uintptr(0x81004506)
+	hidiocgrawinfo = uintptr(0x80084803)
+	hidiocgrawname = uintptr(0x81004804)
 )
 
 type probeOps struct {
-	open  func(string, int, uint32) (int, error)
-	fstat func(int, *syscall.Stat_t) error
-	id    func(int) (InputID, error)
-	name  func(int) (string, error)
-	close func(int) error
+	open       func(string, int, uint32) (int, error)
+	fstat      func(int, *syscall.Stat_t) error
+	id         func(int) (RawID, error)
+	name       func(int) (string, error)
+	descriptor func(int) ([]byte, error)
+	close      func(int) error
 }
 
 func probeNode(n Node) probeResult {
-	return (probeOps{syscall.Open, syscall.Fstat, ioctlID, ioctlName, syscall.Close}).probe(n)
+	return (probeOps{syscall.Open, syscall.Fstat, ioctlID, ioctlName, ioctlDescriptor, syscall.Close}).probe(n)
 }
 
 func (ops probeOps) probe(n Node) (result probeResult) {
@@ -80,25 +81,32 @@ func (ops probeOps) validate(fd int, n Node) (contradiction bool, err error) {
 	if err != nil {
 		return false, err
 	}
-	if id != (InputID{3, 0x16d0, 0x12f7, 0x111}) || n.InputID != nil && id != *n.InputID {
+	if id != (RawID{3, 0x16d0, 0x12f7}) {
+		return true, errMetadata
+	}
+	descriptor, err := ops.descriptor(fd)
+	if err != nil {
+		return false, err
+	}
+	if string(descriptor) != physicalDescriptor {
 		return true, errMetadata
 	}
 	return false, nil
 }
 
-func ioctlID(fd int) (InputID, error) {
-	// Four uint16 fields match struct input_id; the buffer lives through syscall.
-	var id InputID
-	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), eviocgid, uintptr(unsafe.Pointer(&id)))
+func ioctlID(fd int) (RawID, error) {
+	// The uint32 bus and two uint16 IDs match struct hidraw_devinfo.
+	var id RawID
+	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), hidiocgrawinfo, uintptr(unsafe.Pointer(&id)))
 	if errno != 0 {
-		return InputID{}, errno
+		return RawID{}, errno
 	}
 	return id, nil
 }
 
 func ioctlName(fd int) (string, error) {
 	var name [256]byte
-	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), eviocgname, uintptr(unsafe.Pointer(&name[0])))
+	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), hidiocgrawname, uintptr(unsafe.Pointer(&name[0])))
 	if errno != 0 {
 		return "", errno
 	}
@@ -107,4 +115,28 @@ func ioctlName(fd int) (string, error) {
 		end = len(name)
 	}
 	return string(name[:end]), nil
+}
+
+func ioctlDescriptor(fd int) ([]byte, error) {
+	var size uint32
+	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), 0x80044801, uintptr(unsafe.Pointer(&size)))
+	if errno != 0 {
+		return nil, errno
+	}
+	if size != uint32(len(physicalDescriptor)) {
+		return nil, errUnsupported
+	}
+	var descriptor struct {
+		Size  uint32
+		Value [4096]byte
+	}
+	descriptor.Size = size
+	_, _, errno = syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), 0x90044802, uintptr(unsafe.Pointer(&descriptor)))
+	if errno != 0 {
+		return nil, errno
+	}
+	if descriptor.Size != size {
+		return nil, errMetadata
+	}
+	return descriptor.Value[:size], nil
 }

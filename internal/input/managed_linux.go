@@ -42,7 +42,7 @@ type managedOps struct {
 func StartManaged(ctx context.Context, target device.ReconnectTarget, generations Generations) (*Managed, error) {
 	return startManaged(ctx, target, generations, managedOps{
 		discover: device.Discover,
-		session:  sessionOps{open: target.Open, clock: setMonotonicClock, axes: readAxisInfo},
+		session:  sessionOps{open: target.Open},
 	})
 }
 
@@ -52,7 +52,7 @@ func startManaged(ctx context.Context, target device.ReconnectTarget, generation
 		return nil, &d
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	m := &Managed{cancel: cancel, done: make(chan struct{}), latest: ManagedSnapshot{State: ManagedDegraded, Snapshot: &Snapshot{Generations: generations, reportingNode: -1}}}
+	m := &Managed{cancel: cancel, done: make(chan struct{}), latest: ManagedSnapshot{State: ManagedDegraded, Snapshot: &Snapshot{Generations: generations, Availability: Unavailable}}}
 	go m.run(ctx, target, generations, ops)
 	return m, nil
 }
@@ -216,7 +216,7 @@ func managedDiagnostic(err error) *device.Diagnostic {
 	if errors.As(err, &inputErr) && inputErr.cause == nil {
 		d := &device.Diagnostic{Code: inputErr.Code, Severity: "error", Stage: "input"}
 		if inputErr.Code == ERR_INPUT_EVENT {
-			d.Summary = "Input events were invalid."
+			d.Summary = "Physical reports were invalid."
 			d.Remediation = "Reconnect the selected device and restart input."
 		} else {
 			d.Summary = "Input could not be read."

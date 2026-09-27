@@ -1,19 +1,20 @@
 package input
 
 import (
+	"github.com/sh4869221b/azerlay/internal/layout"
 	"github.com/sh4869221b/azerlay/internal/matching"
-	"github.com/sh4869221b/azerlay/internal/profile"
+	"slices"
 )
 
-type MatchingOutput struct {
-	Code                    profile.CanonicalCode
-	Candidates              []matching.Candidate
-	Ambiguous               bool
-	HasUnresolvedCandidates bool
-	Known                   bool
-	Down                    bool
+type PhysicalContext struct {
+	matching.Context
+	SoftwareMode bool
 }
-
+type PhysicalControl struct {
+	RegionID    string
+	SourceID    int
+	Down, Known bool
+}
 type MatchingState struct {
 	Connected          bool
 	Sequence           uint64
@@ -21,59 +22,38 @@ type MatchingState struct {
 	ScopeSupported     bool
 	HasUnknownBindings bool
 	Controls           []matching.Control
-	Outputs            []MatchingOutput
+	Outputs            []matching.Output
+	Physical           []PhysicalControl
 }
 
-func ProjectMatching(snapshot *Snapshot, index matching.Index, sources map[profile.CanonicalCode]int) MatchingState {
-	state := MatchingState{
-		Connected: snapshot.Connected, Sequence: snapshot.Sequence, Generations: snapshot.Generations,
-		ScopeSupported: index.ScopeSupported, HasUnknownBindings: index.HasUnknownBindings,
-		Controls: make([]matching.Control, len(index.Controls)), Outputs: make([]MatchingOutput, len(index.Outputs)),
+// ProjectMatching keeps static assignment candidates separate from physical
+// observations. SOFTWARE mode is explicit; USB identity cannot establish it.
+func ProjectMatching(snapshot *Snapshot, index matching.Index, context PhysicalContext) MatchingState {
+	state := MatchingState{Connected: snapshot.Connected, Sequence: snapshot.Sequence, Generations: snapshot.Generations, HasUnknownBindings: index.HasUnknownBindings}
+	for _, control := range index.Controls {
+		control.Bindings = slices.Clone(control.Bindings)
+		state.Controls = append(state.Controls, control)
 	}
-	for i, control := range index.Controls {
-		control.Bindings = append([]matching.Binding(nil), control.Bindings...)
-		state.Controls[i] = control
+	for _, output := range index.Outputs {
+		output.Candidates = slices.Clone(output.Candidates)
+		state.Outputs = append(state.Outputs, output)
 	}
-	for i, output := range index.Outputs {
-		projected := MatchingOutput{
-			Code: output.Code, Candidates: append([]matching.Candidate(nil), output.Candidates...),
-			Ambiguous: output.Ambiguous, HasUnresolvedCandidates: output.HasUnresolvedCandidates,
+	definition, err := layout.LoadEmbedded(context.Model, context.Hand)
+	if err != nil {
+		return state
+	}
+	a := context.Applicability
+	state.ScopeSupported = index.ScopeSupported && context.SoftwareMode && a.SoftwareRelease == "2.0.2" && a.DisplayedFirmware == "111" && a.HardwareRevision == nil && a.Mode == "keyboard-stick"
+	for _, control := range definition.Controls {
+		if control.ID == "stick.main" {
+			continue
 		}
-		if snapshot.Connected {
-			if node, selected := sources[output.Code]; selected {
-				if raw, known := matchingRawCode(output.Code); known {
-					projected.Down, projected.Known = snapshot.Key(node, raw)
-				}
-			}
+		physical := PhysicalControl{RegionID: control.ID, SourceID: control.SourceInputID}
+		if state.ScopeSupported && snapshot.Connected {
+			observed := snapshot.Physical(control.ID)
+			physical.Down, physical.Known = observed.Down, observed.Known
 		}
-		state.Outputs[i] = projected
+		state.Physical = append(state.Physical, physical)
 	}
 	return state
-}
-
-func matchingRawCode(code profile.CanonicalCode) (uint16, bool) {
-	switch code {
-	case profile.KEY_W:
-		return 17, true
-	case profile.KEY_T:
-		return 20, true
-	case profile.KEY_A:
-		return 30, true
-	case profile.KEY_S:
-		return 31, true
-	case profile.KEY_D:
-		return 32, true
-	case profile.KEY_U:
-		return 22, true
-	case profile.KEY_P:
-		return 25, true
-	case profile.KEY_L:
-		return 38, true
-	case profile.KEY_I:
-		return 23, true
-	case profile.KEY_LEFTCTRL:
-		return 29, true
-	default:
-		return 0, false
-	}
 }

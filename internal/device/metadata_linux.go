@@ -48,9 +48,9 @@ func (m *metadata) optional(path string) *string {
 }
 
 func (c collector) metadata(path, event string) metadata {
-	m := metadata{node: Node{Path: path, Roles: []string{}, Admission: "indeterminate", Access: "not_checked", Capabilities: map[string][]int{}}}
-	class := filepath.Join(c.sysRoot, "class/input", event)
-	if valid, err := subsystem(class, "input"); err != nil || !valid {
+	m := metadata{node: Node{Path: path, Roles: []string{}, Admission: "indeterminate", Access: "not_checked"}}
+	class := filepath.Join(c.sysRoot, "class/hidraw", event)
+	if valid, err := subsystem(class, "hidraw"); err != nil || !valid {
 		if err == nil {
 			err = errMetadata
 		}
@@ -67,27 +67,30 @@ func (c collector) metadata(path, event string) metadata {
 	if err != nil {
 		m.failure(err)
 	}
-	before := len(m.findings)
-	id := InputID{Bus: uint16(m.hex(filepath.Join(input, "id/bustype"), 16)), Vendor: uint16(m.hex(filepath.Join(input, "id/vendor"), 16)), Product: uint16(m.hex(filepath.Join(input, "id/product"), 16)), Version: uint16(m.hex(filepath.Join(input, "id/version"), 16))}
-	if len(m.findings) == before {
-		m.node.InputID = &id
+	data, readErr := os.ReadFile(filepath.Join(input, "report_descriptor"))
+	if readErr != nil {
+		m.failure(readErr)
 	} else {
-		m.identityUnknown = true
+		if string(data) == physicalDescriptor {
+			m.node.ReportDescriptor = &ReportDescriptor{0xff01, 0x0101, 64, false}
+		}
 	}
-	m.node.Name = m.optional(filepath.Join(input, "name"))
-	m.node.PhysicalPath = m.optional(filepath.Join(input, "phys"))
-	for _, family := range []string{"ev", "key", "rel", "abs", "msc", "sw", "led", "ff", "snd"} {
-		data, readErr := os.ReadFile(filepath.Join(input, "capabilities", family))
-		if readErr != nil {
-			m.failure(readErr)
-			continue
+	uevent, readErr := os.ReadFile(filepath.Join(input, "uevent"))
+	if readErr != nil {
+		m.failure(readErr)
+	} else {
+		for _, line := range strings.Split(string(uevent), "\n") {
+			key, value, ok := strings.Cut(line, "=")
+			if !ok {
+				continue
+			}
+			switch key {
+			case "HID_NAME":
+				m.node.Name = &value
+			case "HID_PHYS":
+				m.node.PhysicalPath = &value
+			}
 		}
-		codes, parseErr := parseBitmap(string(data))
-		if parseErr != nil {
-			m.failure(parseErr)
-			continue
-		}
-		m.node.Capabilities[family] = codes
 	}
 	m.ancestry(input)
 	return m
@@ -153,26 +156,6 @@ func (m *metadata) ancestry(input string) {
 			return
 		}
 	}
-}
-
-func parseBitmap(value string) ([]int, error) {
-	words := strings.Fields(value)
-	if len(words) == 0 {
-		return nil, errMetadata
-	}
-	codes := []int{}
-	for i := len(words) - 1; i >= 0; i-- {
-		word, err := strconv.ParseUint(words[i], 16, 64)
-		if err != nil {
-			return nil, errMetadata
-		}
-		for bit := 0; bit < 64; bit++ {
-			if word&(uint64(1)<<bit) != 0 {
-				codes = append(codes, (len(words)-1-i)*64+bit)
-			}
-		}
-	}
-	return codes, nil
 }
 
 func readDeviceNumber(path string) (uint64, error) {

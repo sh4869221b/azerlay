@@ -15,7 +15,9 @@ const doctorHelp = `Usage: azerlay doctor [--config PATH] [--json] [--include-bi
 
 Diagnose next-start configuration and profile selection, plus live socket status.
 Checks do not repair or change configuration, saved profiles, or runtime state.
-Device and renderer checks are not implemented and are reported as warnings.
+Hidraw identity and read-only access are checked without consuming reports.
+Start the official software in SOFTWARE mode; notification initialization is not checked.
+Renderer checks are not implemented and are reported as warnings.
 
 Options:
   --config PATH       Read this configuration instead of the default XDG path

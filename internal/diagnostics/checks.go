@@ -8,6 +8,7 @@ import (
 
 	"github.com/sh4869221b/azerlay/internal/config"
 	"github.com/sh4869221b/azerlay/internal/control"
+	"github.com/sh4869221b/azerlay/internal/device"
 	"github.com/sh4869221b/azerlay/internal/profilesource"
 )
 
@@ -27,6 +28,9 @@ const (
 )
 
 func Collect(ctx context.Context, configPath string, includeBindings bool) Report {
+	return collect(ctx, configPath, includeBindings, device.Discover)
+}
+func collect(ctx context.Context, configPath string, includeBindings bool, discover func() (*device.Result, *device.Diagnostic)) Report {
 	checks := make([]Check, 0, 12)
 	sessionCode := OK_SESSION_ENVIRONMENT
 	if os.Getenv("WAYLAND_DISPLAY") == "" {
@@ -37,12 +41,10 @@ func Collect(ctx context.Context, configPath string, includeBindings bool) Repor
 		{"libraries", "Library checks are not implemented.", "Follow library integration in issues #15 and #32."},
 		{"layer-shell", "Layer Shell checks are not implemented.", "Follow Layer Shell integration in issue #32."},
 		{"monitor", "Monitor checks are not implemented.", "Follow monitor support in issues #41 and #33."},
-		{"device-discovery", "Device discovery checks are not implemented.", "Follow supported device discovery in issues #13 and #27."},
-		{"permissions", "Device and udev access checks are not implemented.", "Follow device permission support in issues #13 and #27."},
-		{"evdev-capabilities", "Evdev capability checks are not implemented.", "Follow evdev capability support in issues #27 and #28."},
 	} {
 		checks = append(checks, Check{Category: backend.category, Code: WARN_CHECK_NOT_IMPLEMENTED, Summary: backend.summary, Remediation: backend.remediation, Severity: SeverityWarning})
 	}
+	checks = append(checks, deviceChecks(discover)...)
 	path, err := config.ResolvePath(configPath)
 	target := knownTarget(path)
 	var settings config.Config

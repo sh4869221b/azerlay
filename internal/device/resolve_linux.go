@@ -17,15 +17,15 @@ type collector struct {
 	uid     int
 }
 
-func eventNumber(name string) (uint64, bool) {
-	if !strings.HasPrefix(name, "event") {
+func hidrawNumber(name string) (uint64, bool) {
+	if !strings.HasPrefix(name, "hidraw") {
 		return 0, false
 	}
-	n, err := strconv.ParseUint(strings.TrimPrefix(name, "event"), 10, 32)
+	n, err := strconv.ParseUint(strings.TrimPrefix(name, "hidraw"), 10, 32)
 	return n, err == nil
 }
 
-func (c collector) events() ([]string, error) {
+func (c collector) hidraws() ([]string, error) {
 	entries, err := os.ReadDir(c.devRoot)
 	if os.IsNotExist(err) {
 		return []string{}, nil
@@ -35,7 +35,7 @@ func (c collector) events() ([]string, error) {
 	}
 	paths := []string{}
 	for _, entry := range entries {
-		if _, valid := eventNumber(entry.Name()); valid {
+		if _, valid := hidrawNumber(entry.Name()); valid {
 			paths = append(paths, filepath.Join(c.devRoot, entry.Name()))
 		}
 	}
@@ -57,17 +57,17 @@ func (c collector) resolve(path string) (string, error) {
 		return "", err
 	}
 	event := filepath.Base(resolved)
-	if _, valid := eventNumber(event); !valid {
-		return "", errMetadata
+	if _, valid := hidrawNumber(event); !valid {
+		return "", errUnsupported
 	}
-	valid, err := subsystem(resolved, "input")
+	valid, err := subsystem(resolved, "hidraw")
 	if err != nil {
 		return "", err
 	}
 	if !valid {
 		return "", errMetadata
 	}
-	class, err := filepath.EvalSymlinks(filepath.Join(c.sysRoot, "class/input", event))
+	class, err := filepath.EvalSymlinks(filepath.Join(c.sysRoot, "class/hidraw", event))
 	if err != nil {
 		return "", err
 	}

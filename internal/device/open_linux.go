@@ -14,21 +14,20 @@ type OpenedNode struct {
 	File *os.File
 }
 
-// OpenGroup opens exactly the selected paths, preserving their order. Complete
-// describes topology only; a qualifying partial group may also be opened.
+// OpenGroup opens the single selected interface04 path.
 // On failure no descriptor is transferred to the caller.
 func OpenGroup(group Group) ([]OpenedNode, error) {
-	ops := probeOps{open: syscall.Open, fstat: syscall.Fstat, id: ioctlID, close: syscall.Close}
+	ops := probeOps{open: syscall.Open, fstat: syscall.Fstat, id: ioctlID, descriptor: ioctlDescriptor, close: syscall.Close}
 	return systemCollector().openGroup(group, ops)
 }
 
 func (c collector) openGroup(group Group, ops probeOps) (opened []OpenedNode, err error) {
-	if len(group.EventPaths) == 0 || group.USBParent == "" {
+	if len(group.HIDPaths) != 1 || group.USBParent == "" {
 		d := diagnostic(ERR_DEVICE_METADATA, "selection", nil)
 		return nil, &d
 	}
-	paths := make(map[string]bool, len(group.EventPaths))
-	for _, path := range group.EventPaths {
+	paths := make(map[string]bool, len(group.HIDPaths))
+	for _, path := range group.HIDPaths {
 		clean := filepath.Clean(path)
 		if path == "" || paths[clean] {
 			d := diagnostic(ERR_DEVICE_METADATA, "selection", &path)
@@ -50,8 +49,8 @@ func (c collector) openGroup(group Group, ops probeOps) (opened []OpenedNode, er
 			}
 		}
 	}()
-	devices := make(map[uint64]bool, len(group.EventPaths))
-	for _, path := range group.EventPaths {
+	devices := make(map[uint64]bool, len(group.HIDPaths))
+	for _, path := range group.HIDPaths {
 		n, err := c.selectedNode(path, group.USBParent)
 		if err != nil {
 			return nil, err

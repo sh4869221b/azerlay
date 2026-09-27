@@ -28,7 +28,7 @@ func TestCollectLivePrivacy(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			report := Collect(t.Context(), path, include)
+			report := collect(t.Context(), path, include, successfulRawDiscovery)
 			if report.ExitCode != 1 || (report.ProfileDetails != nil) != include {
 				t.Fatalf("report=%+v", report)
 			}
@@ -40,7 +40,7 @@ func TestCollectLivePrivacy(t *testing.T) {
 			for _, check := range report.Checks {
 				counts[check.Code]++
 			}
-			if counts[WARN_CHECK_NOT_IMPLEMENTED] != 6 || counts[config.WARN_CONFIG_UNKNOWN_KEY] != 1 || counts[OK_CONTROL_SOCKET] != 1 || counts["DEVICE_UNAVAILABLE"] != 1 || counts[WARN_CONTROL_DEGRADED] != 1 {
+			if counts[WARN_CHECK_NOT_IMPLEMENTED] != 3 || counts[config.WARN_CONFIG_UNKNOWN_KEY] != 1 || counts[OK_CONTROL_SOCKET] != 1 || counts["DEVICE_UNAVAILABLE"] != 1 || counts[WARN_CONTROL_DEGRADED] != 1 {
 				t.Fatalf("codes=%v", counts)
 			}
 			for _, jsonMode := range []bool{false, true} {
@@ -126,7 +126,7 @@ func TestCollectFailures(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			report := Collect(t.Context(), path, true)
+			report := collect(t.Context(), path, true, successfulRawDiscovery)
 			assertCollectCategories(t, report)
 			if report.ExitCode != tc.exit || report.ProfileDetails != nil {
 				t.Fatalf("report=%+v", report)
@@ -228,7 +228,7 @@ func assertCollectCategories(t *testing.T, report Report) {
 			got = append(got, check.Category)
 		}
 	}
-	want := []string{"session", "libraries", "layer-shell", "monitor", "configuration", "profile-source", "device-discovery", "permissions", "evdev-capabilities", "control-socket"}
+	want := []string{"session", "libraries", "layer-shell", "monitor", "configuration", "profile-source", "device-discovery", "permissions", "hidraw-capabilities", "control-socket"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("categories=%v", got)
 	}

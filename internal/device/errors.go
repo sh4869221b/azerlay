@@ -32,13 +32,13 @@ func diagnostic(code, stage string, target *string) Diagnostic {
 	d := Diagnostic{Code: code, Severity: "error", Stage: stage, Target: target}
 	switch code {
 	case ERR_DEVICE_NOT_FOUND:
-		d.Summary, d.Remediation = "No qualifying device was found.", "Connect a supported device and check its event path."
+		d.Summary, d.Remediation = "No qualifying device was found.", "Connect a supported device and check its hidraw path."
 	case ERR_DEVICE_PERMISSION:
 		d.Summary, d.Remediation = "Device access was denied.", "Check the active seat/session and specific supported-device uaccess packaging, then reconnect the device."
 	case ERR_DEVICE_DISCONNECTED:
 		d.Summary, d.Remediation = "Device disappeared during discovery.", "Reconnect the device and enumerate it again."
 	case ERR_DEVICE_UNSUPPORTED:
-		d.Summary, d.Remediation = "Device identity or capabilities are unsupported.", "Check the researched Cyborg II identity contract."
+		d.Summary, d.Remediation = "Device identity or report descriptor are unsupported.", "Check the researched Cyborg II identity contract."
 	case ERR_DEVICE_AMBIGUOUS:
 		d.Summary, d.Remediation = "More than one device or selected interface matches.", "Select a unique device and reconnect it."
 	case WARN_DEVICE_INCOMPLETE:
@@ -53,6 +53,9 @@ func diagnostic(code, stage string, target *string) Diagnostic {
 
 func boundaryDiagnostic(err error, stage string, target *string) Diagnostic {
 	code := ERR_DEVICE_METADATA
+	if errors.Is(err, errUnsupported) {
+		code = ERR_DEVICE_UNSUPPORTED
+	}
 	if errors.Is(err, fs.ErrPermission) || errors.Is(err, syscall.EPERM) {
 		code = ERR_DEVICE_PERMISSION
 	} else if errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ENODEV) || errors.Is(err, syscall.ENXIO) {
@@ -64,3 +67,5 @@ func boundaryDiagnostic(err error, stage string, target *string) Diagnostic {
 func ReconnectDiagnostic(err error) Diagnostic {
 	return boundaryDiagnostic(err, "reconnect", nil)
 }
+
+var errUnsupported = errors.New("unsupported HID node")

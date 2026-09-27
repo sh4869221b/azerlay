@@ -12,15 +12,15 @@ const devicesHelp = `Usage: azerlay devices <command>
 
 Commands:
   list     List supported device groups and access diagnostics
-  inspect  Inspect relevant nodes, or one event path
+  inspect  Inspect relevant nodes, or one hidraw path
 
 Use devices list --help or devices inspect --help for options.
-Discovery does not read input events or change permissions.`
+Discovery does not consume HID reports or change permissions.`
 
 const devicesListHelp = `Usage: azerlay devices list [--json] [--help]
 
-List supported Cyborg II groups and their admitted event nodes.
-Partial groups and access failures retain the available metadata.
+List supported Cyborg II groups and their admitted hidraw nodes.
+Complete means one admitted interface04; access failures retain its metadata.
 
 Options:
   --json  Print schema-versioned JSON
@@ -31,14 +31,14 @@ Exit codes: 0 readable qualifying node without errors; 1 discovery, access or ou
 const devicesInspectHelp = `Usage: azerlay devices inspect [path] [--json] [--help]
 
 Inspect relevant candidates, including excluded nodes and serial values.
-With a path, inspect only that event node; symlinks and relative paths are accepted.
+With a path, inspect only that hidraw node; symlinks and relative paths are accepted.
 Use -- before a path that starts with a dash.
 
 Options:
   --json  Print schema-versioned JSON
   --help  Print this help without discovering devices
 
-Inspection does not read input events or change permissions.
+Inspection does not consume HID reports or change permissions.
 Exit codes: 0 readable qualifying node without errors; 1 discovery, access or output failure; 2 usage.`
 
 type devicesOptions struct {
@@ -127,5 +127,5 @@ func runDevices(o devicesOptions, collect deviceCollector, stdout, stderr io.Wri
 
 func writeDevicesUsage(o devicesOptions, stdout, stderr io.Writer) int {
 	failure := &device.Diagnostic{Code: "ERR_CLI_USAGE", Severity: "error", Stage: "usage", Summary: "Invalid command arguments.", Remediation: "Use devices --help for usage."}
-	return writeDevicesReport(devicesReport{SchemaVersion: 1, Command: o.command, Error: failure}, o.json, stdout, stderr)
+	return writeDevicesReport(devicesReport{SchemaVersion: 2, Command: o.command, Error: failure}, o.json, stdout, stderr)
 }

@@ -5,7 +5,7 @@ The complete normative design is in [design-research.md](design-research.md).
 
 ## Least privilege
 
-Azerlay must observe only supported Azeron event nodes. Production code must not:
+Azerlay must observe only the qualified Azeron interface04 hidraw node. Production code must not:
 
 - require root;
 - require permanent membership in the `input` group;
@@ -13,8 +13,15 @@ Azerlay must observe only supported Azeron event nodes. Production code must not
 - use `uinput`; or
 - monitor general keyboards.
 
-Device access will use narrowly targeted udev `uaccess` rules after supported
-device identifiers are verified.
+Device access uses read-only, nonblocking, close-on-exec descriptors. Only passive
+reports and OS-held identity/report-descriptor getters are permitted. No HID
+writes, Feature/Output requests, GET_INPUT requests, onboard profile access or
+evdev fallback are allowed, including in diagnostics.
+
+Issue #37 must restrict any future uaccess packaging to hidraw, USB
+`16d0:12f7:0111`, interface04. No rules are installed by this implementation.
+A uaccess ACL does not itself enforce read-only opens; that is the application's
+contract. Existing broad host grants do not prove least-privilege packaging.
 
 ## Untrusted profile input
 

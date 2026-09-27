@@ -61,7 +61,7 @@ deferred beyond v1.
 
 | Key | Default | Meaning and accepted values |
 | --- | --- | --- |
-| `input.source` | `"auto"` | Input source setting; `"auto"` or `"evdev"`. |
+| `input.source` | `"auto"` | Accepted legacy setting: `"auto"` or `"evdev"`; currently unwired. Neither value starts evdev; the input library is raw-only. |
 | `input.refresh_hz` | `60` | Refresh frequency; integer `30`, `60`, or `120`. |
 | `input.show_ambiguous` | `true` | Ambiguous-input visibility setting; boolean. |
 

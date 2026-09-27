@@ -45,47 +45,43 @@ Sway provides an isolated test fixture only.
 ## Device discovery and permissions
 
 Start with `azerlay devices list`. Use `azerlay devices inspect` to include
-excluded candidates, or `azerlay devices inspect /dev/input/eventN --json` to
-examine one current event path. Inspect can disclose the device serial, name,
+excluded candidates, or `azerlay devices inspect /dev/hidrawN --json` to
+examine one current hidraw path. Inspect can disclose the device serial, name,
 physical path, and sysfs path; review the output before sharing it. List omits
-serial and detailed metadata. Neither command reads input events, saves host
+serial and detailed metadata. Neither command reads HID reports, saves host
 metadata, changes permissions, or needs a running Azerlay instance.
 
 ## Matching and partial results
 
-The supported signature is USB `16d0:12f7:0111`, with the specific interfaces,
-descriptor tuples, and minimum capabilities in the
+The supported signature is USB `16d0:12f7:0111`, with interface04 (`03/00/00`) and the qualified vendor report descriptor in the
 [identity and grouping contract](decisions/device-identity.md#identity-and-grouping-contract).
 A matching name or manually supplied path cannot substitute for those checks.
-Other USB releases, products, interfaces, or missing required roles are
+Other USB releases, products, interfaces, or unqualified report descriptors are
 unsupported; unavailable or contradictory metadata is indeterminate. This does
 not establish support for other Cyborg variants, hardware revisions, or firmware.
 
 Nodes are grouped by their resolved USB device parent for this scan, not by
-serial or hub. Event numbers and parent paths are not persistent device IDs.
+serial or hub. Hidraw numbers and parent paths are not persistent device IDs.
 Re-enumerate after a reconnect before inspecting a path. Relative paths and
-symlinks must resolve to an existing input event character device in sysfs;
+symlinks must resolve to an existing hidraw character device in sysfs;
 regular files and other device types are not opened.
 
-A group can contain fewer than the three researched interfaces. `complete`
-describes admitted interfaces, independently of their access status. Inspecting
-one explicit path examines only that node, so it does not establish whether
-its siblings are present. Unsupported automatic candidates produce warnings;
-an explicitly requested unsupported node produces an error. An admitted readable
-subset can succeed with warnings, but any candidate metadata or access error
-returns exit `1`, preserving available results. No admitted node also returns
-`1`. Invalid arguments return `2`; otherwise successful discovery returns `0`.
+A complete group has exactly one admitted interface04, regardless of its access
+status. Multiple matching interfaces are ambiguous. Inspecting one path examines
+only that node. Automatic unsupported candidates are warnings; an explicitly
+unsupported node is an error. Devices schema version2 uses `hidraw_paths` and
+`report_descriptor`; it no longer contains `event_paths`, `input_id` or evdev
+capabilities. No event path is opened, including a symlink to one.
 
 ## Diagnostics
 
 | Code | Meaning and next step |
 | --- | --- |
-| `ERR_DEVICE_NOT_FOUND` | No qualifying node, or the requested path does not exist. Check the supported signature, connection, and current event path. |
-| `ERR_DEVICE_UNSUPPORTED` | Identity, interface, or required capabilities fall outside the researched contract. Check inspect metadata against the linked decision; a different name or path does not enable support. |
+| `ERR_DEVICE_NOT_FOUND` | No qualifying node, or the requested path does not exist. Check the supported signature, connection, and current hidraw path. |
+| `ERR_DEVICE_UNSUPPORTED` | Identity, interface, or report descriptor fall outside the researched contract. Check inspect metadata against the linked decision; a different name or path does not enable support. |
 | `ERR_DEVICE_METADATA` | Required evidence could not be established, including malformed or contradictory metadata or failed identification queries. Check the connection and inspect the reported target. |
 | `ERR_DEVICE_PERMISSION` | Metadata access or a qualifying node's read-only probe was denied. Follow the session and packaging checks below. |
 | `ERR_DEVICE_DISCONNECTED` | A node disappeared during discovery. Reconnect and enumerate again. |
-| `WARN_DEVICE_INCOMPLETE` | Expected interfaces are missing or excluded. Inspect the candidates and accompanying diagnostics; a qualifying subset is still usable for discovery. |
 | `WARN_DEVICE_ROOT` | Access results describe root, not the ordinary user. Check access as the ordinary active-session user. This warning alone does not change the exit status. |
 | `ERR_CLI_USAGE` | Invalid arguments. Use `azerlay devices --help` or the subcommand's `--help`. |
 
@@ -96,48 +92,44 @@ The [CLI contract](design-research.md#1711-devices-implemented) defines the sche
 
 ## Internal input recovery
 
-Recovery is implemented in the internal input library. It is not connected to
-`run`, the controller, GTK, or CLI status yet; the device CLI still performs
-discovery and access probes without reading events.
+The internal library is raw-only and remains unconnected to `run`, the
+controller, GTK or CLI status. Devices and doctor only check metadata and access;
+they do not consume reports or initialize notifications.
 
-After `SYN_DROPPED`, the affected node's keys and raw axes become unknown while
-the library discards the loss interval and queued events, then queries the
-retained descriptor. A complete successful query replaces that node's key and
-axis state; it does not reconstruct missed press/release transitions or relative
-motion. Other nodes continue processing. A failed query or disconnected node
-stops the session and clears observed state across the selected group.
+Start the official Azeron Software in SOFTWARE mode. Initial state and every
+reopen are unknown. Each valid type57 report establishes the last observed state
+of its own physical button. Malformed physical reports invalidate all knowledge;
+counter discontinuity, including wrap/reset, conservatively invalidates older
+knowledge. Counter semantics are not a continuity guarantee. An undetected final
+lost release can leave stale state indefinitely. Silence is unconfirmed, never
+proof of release or of a required initialization action.
 
-Callers using `StartManaged` retain their selected target while degraded and
-retry discovery/open after a 250ms wait. Event paths may change. A unique known
-serial allows a port move; an originally serial-free target requires the same
-resolved USB device parent and supported identity. The original selected node
-slots and order must all be available, while unselected siblings are not
-required. See the [selection contract](decisions/device-identity.md#reconnect-selection)
-for ambiguity handling and the limits of same-port matching.
-
-Managed diagnostics reuse the device permission, disappearance, and selection
-codes above, with these additional internal recovery results:
+Disconnect clears observations. `StartManaged` retries discovery/open every
+250ms while degraded and retains the selected serial, or the same USB parent
+when no serial exists. A duplicate known serial is ambiguous even if one node
+is unreadable. New sessions increment Device generation and retain Profile
+generation. Only new reports recover individual observations. The library does
+not issue state requests, monitor evdev or infer analog/output/trigger state.
 
 | Code | Meaning and next step |
 | --- | --- |
-| `ERR_DEVICE_AMBIGUOUS` | More than one group or selected interface matches. Select a unique device; an unreadable duplicate serial still counts. The manager stays degraded instead of choosing the first candidate. |
-| `ERR_INPUT_READ` | Event reading or a state query failed without a more specific permission/disconnection cause. Check the selected device connection and access. The manager retains the target and retries. |
-| `ERR_INPUT_EVENT` | An ordinary input event is invalid. The manager stops; reconnect the selected device and restart the input lifecycle after investigating the cause. |
+| `ERR_DEVICE_AMBIGUOUS` | Multiple matching devices or interfaces; resolve the selection rather than choosing the first. |
+| `ERR_INPUT_READ` | Passive reading failed. Check the selected device and access; the manager retries. |
+| `ERR_INPUT_EVENT` | Malformed physical report; state is unknown until later valid observations. |
+| `ERR_INPUT_DROPPED` | Suspected counter discontinuity; older observations were invalidated. |
 
-For `ERR_DEVICE_PERMISSION`, follow the active-session and specific-device
-packaging checks below. The manager does not change permissions. A successful
-reconnect starts with unknown input until new events arrive; it preserves the
-caller-supplied Profile generation and does not change the selected profile.
-Closing the manager cancels retry, closes descriptors, and joins its sessions
-and readers before `Done`. Callers should check `Err` after `Done` or the return
-value of `Close`, since cleanup failures are retained even after a later retry
-succeeds.
+After USB reconnect, check whether notifications resume with the official
+software still running. If needed, use the owner's normal software restart or
+SOFTWARE-mode operation. No automatic recovery or two-second timing guarantee
+is established by a readable fd. `Close` cancels retries, closes the fd and joins
+all reader/session work before `Done`; cleanup failures are retained.
 
-Tests exercise synthetic metadata and ioctl results, real OS-pipe events,
-renumbered selections, and fd cleanup. The two-second live reconnect acceptance
-target in [#45](https://github.com/sh4869221b/azerlay/issues/45) remains
-unmeasured; these tests do not establish physical unplug/replug or permission
-revocation acceptance.
+Synthetic tests cover mapping, unknown state, loss suspicion, same-device
+reconnect, denied access and fd cleanup. Owner-operated production verification
+uses `AZERLAY_TEST_PHYSICAL_HID=1 go test -v ./internal/input -run
+'^TestPhysicalHardwareLifecycle$' -count=1 -timeout=5m`: source15/16 press/release,
+unplug/replug, restored notifications and close. Without the opt-in it skips;
+a skip is not a hardware pass.
 
 ## Permission checks and packaging status
 
@@ -147,17 +139,33 @@ whether the specific supported-device uaccess packaging is installed and
 applicable. Reconnect the device after the applicable session or packaging
 conditions have been corrected, then enumerate again.
 
-The specific uaccess rule is a researched candidate, **not shipped or installed
-by this discovery implementation**. Packaging and target-distribution rule
+The earlier event-node rule is historical. Hidraw uaccess packaging is
+**not shipped or installed by this discovery implementation**. Packaging and target-distribution rule
 ordering, active-session grants, and revocation validation belong to
 [#37](https://github.com/sh4869221b/azerlay/issues/37). See the
-[permission decision](decisions/device-identity.md#permission-validation) for
+[permission decision](decisions/device-identity.md#permission-contract) for
 what has and has not been validated. Do not broaden device grants or alter node
 modes or group membership to work around this missing packaging.
 
 A successful read-only open proves access for the invoking process only. It
 does not prove that the specific uaccess rule is installed, that access is
 least-privilege, or that seat ACL grant/revocation works. Discovery does not
-install rules or repair access. Runtime input and the device checks within
-`doctor` remain unimplemented; successful discovery does not establish overlay
-readiness.
+install rules or repair access. Input remains unconnected to the runtime overlay; doctor implements passive
+device/access checks. Successful discovery does not establish overlay readiness.
+
+Raw-only packaging for #37 must grant only hidraw USB `16d0:12f7:0111`
+interface04. Event-node permissions are not required. No permission rules are
+installed or changed here, and uaccess does not enforce read-only operations.
+The historical host's broad `0666` grants do not validate this packaging scope.
+
+### Production lifecycle observation, 2026-09-27
+
+The opt-in `TestPhysicalHardwareLifecycle` passed using the production reader:
+initial unknown, source15/16 press and release, physical USB disconnect with
+unknown state, reopened session with increased Device generation and
+unknown state, source15/16 press and release again, then closed/joined reader.
+The owner performed each operation. The official software stayed running;
+notifications resumed after reconnect without restarting it. The run took
+120.881 seconds including owner interaction; this is not a reconnect-latency
+measurement or a continuous-current-state guarantee. Analog, other firmware,
+right-hand hardware and least-privilege uaccess packaging remain unqualified.

@@ -108,7 +108,7 @@ func parsedDoctorReport(t *testing.T, output cliOutput) diagnostics.Report {
 	if err := decoder.Decode(&report); err != nil {
 		t.Fatal(err)
 	}
-	if output.stderr != "" || !strings.HasSuffix(output.stdout, "\n") || report.SchemaVersion != 1 || report.Command != "doctor" || report.ExitCode != output.status {
+	if output.stderr != "" || !strings.HasSuffix(output.stdout, "\n") || report.SchemaVersion != 2 || report.Command != "doctor" || report.ExitCode != output.status {
 		t.Fatalf("invalid doctor report: %+v", output)
 	}
 	return report
