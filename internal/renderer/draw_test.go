@@ -19,7 +19,10 @@ func renderedGeometry(t *testing.T, snapshot *OverlaySnapshot, options Options, 
 	surface := cairo.CreateImageSurface(cairo.FormatARGB32, width, height)
 	defer surface.Close()
 	context := cairo.Create(surface)
-	drawGeometry(context, snapshot, options, float64(width), float64(height), 0, 0)
+	frame := Prepare(snapshot, options, float64(width), float64(height))
+	if frame != nil {
+		frame.Draw(context)
+	}
 	if err := context.Status(); err != cairo.StatusSuccess {
 		t.Fatalf("Cairo drawing failed: %v", err)
 	}
@@ -120,7 +123,10 @@ func TestZeroAllocation(t *testing.T) {
 	context.Paint()
 	snapshot := NewSnapshot(syntheticShapes(t), Content{})
 	for _, size := range [][2]float64{{0, 8}, {8, 0}, {-1, 8}, {8, -1}} {
-		drawGeometry(context, snapshot, Options{Scale: 1, Opacity: 1}, size[0], size[1], 0, 0)
+		frame := Prepare(snapshot, Options{Scale: 1, Opacity: 1}, size[0], size[1])
+		if frame != nil {
+			frame.Draw(context)
+		}
 	}
 	surface.Flush()
 	data := surface.Data()

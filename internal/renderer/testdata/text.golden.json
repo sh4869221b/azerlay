@@ -1,0 +1,13 @@
+{
+  "compact": ["Single action"],
+  "normal": ["Single action", "W"],
+  "detailed": [
+    "Single action",
+    "W",
+    "AMBIG",
+    "HOLD: Hold action · U",
+    "DOUBLE: Double action · Macro",
+    "?: Unknown action · ?"
+  ],
+  "macro_primary": ["Macro action", "Macro", "HOLD · MACRO · AMBIG"]
+}

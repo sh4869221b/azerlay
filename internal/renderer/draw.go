@@ -8,39 +8,74 @@ import (
 	"github.com/sh4869221b/azerlay/internal/profile"
 )
 
-func drawGeometry(cr *cairo.Context, snapshot *OverlaySnapshot, options Options, width, height, titleBand, statusBand float64) {
-	placement := fitGeometry(snapshot.definition.ViewBox, options, width, height, titleBand, statusBand)
-	if placement.Scale == 0 {
-		return
-	}
-	cr.Save()
-	defer cr.Restore()
-	cr.Rectangle(0, 0, width, height)
-	cr.Clip()
-	cr.SetOperator(cairo.OperatorClear)
-	cr.Paint()
-	cr.SetOperator(cairo.OperatorOver)
-	cr.PushGroup()
+type physicalMark uint8
 
-	view := snapshot.definition.ViewBox
-	frameX := (width - (view.Width+2*geometryPadding)*placement.Scale) / 2
-	frameY := (height - (view.Height+2*geometryPadding+titleBand+statusBand)*placement.Scale) / 2
+const (
+	physicalNone physicalMark = iota
+	physicalUnknown
+	physicalReleased
+	physicalPressed
+)
+
+type controlStyle struct {
+	fill      color
+	width     float64
+	dashed    bool
+	physical  physicalMark
+	static    profile.BindingKind
+	ambiguous bool
+	bounds    shapeBounds
+}
+
+func prepareControlStyle(region layout.Control, control Control, colors palette, options Options) controlStyle {
+	style := controlStyle{
+		fill:      colors.idle,
+		width:     colors.strokeWidth,
+		static:    staticKind(control),
+		ambiguous: options.ShowAmbiguous && hasAmbiguous(control),
+		bounds:    boundsOfShape(region.Shape, shapeTransform{scaleX: 1, scaleY: 1}),
+	}
+	if region.ID != "stick.main" {
+		switch {
+		case !control.Known:
+			style.physical = physicalUnknown
+			style.dashed = true
+		case control.Down:
+			style.physical = physicalPressed
+		case !control.Down:
+			style.physical = physicalReleased
+		}
+	}
+	if style.physical == physicalPressed {
+		style.fill = colors.pressed
+		style.width++
+	} else if style.static == profile.BindingUnbound && options.ShowUnbound {
+		style.fill = colors.unbound
+	} else if style.static == profile.BindingUnknown {
+		style.fill = colors.unknown
+	}
+	if style.static == profile.BindingUnbound && !options.ShowUnbound {
+		style.static = ""
+	}
+	return style
+}
+
+func drawGeometryLayer(cr *cairo.Context, frame *Frame) {
+	view := frame.snapshot.definition.ViewBox
+	frameX := (frame.width - (view.Width+2*geometryPadding)*frame.placement.Scale) / 2
+	frameY := (frame.height - (view.Height+2*geometryPadding+frame.titleBand+frame.statusBand)*frame.placement.Scale) / 2
 	cr.Translate(frameX, frameY)
-	cr.Scale(placement.Scale, placement.Scale)
-	colors := themeFor(options)
-	colors.background.set(cr)
-	cr.Rectangle(0, 0, view.Width+2*geometryPadding, view.Height+2*geometryPadding+titleBand+statusBand)
+	cr.Scale(frame.placement.Scale, frame.placement.Scale)
+	frame.colors.background.set(cr)
+	cr.Rectangle(0, 0, view.Width+2*geometryPadding, view.Height+2*geometryPadding+frame.titleBand+frame.statusBand)
 	cr.Fill()
-	cr.Translate(geometryPadding-view.X, geometryPadding+titleBand-view.Y)
-
-	for _, shape := range snapshot.definition.Decorations {
-		drawShape(cr, shape, colors.idle, colors.outline, 1, false)
+	cr.Translate(geometryPadding-view.X, geometryPadding+frame.titleBand-view.Y)
+	for _, shape := range frame.snapshot.definition.Decorations {
+		drawShape(cr, shape, frame.colors.idle, frame.colors.outline, 1, false)
 	}
-	for _, region := range orderedControls(snapshot.definition) {
-		drawControl(cr, region, snapshot.content.Controls[region.ID], colors, options)
+	for _, item := range frame.controls {
+		drawControlStyle(cr, item.region, item.style, frame.colors)
 	}
-	cr.PopGroupToSource()
-	cr.PaintWithAlpha(options.Opacity)
 }
 
 func drawShape(cr *cairo.Context, shape layout.Shape, fill, outline color, width float64, dashed bool) {
@@ -71,39 +106,24 @@ func drawShape(cr *cairo.Context, shape layout.Shape, fill, outline color, width
 	cr.Restore()
 }
 
-func drawControl(cr *cairo.Context, region layout.Control, control Control, colors palette, options Options) {
-	fill := colors.idle
-	static := staticKind(control)
-	if control.Known && control.Down {
-		fill = colors.pressed
-	} else if static == profile.BindingUnbound && options.ShowUnbound {
-		fill = colors.unbound
-	} else if static == profile.BindingUnknown {
-		fill = colors.unknown
+func drawControlStyle(cr *cairo.Context, region layout.Control, style controlStyle, colors palette) {
+	drawShape(cr, region.Shape, style.fill, colors.outline, style.width, style.dashed)
+	if style.physical != physicalNone {
+		drawPhysicalMark(cr, style.bounds, style.physical, colors)
 	}
-	width := colors.strokeWidth
-	if control.Known && control.Down {
-		width++
-	}
-	physical := region.ID != "stick.main"
-	drawShape(cr, region.Shape, fill, colors.outline, width, physical && !control.Known)
-	bounds := boundsOfShape(region.Shape, shapeTransform{scaleX: 1, scaleY: 1})
-	if physical {
-		drawPhysicalMark(cr, bounds, control, colors)
-	}
-	markX := bounds.maxX - 6
-	markY := bounds.minY + 6
-	if options.ShowAmbiguous && hasAmbiguous(control) {
+	markX := style.bounds.maxX - 6
+	markY := style.bounds.minY + 6
+	if style.ambiguous {
 		drawLetterA(cr, markX, markY, colors.statusWarning)
 		markX -= 8
 	}
-	if static == profile.BindingUnbound && options.ShowUnbound {
+	if style.static == profile.BindingUnbound {
 		colors.primary.set(cr)
 		cr.SetLineWidth(1.5)
 		cr.MoveTo(markX-2, markY)
 		cr.LineTo(markX+2, markY)
 		cr.Stroke()
-	} else if static == profile.BindingUnknown {
+	} else if style.static == profile.BindingUnknown {
 		drawQuestionMark(cr, markX, markY, colors.primary)
 	}
 }
@@ -133,9 +153,9 @@ func hasAmbiguous(control Control) bool {
 	return false
 }
 
-func drawPhysicalMark(cr *cairo.Context, bounds shapeBounds, control Control, colors palette) {
+func drawPhysicalMark(cr *cairo.Context, bounds shapeBounds, mark physicalMark, colors palette) {
 	x, y := bounds.minX+6, bounds.minY+6
-	if !control.Known {
+	if mark == physicalUnknown {
 		drawQuestionMark(cr, x, y, colors.primary)
 		return
 	}
@@ -143,7 +163,7 @@ func drawPhysicalMark(cr *cairo.Context, bounds shapeBounds, control Control, co
 	cr.SetLineWidth(1.5)
 	cr.NewPath()
 	cr.Arc(x, y, 2.4, 0, 2*math.Pi)
-	if control.Down {
+	if mark == physicalPressed {
 		cr.Fill()
 	} else {
 		cr.Stroke()
