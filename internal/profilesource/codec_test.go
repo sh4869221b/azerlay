@@ -121,6 +121,30 @@ func TestCacheRoundTrip(t *testing.T) {
 		})
 	}
 }
+
+func TestUnknownDisplayCacheValidation(t *testing.T) {
+	t.Parallel()
+	bundle := codecFixture(t, "bundle")
+	source := codecRecord(bundle)
+	data, err := encodeBundleCache(source, bundle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := "bundle/profiles/0/controls/0/bindings/0/unknown/raw_display"
+	for _, value := range []string{`null`, `7`, `"line\nprivate"`, `"caf\u00e9"`, strconv.Quote(strings.Repeat("x", 257))} {
+		t.Run(value, func(t *testing.T) {
+			changed := mutateStorage(t, data, storageMutation{path, value})
+			if _, err := decodeBundleCache(bytes.NewReader(changed), source); err == nil {
+				t.Fatal("corrupt display accepted")
+			}
+		})
+	}
+	legacy := mutateStorage(t, data, storageMutation{path, ""})
+	got, err := decodeBundleCache(bytes.NewReader(legacy), source)
+	if err != nil || got.Profiles[0].Controls[0].Bindings[0].Unknown.RawDisplay != "" {
+		t.Fatalf("optional legacy display = %v", err)
+	}
+}
 func TestStorageCodecRejectsInvalid(t *testing.T) {
 	t.Parallel()
 	for name, input := range map[string]string{
@@ -243,8 +267,10 @@ func TestStorageCodecRejectsInvalid(t *testing.T) {
 		{"bundle", bundleData, func(b []byte) error { _, err := decodeBundleCache(bytes.NewReader(b), source); return err }},
 		{"profile", profileData, func(b []byte) error { _, err := decodeProfileCache(bytes.NewReader(b), source, 1); return err }},
 	} {
-		// Every DTO field is mandatory, including nullable pointers and raw maps.
 		for _, path := range storageFieldPaths(t, artifact.data) {
+			if strings.HasSuffix(path, "/unknown/raw_display") {
+				continue
+			}
 			t.Run(artifact.name+"/missing/"+path, func(t *testing.T) {
 				// When
 				err := artifact.decode(mutateStorage(t, artifact.data, storageMutation{path, ""}))

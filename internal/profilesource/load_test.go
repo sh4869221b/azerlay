@@ -57,7 +57,7 @@ func TestImportedLoadRestart(t *testing.T) {
 
 func TestImportedLoadCacheMiss(t *testing.T) {
 	for _, member := range []string{"bundle.json", "p1.json", "p2.json"} {
-		for _, damage := range []string{"missing", "corrupt", "stale", "mismatched model"} {
+		for _, damage := range []string{"missing", "corrupt", "corrupt display", "stale", "mismatched model"} {
 			t.Run(member+"/"+damage, func(t *testing.T) {
 				// Given: exactly one missing, corrupt, or incompatible derived member.
 				home, selection, want := loadFixture(t)
@@ -71,8 +71,15 @@ func TestImportedLoadCacheMiss(t *testing.T) {
 					if err := os.WriteFile(path, []byte("{"), 0600); err != nil {
 						t.Fatal(err)
 					}
+				case "corrupt display":
+					field := "bundle/profiles/0/controls/0/bindings/0/unknown/raw_display"
+					if member != "bundle.json" {
+						field = "profile/controls/0/bindings/0/unknown/raw_display"
+					}
+					data := mutateStorage(t, storeBytes(t, path), storageMutation{field, `"PRIVATE\nLABEL"`})
+					writeLoadFile(t, path, data)
 				case "stale":
-					data := mutateStorage(t, storeBytes(t, path), storageMutation{"normalizer_version", `"old"`})
+					data := mutateStorage(t, storeBytes(t, path), storageMutation{"normalizer_version", `"4"`})
 					writeLoadFile(t, path, data)
 				case "mismatched model":
 					data := storeBytes(t, path)
@@ -91,6 +98,10 @@ func TestImportedLoadCacheMiss(t *testing.T) {
 				assertLoadValues(t, *got)
 				if !reflect.DeepEqual(before, storeTree(t, home)) {
 					t.Fatal("load repaired store")
+				}
+				selected, err := NewImportedSource(home).Selected(context.Background())
+				if err != nil || selected != selection {
+					t.Fatalf("selection changed: %+v, %v", selected, err)
 				}
 			})
 		}

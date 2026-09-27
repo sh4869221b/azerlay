@@ -34,9 +34,9 @@ func TestNormalizePreservation(t *testing.T) {
 				Controls: []profile.ControlBinding{{
 					Label: stringPointer("first"),
 					Bindings: []profile.TriggerBinding{
-						{Trigger: profile.TriggerSingle, Kind: profile.BindingUnknown, Unknown: &profile.UnknownBinding{Reason: "unmapped_binding"}},
-						{Trigger: profile.TriggerLong, Kind: profile.BindingUnknown, Unknown: &profile.UnknownBinding{Reason: "unmapped_binding"}},
-						{Trigger: profile.TriggerDouble, Kind: profile.BindingUnknown, Unknown: &profile.UnknownBinding{Reason: "unmapped_binding"}},
+						{Trigger: profile.TriggerSingle, Kind: profile.BindingUnknown, Unknown: &profile.UnknownBinding{Reason: "unmapped_binding", RawDisplay: `types[0]="1"`}},
+						{Trigger: profile.TriggerLong, Kind: profile.BindingUnknown, Unknown: &profile.UnknownBinding{Reason: "unmapped_binding", RawDisplay: `types[1]="11"`}},
+						{Trigger: profile.TriggerDouble, Kind: profile.BindingUnknown, Unknown: &profile.UnknownBinding{Reason: "unmapped_binding", RawDisplay: `types[2]="11"`}},
 					},
 					Raw: profile.RawBindingReference{
 						RootKind:     profile.RootBundle,

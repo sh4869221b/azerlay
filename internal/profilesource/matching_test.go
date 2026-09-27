@@ -32,7 +32,7 @@ func TestMatchingModelRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	index := storeIndex(t, home)
-	if index.Sources[0].NormalizerVersion != "4" {
+	if index.Sources[0].NormalizerVersion != "5" {
 		t.Fatalf("normalizer revision = %q", index.Sources[0].NormalizerVersion)
 	}
 	cacheDir := filepath.Join(home, "azerlay/profiles", selection.Source.Hash)

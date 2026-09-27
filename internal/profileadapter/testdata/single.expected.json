@@ -14,8 +14,8 @@
           "label":"ctrl-u",
           "bindings":[
             {"trigger":"single","kind":"keyboard","actions":[{"kind":"keyboard","code":"KEY_U","modifiers":["KEY_LEFTCTRL"]}],"trigger_delay_ms":null,"trigger_interval_ms":null,"release_behavior":"regular","unknown":null},
-            {"trigger":"long","kind":"unknown","actions":null,"trigger_delay_ms":null,"trigger_interval_ms":null,"release_behavior":null,"unknown":{"Reason":"unmapped_binding"}},
-            {"trigger":"double","kind":"unknown","actions":null,"trigger_delay_ms":null,"trigger_interval_ms":null,"release_behavior":null,"unknown":{"Reason":"unmapped_binding"}}
+            {"trigger":"long","kind":"unknown","actions":null,"trigger_delay_ms":null,"trigger_interval_ms":null,"release_behavior":null,"unknown":{"Reason":"unmapped_binding","RawDisplay":"types[1]=\"11\""}},
+            {"trigger":"double","kind":"unknown","actions":null,"trigger_delay_ms":null,"trigger_interval_ms":null,"release_behavior":null,"unknown":{"Reason":"unmapped_binding","RawDisplay":"types[2]=\"11\""}}
           ],
           "raw":{
             "root_kind":"single",

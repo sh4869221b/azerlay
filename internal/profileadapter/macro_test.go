@@ -72,7 +72,7 @@ func TestNormalizeMacro(t *testing.T) {
 				}
 				control := bundle.Profiles[0].Controls[0]
 				assertMacroUnknown(t, control)
-				if got := control.Bindings[0]; !reflect.DeepEqual(got, profile.TriggerBinding{Trigger: profile.TriggerSingle, Kind: profile.BindingUnknown, Unknown: &profile.UnknownBinding{Reason: "unmapped_binding"}}) {
+			if got := control.Bindings[0]; !reflect.DeepEqual(got, profile.TriggerBinding{Trigger: profile.TriggerSingle, Kind: profile.BindingUnknown, Unknown: &profile.UnknownBinding{Reason: "unmapped_binding", RawDisplay: `types[0]="16"`}}) {
 					t.Fatalf("single near-match gained partial semantics: %#v", got)
 				}
 				assertLiteralRaw(t, control.Raw.Fields, json.RawMessage(input))
