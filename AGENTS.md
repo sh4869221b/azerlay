@@ -72,7 +72,8 @@ azerlay/
 
 ## UNIQUE STYLES
 
-- Planned input flow is evdev readers -> ordered reducer -> immutable snapshot -> overlay projection.
+- Input flow is qualified interface04 hidraw reader -> ordered reducer -> immutable last-observed physical-button snapshot -> overlay projection; runtime/GTK integration remains separate work.
+- Do not use evdev, including in discovery, diagnostics, or reconnect. Initial/reopened state is unknown; undetected terminal-report loss can leave stale observations. Preserve the official-software prerequisite and never fabricate release from silence.
 - GTK objects stay on the locked main OS thread; draw callbacks perform no I/O, parsing, or waiting.
 - The gtk4-layer-shell CGo bridge remains isolated at the Layer Shell boundary.
 - Raw Azeron schema remains behind version-specific adapters; provisional decoder classification is not the authoritative model decision.
