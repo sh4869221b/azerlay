@@ -54,7 +54,7 @@ from this job by `-run='^$'`. Longer fuzz campaigns are outside PR CI.
 
 `test`, `native-build`, `vulnerability`, and `licenses` use
 `archlinux:base`. Before checkout and Go setup, they run `pacman -Syu` and install
-`ca-certificates git curl tar gzip base-devel pkgconf gtk4 gtk4-layer-shell
+`ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell
 gobject-introspection`. Ubuntu distribution support is excluded from v1 and
 tracked in [Issue #98](https://github.com/sh4869221b/azerlay/issues/98).
 The Ubuntu-hosted runner and the pure `fuzz`/`generated-files` jobs do not qualify
@@ -76,12 +76,83 @@ that is removed after checkout. Container users can differ from the mounted
 workspace's owner, so the build step trusts only that workspace in its own
 global Git config. This preserves normal Go VCS metadata during compilation.
 
-`test`, `native-build`, `vulnerability`, and `licenses` each
-use an isolated Go cache keyed by `go.mod`, `go.sum`, the job ID, and the
-sorted installed Arch package list. A change to the native package set causes
-that job to build cold. Cache hits and misses are both followed by the full
-checks for the job; package installation, compilation, and binary execution
-failures block their respective job.
+### Module and native build caches
+
+The four Arch jobs use `.github/actions/native-go-cache`. Automatic setup-go
+caching is disabled for those jobs to avoid saving the same directories twice.
+The two pure Ubuntu jobs retain their existing setup-go caches unchanged.
+
+- **Application modules:** all four jobs restore
+  `/tmp/azerlay-go-mod/cache/download`, keyed
+  by OS, architecture, resolved Go toolchain, `go.mod`, `go.sum`, and the module
+  preparation script. The key excludes the job, native packages and analyzer
+  versions. All four install `zstd` before restore, so cache paths and compression
+  agree. Only the existing `native-build` job saves this snapshot, after a
+  successful `go mod download` and `go mod verify`. No job waits for it;
+  concurrent cold consumers may miss and download normally.
+- **Analyzer modules:** Staticcheck, govulncheck and go-licenses install with
+  `GOMODCACHE=/tmp/azerlay-tool-go-mod`, with its `cache/download` directory
+  separately cached by owning job, OS,
+  architecture, resolved Go version and `.github/ci-tools.env`. That manifest
+  drives the unchanged pinned tool versions. This prevents an incomplete
+  first-writer snapshot and avoids transferring all three tools' dependency
+  graphs to every consumer. Native package updates do not invalidate tool
+  downloads. Each tool installs normally on a cache miss; no priming build or
+  cross-job dependency is introduced.
+- **Build results:** each job restores and saves only `/tmp/azerlay-go-build`.
+  Its key includes the job ID and complete sorted installed Arch package list,
+  plus OS, architecture, resolved Go toolchain, application dependency files,
+  and CI-tool versions. No restore prefix crosses the native compatibility
+  boundary. Native updates still produce a cold build cache.
+
+The module snapshots contain Go's download archives and metadata (`.info`,
+`.mod`, `.zip`, `.ziphash`, and cached sumdb data), not duplicate extracted source
+trees. Normal `go mod download` and pinned `go install` commands reconstruct
+sources and retain their existing checksum checks. This does not promise offline
+CI: Go may still query release/deprecation metadata, and vulnerability scanning
+still contacts its database. No checksum service is disabled.
+
+App download, checksum verification and an unchanged `go.mod`/`go.sum` check run
+on every cache hit or miss. Application and analyzer cache paths do not overlap.
+Each analyzer retains its own native-keyed build results while sharing the
+job's GOCACHE with the application's other checks.
+
+Cache hits never skip formatting, vet, analyzers, tests, compilation, or binary
+execution. No credentials, HOME directory, binaries, or user profiles are included
+in the module snapshots. GitHub's normal branch/PR cache scope remains in force;
+there is no privileged workflow, ref override, or PR-to-main cache promotion.
+The test job's existing ownership transition covers both normalized cache roots.
+
+Changing to separate caches initially invalidates the old combined snapshots.
+This migration cost is distinct from steady-state results. It does not implement
+Issue #114's rejected source-generation experiment: build snapshots remain keyed
+by dependency/native inputs, without a source or run-ID generation.
+
+#### Measurement and adoption
+
+This is a measured candidate for Issue #116, not a demonstrated wall-time win.
+`scripts/ci-go-modules.sh` reports application-download/verification milliseconds
+and raw module/download-cache bytes. Analyzer installation steps report their own
+download-cache bytes. The Actions cache
+logs provide compressed bytes, hit/key details, and restore/save step durations.
+Compare these overheads and job durations against the preceding combined-cache
+workflow; do not add parallel-job seconds to claim a workflow elapsed reduction.
+
+The target cases are a cold first run, identical warm run, source-only change,
+Go-dependency change, and native-only change. A native-only change must preserve
+the app/tool module keys while invalidating the build key. A Go-dependency change
+invalidates the app snapshot; a tool-version change invalidates tool snapshots;
+a source-only change does neither. Key
+simulation is distinct from actual hosted restore and timing evidence. Keep
+adoption contingent on warm/native-update measurements: extra cache round trips
+may outweigh avoided downloads. If so, narrow sharing or leave this candidate
+unadopted. A preliminary local combined app/tool snapshot was about 244 MB raw
+and 86 MB compressed, so the candidate separates analyzer modules instead of
+making every consumer transfer that union. An initial full-directory shared
+snapshot also increased aggregate restore bytes, so the final candidate keeps
+only download archives and reconstructs sources locally. The issue's
+0–10-second estimate
+is a hypothesis, not a measured result or a compile-time saving.
 
 The test job also installs Sway and D-Bus, removes Sway's file capability inside
 the container, and runs tests as a dedicated non-root user with writable Go
@@ -100,11 +171,9 @@ section inspection. All commands fail the job on a nonzero exit; no cache-hit
 condition skips a build or runs a previously saved executable. The final `test`
 job build and the CLI tests' current-checkout build remain independent and unchanged.
 
-The job ID is part of the native cache input: `native-build` creates a new
-isolated cache, initially cold, instead of maintaining two equivalent native
-build caches. It uses the existing setup-go restore/save behavior and complete
-sorted package inventory; this does not adopt the separate cache experiment in
-Issue #114. Existing old caches expire under GitHub's normal cache retention.
+The job ID remains part of the native cache input, so `native-build` has one
+isolated build cache rather than the two equivalent caches it replaced. Old
+combined cache entries expire under GitHub's normal retention policy.
 
 ### Required-check migration
 
