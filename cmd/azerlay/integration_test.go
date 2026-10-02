@@ -71,7 +71,6 @@ func cliTestMain(m *testing.M) (status int) {
 		}
 	}()
 	cliBinary = filepath.Join(dir, "azerlay")
-	// Cache measurement probe: ordinary CLI builds retain this 30-second bound.
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "go", "build", "-o", cliBinary, ".")

@@ -240,3 +240,6 @@ git diff --exit-code -- internal/profiledecode/testdata/zeros-64mib.lzma interna
 Only the existing compressed files are written; ordinary tests read them
 without regeneration and no decompressed files are stored. Any byte change
 fails the diff check and needs an explanation, not an automatic fixture update.
+
+Measured cases, exact fingerprints, source links and limitations are recorded
+in [the #114 measurement report](ci-cache-measurements.md).
