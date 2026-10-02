@@ -1,0 +1,35 @@
+{
+  "publisher_run": "https://github.com/sh4869221b/azerlay/actions/runs/36986957629",
+  "source_sha": "a36e8c1b4a77489ec97f1f1233f0a5a06ca2b465",
+  "base": "archlinux@sha256:b21322c663be387c0ed9cbc7bbbfe18e41633ad4e7b7c77cfad45f128be20040",
+  "package_access": {
+    "id": 15536413,
+    "name": "azerlay-ci",
+    "visibility": "private",
+    "repository": null,
+    "ui_verified": {
+      "at": "2026-10-02T09:01:59Z",
+      "settings_url": "https://github.com/users/sh4869221b/packages/container/azerlay-ci/settings",
+      "source_repository": "sh4869221b/azerlay",
+      "inherit_source_access": true,
+      "actions_repositories": [
+        "sh4869221b/azerlay"
+      ]
+    }
+  },
+  "images": {
+    "native": {
+      "digest": "ghcr.io/sh4869221b/azerlay-ci@sha256:aacdcd375e205ee1c104f1d9c101d037adfe7f7e51164123b1eabcbba64bf128",
+      "package_manifest_sha256": "627ac7b960f8e394480c97e0dec12468cf45dd7f723ebdd3433e5942a660fd2a",
+      "uncompressed_bytes": 1578797702,
+      "compressed_bytes": 520195982
+    },
+    "wayland": {
+      "digest": "ghcr.io/sh4869221b/azerlay-ci@sha256:1450369c2712232c76b779159aade3cf9b3f642d47229419be0392a5cb093e13",
+      "package_manifest_sha256": "6d54f080d38e0f7cd5fd583ce73e601c31b9e38dec1a72a17dd3349e1532486e",
+      "uncompressed_bytes": 1937849242,
+      "compressed_bytes": 799297914
+    }
+  },
+  "recovery_run": "https://github.com/sh4869221b/azerlay/actions/runs/36987553897"
+}

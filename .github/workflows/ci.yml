@@ -15,18 +15,30 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    container: archlinux:base
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ghcr.io/sh4869221b/azerlay-ci@sha256:1450369c2712232c76b779159aade3cf9b3f642d47229419be0392a5cb093e13
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
     defaults:
       run:
         shell: bash
     env:
+      CI_NATIVE_IMAGE: ghcr.io/sh4869221b/azerlay-ci@sha256:1450369c2712232c76b779159aade3cf9b3f642d47229419be0392a5cb093e13
       GOCACHE: /tmp/azerlay-go-build
       GOMODCACHE: /tmp/azerlay-go-mod
     steps:
-      - name: Install native test dependencies
+      - name: Verify prebuilt native dependencies
         run: |
-          pacman -Syu --noconfirm --needed ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection sway dbus grim noto-fonts-cjk noto-fonts-emoji
-          setcap -r /usr/bin/sway
+          set -euo pipefail
+          diff -u /usr/local/share/azerlay-ci/packages.txt <(LC_ALL=C pacman -Q | LC_ALL=C sort)
+          pkg-config --exists gtk4 gtk4-layer-shell-0
+          command -v cc readelf zstd
+          test -z "$(getcap /usr/bin/sway)"
+          pacman -Q sway dbus grim noto-fonts-cjk noto-fonts-emoji
 
       - name: Check out repository
         uses: actions/checkout@v4
@@ -39,7 +51,7 @@ jobs:
         run: |
           set -euo pipefail
           {
-            printf 'job=%s\n' "$CI_CACHE_JOB"
+            printf 'job=%s\nimage=%s\n' "$CI_CACHE_JOB" "$CI_NATIVE_IMAGE"
             LC_ALL=C pacman -Q | LC_ALL=C sort
           } > .git/ci-native-cache-input
 
@@ -115,16 +127,28 @@ jobs:
   native-build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    container: archlinux:base
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ghcr.io/sh4869221b/azerlay-ci@sha256:aacdcd375e205ee1c104f1d9c101d037adfe7f7e51164123b1eabcbba64bf128
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
     defaults:
       run:
         shell: bash
     env:
+      CI_NATIVE_IMAGE: ghcr.io/sh4869221b/azerlay-ci@sha256:aacdcd375e205ee1c104f1d9c101d037adfe7f7e51164123b1eabcbba64bf128
       GOCACHE: /tmp/azerlay-go-build
       GOMODCACHE: /tmp/azerlay-go-mod
     steps:
-      - name: Install Arch build dependencies
-        run: pacman -Syu --noconfirm --needed ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection
+      - name: Verify prebuilt native dependencies
+        run: |
+          set -euo pipefail
+          diff -u /usr/local/share/azerlay-ci/packages.txt <(LC_ALL=C pacman -Q | LC_ALL=C sort)
+          pkg-config --exists gtk4 gtk4-layer-shell-0
+          command -v cc readelf zstd
 
       - name: Check out repository
         uses: actions/checkout@v4
@@ -137,7 +161,7 @@ jobs:
         run: |
           set -euo pipefail
           {
-            printf 'job=%s\n' "$CI_CACHE_JOB"
+            printf 'job=%s\nimage=%s\n' "$CI_CACHE_JOB" "$CI_NATIVE_IMAGE"
             LC_ALL=C pacman -Q | LC_ALL=C sort
           } > .git/ci-native-cache-input
 
@@ -163,16 +187,28 @@ jobs:
   vulnerability:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    container: archlinux:base
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ghcr.io/sh4869221b/azerlay-ci@sha256:aacdcd375e205ee1c104f1d9c101d037adfe7f7e51164123b1eabcbba64bf128
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
     defaults:
       run:
         shell: bash
     env:
+      CI_NATIVE_IMAGE: ghcr.io/sh4869221b/azerlay-ci@sha256:aacdcd375e205ee1c104f1d9c101d037adfe7f7e51164123b1eabcbba64bf128
       GOCACHE: /tmp/azerlay-go-build
       GOMODCACHE: /tmp/azerlay-go-mod
     steps:
-      - name: Install native build dependencies
-        run: pacman -Syu --noconfirm --needed ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection
+      - name: Verify prebuilt native dependencies
+        run: |
+          set -euo pipefail
+          diff -u /usr/local/share/azerlay-ci/packages.txt <(LC_ALL=C pacman -Q | LC_ALL=C sort)
+          pkg-config --exists gtk4 gtk4-layer-shell-0
+          command -v cc readelf zstd
 
       - name: Check out repository
         uses: actions/checkout@v4
@@ -185,7 +221,7 @@ jobs:
         run: |
           set -euo pipefail
           {
-            printf 'job=%s\n' "$CI_CACHE_JOB"
+            printf 'job=%s\nimage=%s\n' "$CI_CACHE_JOB" "$CI_NATIVE_IMAGE"
             LC_ALL=C pacman -Q | LC_ALL=C sort
           } > .git/ci-native-cache-input
 
@@ -210,16 +246,28 @@ jobs:
   licenses:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    container: archlinux:base
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ghcr.io/sh4869221b/azerlay-ci@sha256:aacdcd375e205ee1c104f1d9c101d037adfe7f7e51164123b1eabcbba64bf128
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
     defaults:
       run:
         shell: bash
     env:
+      CI_NATIVE_IMAGE: ghcr.io/sh4869221b/azerlay-ci@sha256:aacdcd375e205ee1c104f1d9c101d037adfe7f7e51164123b1eabcbba64bf128
       GOCACHE: /tmp/azerlay-go-build
       GOMODCACHE: /tmp/azerlay-go-mod
     steps:
-      - name: Install native build dependencies
-        run: pacman -Syu --noconfirm --needed ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection
+      - name: Verify prebuilt native dependencies
+        run: |
+          set -euo pipefail
+          diff -u /usr/local/share/azerlay-ci/packages.txt <(LC_ALL=C pacman -Q | LC_ALL=C sort)
+          pkg-config --exists gtk4 gtk4-layer-shell-0
+          command -v cc readelf zstd
 
       - name: Check out repository
         uses: actions/checkout@v4
@@ -232,7 +280,7 @@ jobs:
         run: |
           set -euo pipefail
           {
-            printf 'job=%s\n' "$CI_CACHE_JOB"
+            printf 'job=%s\nimage=%s\n' "$CI_CACHE_JOB" "$CI_NATIVE_IMAGE"
             LC_ALL=C pacman -Q | LC_ALL=C sort
           } > .git/ci-native-cache-input
 

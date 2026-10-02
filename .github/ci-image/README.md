@@ -1,8 +1,15 @@
 # Native CI image prototype (Issue #115)
 
-This is an unbuilt candidate, not the active CI environment. The CI workflow
-continues to use `archlinux:base` and install packages normally. No registry,
-publishing workflow, package permission, or schedule is enabled by these files.
+This is a built candidate under evaluation, not yet adopted on the default
+branch. `lock.json` records the private package, immutable digests, official base,
+image sizes and package manifests. The final publisher is manual on `main` only;
+PR CI has read-only package access. The one-off bootstrap trigger was removed.
+The first publisher's API linkage assertion failed after both pushes: the REST
+response omitted `repository`, while package settings confirmed the correct
+source repository, inherited access and exactly one Actions repository. The
+read-only recovery run verified source labels and recovered immutable manifests.
+The publisher now checks the approved package ID and private visibility; before
+manually rebuilding, verify that settings still show only the intended access.
 
 The `native` target preserves the existing native-build/vulnerability/licenses
 package set; `wayland` adds Sway, D-Bus, grim, and CJK/emoji fonts for `test`.
@@ -38,21 +45,30 @@ digest when switching consumers so even a same-package image rebuild invalidates
 native build results. Do not add a broad restore prefix. Module caches stay
 independent of the image and native-package boundary.
 
-## Required decision before publication
+## Approved publication boundary
 
-Recommended candidate destination: a private GHCR package owned by the repository
-owner, linked to this private repository only. First confirm the selected name,
-existing visibility/access, and approval to create/use it. Package inventory was
-not accessible with the current repository credential. Do not assume a name is
-unused or that an existing package is private.
+Approved destination: private `ghcr.io/sh4869221b/azerlay-ci`, package ID
+15536413, source-linked to `sh4869221b/azerlay`, inheriting its private access.
+The 2026-10-02 settings verification showed only `azerlay` under Actions access.
+The source repository receives GitHub's automatic package administration role;
+individual jobs are restricted by their explicit GITHUB_TOKEN scopes.
 
-Only a separately approved publisher needs `contents: read, packages: write`;
-consuming jobs need `contents: read, packages: read` and GHCR container credentials
-using their ephemeral repository GITHUB_TOKEN. Do not create or save a PAT or
-widen other jobs. No public access, external repository access, automatic
-publication from PR code, or `pull_request_target` is proposed. Use manual
-rebuilds initially; any scheduled rebuild and retention deletion needs its own
-approved operating policy. Never expose tokens in image layers or build args.
+Only the manual publisher has `contents: read, packages: write`; the four
+consuming jobs have `contents: read, packages: read` and ephemeral GHCR container
+credentials. Other CI jobs retain only repository read access. No PAT, permanent
+secret, public access, external repository access, PR publisher or
+`pull_request_target` is added. Builds run only from `main` on workflow_dispatch.
+A proposed image update requires reviewing manifests, paired measurements and
+all quality gates before changing pinned digests in a separate PR. Dispatching a
+build never updates consumers automatically.
+
+Rebuild manually after native dependency changes and security updates. There is
+no scheduled rebuild or automatic deletion. Review freshness during dependency
+maintenance; if manual maintenance is not sustainable, revert to full pacman
+setup. Retain the previous tested digests for rollback. Broader sharing,
+scheduling, and destructive cleanup need separate authorization. Build/push and
+read-only recovery evidence remain in the linked runs even when their short-lived
+artifacts expire; selected immutable package manifests are committed here.
 
 ## Measurement and adoption gate
 

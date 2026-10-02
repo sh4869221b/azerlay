@@ -52,11 +52,27 @@ from this job by `-run='^$'`. Longer fuzz campaigns are outside PR CI.
 
 ## Distribution builds and GTK coverage
 
-`test`, `native-build`, `vulnerability`, and `licenses` use
-`archlinux:base`. Before checkout and Go setup, they run `pacman -Syu` and install
+`test`, `native-build`, `vulnerability`, and `licenses` use private, digest-pinned
+Arch dependency images from `ghcr.io/sh4869221b/azerlay-ci`. The three build-only
+jobs use the `native` image; `test` uses the additional `wayland` layer. The image
+build runs a complete `pacman -Syu` and installs the unchanged native package set:
 `ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell
-gobject-introspection`. Ubuntu distribution support is excluded from v1 and
-tracked in [Issue #98](https://github.com/sh4869221b/azerlay/issues/98).
+gobject-introspection`. Consumers verify the complete installed manifest and
+GTK tooling before checkout rather than performing a partial Arch upgrade.
+The test image also preserves Sway, D-Bus, grim, Japanese/emoji fonts and removed
+Sway capabilities. Non-root test execution remains unchanged below.
+
+The [image contract](../.github/ci-image/README.md) and
+[lock record](../.github/ci-image/lock.json) track base/output digests, package
+manifests, sizes, private-package access verification and rebuild/rollback steps.
+Only a manual `main` publisher receives package write access. The four consumers
+receive package read access; the other jobs need no registry access. No Go,
+analyzer, GOCACHE or repository source is baked into these dependency images.
+Image refresh does not automatically update CI pins; a reviewed PR must preserve
+all gates and demonstrate a benefit including cold pull and extraction costs.
+The current candidate's measurement/adoption decision is tracked in Issue #115.
+Ubuntu distribution support remains excluded from v1 and tracked in
+[Issue #98](https://github.com/sh4869221b/azerlay/issues/98).
 The Ubuntu-hosted runner and the pure `fuzz`/`generated-files` jobs do not qualify
 Ubuntu as a product target. The distribution build runs:
 
@@ -86,7 +102,7 @@ The two pure Ubuntu jobs retain their existing setup-go caches unchanged.
   `/tmp/azerlay-go-mod/cache/download`, keyed
   by OS, architecture, resolved Go toolchain, `go.mod`, `go.sum`, and the module
   preparation script. The key excludes the job, native packages and analyzer
-  versions. All four install `zstd` before restore, so cache paths and compression
+  versions. All four images include `zstd` before restore, so cache paths and compression
   agree. Only the existing `native-build` job saves this snapshot, after a
   successful `go mod download` and `go mod verify`. No job waits for it;
   concurrent cold consumers may miss and download normally.
@@ -100,7 +116,7 @@ The two pure Ubuntu jobs retain their existing setup-go caches unchanged.
   downloads. Each tool installs normally on a cache miss; no priming build or
   cross-job dependency is introduced.
 - **Build results:** each job restores and saves only `/tmp/azerlay-go-build`.
-  Its key includes the job ID and complete sorted installed Arch package list,
+  Its key includes the job ID, pinned native image digest, and complete sorted installed Arch package list,
   plus OS, architecture, resolved Go toolchain, application dependency files,
   and CI-tool versions. No restore prefix crosses the native compatibility
   boundary. Native updates still produce a cold build cache.
@@ -154,9 +170,9 @@ only download archives and reconstructs sources locally. The issue's
 0–10-second estimate
 is a hypothesis, not a measured result or a compile-time saving.
 
-The test job also installs Sway and D-Bus, removes Sway's file capability inside
-the container, and runs tests as a dedicated non-root user with writable Go
-caches. `scripts/test-wayland.sh` starts a private two-output headless Sway with
+The test image includes Sway and D-Bus with Sway's file capability removed;
+the job verifies this and runs tests as a dedicated non-root user with writable
+Go caches. `scripts/test-wayland.sh` starts a private two-output headless Sway with
 the pixman renderer, waits for its socket, and provides an absolute test display
 path. CLI fixtures retain separate runtime/config/data directories. The launcher
 stops its compositor and removes its private runtime directory on exit. This
