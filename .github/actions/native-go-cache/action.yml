@@ -1,0 +1,62 @@
+name: Native Go caches
+description: Share downloaded modules while isolating compiled native results.
+inputs:
+  module-writer:
+    description: Only native-build may publish the shared application module snapshot.
+    default: 'false'
+  tool-cache:
+    description: Keep this job's pinned analyzer modules separate from app modules.
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - name: Set up Go
+      id: go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.27.1
+        cache: false
+
+    - name: Check cache paths and compression
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GOMODCACHE" = /tmp/azerlay-go-mod
+        test "$GOCACHE" = /tmp/azerlay-go-build
+        # Identical paths and compression are part of the GitHub cache version.
+        command -v zstd
+
+    - name: Restore shared Go modules
+      id: modules
+      uses: actions/cache/restore@v4
+      with:
+        path: /tmp/azerlay-go-mod
+        key: azerlay-mod-v1-${{ runner.os }}-${{ runner.arch }}-go-${{ steps.go.outputs.go-version }}-${{ hashFiles('go.mod', 'go.sum', 'scripts/ci-go-modules.sh') }}
+
+    - name: Restore native Go build cache
+      uses: actions/cache@v4
+      with:
+        path: /tmp/azerlay-go-build
+        # The input includes the job and COMPLETE installed native package list.
+        # No restore prefix may cross that compatibility boundary.
+        key: azerlay-build-v1-${{ runner.os }}-${{ runner.arch }}-go-${{ steps.go.outputs.go-version }}-${{ hashFiles('go.mod', 'go.sum', '.github/ci-tools.env', '.git/ci-native-cache-input') }}
+
+    - name: Download and verify application modules
+      shell: bash
+      run: bash scripts/ci-go-modules.sh
+
+    - name: Save shared Go modules
+      if: inputs.module-writer == 'true' && steps.modules.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: /tmp/azerlay-go-mod
+        key: ${{ steps.modules.outputs.cache-primary-key }}
+
+    - name: Restore pinned tool modules
+      if: inputs.tool-cache == 'true'
+      uses: actions/cache@v4
+      with:
+        path: /tmp/azerlay-tool-go-mod
+        # A single owning job installs and saves its own tool graph. Native
+        # package updates cannot invalidate these downloaded Go modules.
+        key: azerlay-tool-mod-v1-${{ runner.os }}-${{ runner.arch }}-go-${{ steps.go.outputs.go-version }}-${{ github.job }}-${{ hashFiles('.github/ci-tools.env') }}
