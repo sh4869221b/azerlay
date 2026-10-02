@@ -82,7 +82,8 @@ The four Arch jobs use `.github/actions/native-go-cache`. Automatic setup-go
 caching is disabled for those jobs to avoid saving the same directories twice.
 The two pure Ubuntu jobs retain their existing setup-go caches unchanged.
 
-- **Application modules:** all four jobs restore `/tmp/azerlay-go-mod`, keyed
+- **Application modules:** all four jobs restore
+  `/tmp/azerlay-go-mod/cache/download`, keyed
   by OS, architecture, resolved Go toolchain, `go.mod`, `go.sum`, and the module
   preparation script. The key excludes the job, native packages and analyzer
   versions. All four install `zstd` before restore, so cache paths and compression
@@ -90,7 +91,8 @@ The two pure Ubuntu jobs retain their existing setup-go caches unchanged.
   successful `go mod download` and `go mod verify`. No job waits for it;
   concurrent cold consumers may miss and download normally.
 - **Analyzer modules:** Staticcheck, govulncheck and go-licenses install with
-  `GOMODCACHE=/tmp/azerlay-tool-go-mod`, separately cached by owning job, OS,
+  `GOMODCACHE=/tmp/azerlay-tool-go-mod`, with its `cache/download` directory
+  separately cached by owning job, OS,
   architecture, resolved Go version and `.github/ci-tools.env`. That manifest
   drives the unchanged pinned tool versions. This prevents an incomplete
   first-writer snapshot and avoids transferring all three tools' dependency
@@ -102,6 +104,13 @@ The two pure Ubuntu jobs retain their existing setup-go caches unchanged.
   plus OS, architecture, resolved Go toolchain, application dependency files,
   and CI-tool versions. No restore prefix crosses the native compatibility
   boundary. Native updates still produce a cold build cache.
+
+The module snapshots contain Go's download archives and metadata (`.info`,
+`.mod`, `.zip`, `.ziphash`, and cached sumdb data), not duplicate extracted source
+trees. Normal `go mod download` and pinned `go install` commands reconstruct
+sources and retain their existing checksum checks. This does not promise offline
+CI: Go may still query release/deprecation metadata, and vulnerability scanning
+still contacts its database. No checksum service is disabled.
 
 App download, checksum verification and an unchanged `go.mod`/`go.sum` check run
 on every cache hit or miss. Application and analyzer cache paths do not overlap.
@@ -123,8 +132,8 @@ by dependency/native inputs, without a source or run-ID generation.
 
 This is a measured candidate for Issue #116, not a demonstrated wall-time win.
 `scripts/ci-go-modules.sh` reports application-download/verification milliseconds
-and raw module-cache bytes. Analyzer installation steps report their own module
-cache bytes. The Actions cache
+and raw module/download-cache bytes. Analyzer installation steps report their own
+download-cache bytes. The Actions cache
 logs provide compressed bytes, hit/key details, and restore/save step durations.
 Compare these overheads and job durations against the preceding combined-cache
 workflow; do not add parallel-job seconds to claim a workflow elapsed reduction.
@@ -139,7 +148,10 @@ adoption contingent on warm/native-update measurements: extra cache round trips
 may outweigh avoided downloads. If so, narrow sharing or leave this candidate
 unadopted. A preliminary local combined app/tool snapshot was about 244 MB raw
 and 86 MB compressed, so the candidate separates analyzer modules instead of
-making every consumer transfer that union. The issue's 0–10-second estimate
+making every consumer transfer that union. An initial full-directory shared
+snapshot also increased aggregate restore bytes, so the final candidate keeps
+only download archives and reconstructs sources locally. The issue's
+0–10-second estimate
 is a hypothesis, not a measured result or a compile-time saving.
 
 The test job also installs Sway and D-Bus, removes Sway's file capability inside

@@ -68,7 +68,7 @@ jobs:
         run: |
           source .github/ci-tools.env
           go install honnef.co/go/tools/cmd/staticcheck@"$STATICCHECK_VERSION"
-          du -sb "$GOMODCACHE"
+          du -sb "$GOMODCACHE/cache/download"
 
       - name: Staticcheck
         run: staticcheck ./...
@@ -200,7 +200,7 @@ jobs:
         run: |
           source .github/ci-tools.env
           go install golang.org/x/vuln/cmd/govulncheck@"$GOVULNCHECK_VERSION"
-          du -sb "$GOMODCACHE"
+          du -sb "$GOMODCACHE/cache/download"
 
       - name: Check reachable vulnerabilities
         run: |
@@ -247,7 +247,7 @@ jobs:
         run: |
           source .github/ci-tools.env
           go install github.com/google/go-licenses/v2@"$GO_LICENSES_VERSION"
-          du -sb "$GOMODCACHE"
+          du -sb "$GOMODCACHE/cache/download"
 
       - name: Report dependency licenses
         run: |
