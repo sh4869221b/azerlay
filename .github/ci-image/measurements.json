@@ -1,0 +1,356 @@
+[
+  {
+    "label": "main-warm",
+    "run": "https://github.com/sh4869221b/azerlay/actions/runs/36985688702/attempts/2",
+    "sha": "82e15f7bf1af814d91609972d1c39982d59dbd52",
+    "runner_seconds": 530,
+    "job_start_to_finish_span_seconds": 209,
+    "jobs": [
+      {
+        "job": "licenses",
+        "conclusion": "success",
+        "total_seconds": 66,
+        "steps_seconds": {
+          "Set up job": 1,
+          "Initialize containers": 8,
+          "Install native build dependencies": 23,
+          "Check out repository": 1,
+          "Prepare native Go cache input": 0,
+          "Set up Go and native caches": 18,
+          "Install go-licenses": 2,
+          "Report dependency licenses": 1,
+          "Upload dependency license report": 1,
+          "Post Set up Go and native caches": 1,
+          "Post Check out repository": 0,
+          "Stop containers": 7,
+          "Complete job": 0
+        }
+      },
+      {
+        "job": "vulnerability",
+        "conclusion": "success",
+        "total_seconds": 69,
+        "steps_seconds": {
+          "Set up job": 1,
+          "Initialize containers": 10,
+          "Install native build dependencies": 22,
+          "Check out repository": 2,
+          "Prepare native Go cache input": 0,
+          "Set up Go and native caches": 18,
+          "Install govulncheck": 2,
+          "Check reachable vulnerabilities": 4,
+          "Post Set up Go and native caches": 2,
+          "Post Check out repository": 0,
+          "Stop containers": 4,
+          "Complete job": 0
+        }
+      },
+      {
+        "job": "native-build",
+        "conclusion": "success",
+        "total_seconds": 73,
+        "steps_seconds": {
+          "Set up job": 0,
+          "Initialize containers": 15,
+          "Install Arch build dependencies": 19,
+          "Check out repository": 1,
+          "Prepare native Go cache input": 0,
+          "Set up Go and native caches": 19,
+          "Build, run, and inspect native binary": 6,
+          "Post Set up Go and native caches": 0,
+          "Post Check out repository": 1,
+          "Stop containers": 8,
+          "Complete job": 0
+        }
+      },
+      {
+        "job": "generated-files",
+        "conclusion": "success",
+        "total_seconds": 23,
+        "steps_seconds": {
+          "Set up job": 2,
+          "Check out repository": 3,
+          "Set up Go": 13,
+          "Regenerate LZMA boundary fixtures": 1,
+          "Check generated fixtures": 0,
+          "Post Set up Go": 0,
+          "Post Check out repository": 1,
+          "Complete job": 0
+        }
+      },
+      {
+        "job": "fuzz",
+        "conclusion": "success",
+        "total_seconds": 118,
+        "steps_seconds": {
+          "Set up job": 1,
+          "Check out repository": 1,
+          "Set up Go": 13,
+          "Fuzz existing parsing stages": 97,
+          "Post Set up Go": 0,
+          "Post Check out repository": 1,
+          "Complete job": 0
+        }
+      },
+      {
+        "job": "test",
+        "conclusion": "success",
+        "total_seconds": 181,
+        "steps_seconds": {
+          "Set up job": 1,
+          "Initialize containers": 16,
+          "Install native test dependencies": 26,
+          "Check out repository": 2,
+          "Prepare native Go cache input": 0,
+          "Set up Go and native caches": 33,
+          "Check formatting": 1,
+          "Vet": 0,
+          "Install Staticcheck": 2,
+          "Staticcheck": 10,
+          "Test": 76,
+          "Build": 3,
+          "Post Set up Go and native caches": 0,
+          "Post Check out repository": 1,
+          "Stop containers": 6,
+          "Complete job": 0
+        }
+      }
+    ]
+  },
+  {
+    "label": "candidate-native-cache-cold",
+    "run": "https://github.com/sh4869221b/azerlay/actions/runs/36987897494/attempts/1",
+    "sha": "b584292b69863fa1161751700a70a0386434425b",
+    "runner_seconds": 3357,
+    "job_start_to_finish_span_seconds": 1669,
+    "jobs": [
+      {
+        "job": "test",
+        "conclusion": "success",
+        "total_seconds": 1669,
+        "steps_seconds": {
+          "Set up job": 2,
+          "Initialize containers": 31,
+          "Verify prebuilt native dependencies": 0,
+          "Check out repository": 1,
+          "Prepare native Go cache input": 0,
+          "Set up Go and native caches": 13,
+          "Check formatting": 0,
+          "Vet": 729,
+          "Install Staticcheck": 26,
+          "Staticcheck": 18,
+          "Test": 834,
+          "Build": 4,
+          "Post Set up Go and native caches": 7,
+          "Post Check out repository": 0,
+          "Stop containers": 1,
+          "Complete job": 0
+        }
+      },
+      {
+        "job": "vulnerability",
+        "conclusion": "success",
+        "total_seconds": 717,
+        "steps_seconds": {
+          "Set up job": 1,
+          "Initialize containers": 27,
+          "Verify prebuilt native dependencies": 0,
+          "Check out repository": 1,
+          "Prepare native Go cache input": 0,
+          "Set up Go and native caches": 16,
+          "Install govulncheck": 31,
+          "Check reachable vulnerabilities": 634,
+          "Post Set up Go and native caches": 3,
+          "Post Check out repository": 0,
+          "Stop containers": 1,
+          "Complete job": 0
+        }
+      },
+      {
+        "job": "fuzz",
+        "conclusion": "success",
+        "total_seconds": 116,
+        "steps_seconds": {
+          "Set up job": 2,
+          "Check out repository": 2,
+          "Set up Go": 18,
+          "Fuzz existing parsing stages": 88,
+          "Post Set up Go": 0,
+          "Post Check out repository": 1,
+          "Complete job": 0
+        }
+      },
+      {
+        "job": "generated-files",
+        "conclusion": "success",
+        "total_seconds": 21,
+        "steps_seconds": {
+          "Set up job": 1,
+          "Check out repository": 1,
+          "Set up Go": 14,
+          "Regenerate LZMA boundary fixtures": 2,
+          "Check generated fixtures": 0,
+          "Post Set up Go": 0,
+          "Post Check out repository": 0,
+          "Complete job": 0
+        }
+      },
+      {
+        "job": "native-build",
+        "conclusion": "success",
+        "total_seconds": 748,
+        "steps_seconds": {
+          "Set up job": 1,
+          "Initialize containers": 30,
+          "Verify prebuilt native dependencies": 0,
+          "Check out repository": 1,
+          "Prepare native Go cache input": 0,
+          "Set up Go and native caches": 16,
+          "Build, run, and inspect native binary": 691,
+          "Post Set up Go and native caches": 4,
+          "Post Check out repository": 0,
+          "Stop containers": 2,
+          "Complete job": 0
+        }
+      },
+      {
+        "job": "licenses",
+        "conclusion": "success",
+        "total_seconds": 86,
+        "steps_seconds": {
+          "Set up job": 0,
+          "Initialize containers": 28,
+          "Verify prebuilt native dependencies": 0,
+          "Check out repository": 1,
+          "Prepare native Go cache input": 0,
+          "Set up Go and native caches": 15,
+          "Install go-licenses": 32,
+          "Report dependency licenses": 1,
+          "Upload dependency license report": 1,
+          "Post Set up Go and native caches": 2,
+          "Post Check out repository": 1,
+          "Stop containers": 1,
+          "Complete job": 0
+        }
+      }
+    ]
+  },
+  {
+    "label": "candidate-warm-1",
+    "run": "https://github.com/sh4869221b/azerlay/actions/runs/36987897494/attempts/2",
+    "sha": "b584292b69863fa1161751700a70a0386434425b",
+    "runner_seconds": 502,
+    "job_start_to_finish_span_seconds": 185,
+    "jobs": [
+      {
+        "job": "native-build",
+        "conclusion": "success",
+        "total_seconds": 64,
+        "steps_seconds": {
+          "Set up job": 1,
+          "Initialize containers": 30,
+          "Verify prebuilt native dependencies": 0,
+          "Check out repository": 1,
+          "Prepare native Go cache input": 0,
+          "Set up Go and native caches": 20,
+          "Build, run, and inspect native binary": 4,
+          "Post Set up Go and native caches": 0,
+          "Post Check out repository": 1,
+          "Stop containers": 3,
+          "Complete job": 0
+        }
+      },
+      {
+        "job": "fuzz",
+        "conclusion": "success",
+        "total_seconds": 112,
+        "steps_seconds": {
+          "Set up job": 1,
+          "Check out repository": 1,
+          "Set up Go": 12,
+          "Fuzz existing parsing stages": 93,
+          "Post Set up Go": 0,
+          "Post Check out repository": 0,
+          "Complete job": 0
+        }
+      },
+      {
+        "job": "test",
+        "conclusion": "success",
+        "total_seconds": 184,
+        "steps_seconds": {
+          "Set up job": 2,
+          "Initialize containers": 50,
+          "Verify prebuilt native dependencies": 0,
+          "Check out repository": 2,
+          "Prepare native Go cache input": 0,
+          "Set up Go and native caches": 24,
+          "Check formatting": 0,
+          "Vet": 1,
+          "Install Staticcheck": 2,
+          "Staticcheck": 11,
+          "Test": 80,
+          "Build": 3,
+          "Post Set up Go and native caches": 1,
+          "Post Check out repository": 1,
+          "Stop containers": 3,
+          "Complete job": 0
+        }
+      },
+      {
+        "job": "licenses",
+        "conclusion": "success",
+        "total_seconds": 65,
+        "steps_seconds": {
+          "Set up job": 1,
+          "Initialize containers": 28,
+          "Verify prebuilt native dependencies": 0,
+          "Check out repository": 1,
+          "Prepare native Go cache input": 0,
+          "Set up Go and native caches": 20,
+          "Install go-licenses": 3,
+          "Report dependency licenses": 1,
+          "Upload dependency license report": 1,
+          "Post Set up Go and native caches": 1,
+          "Post Check out repository": 0,
+          "Stop containers": 5,
+          "Complete job": 0
+        }
+      },
+      {
+        "job": "generated-files",
+        "conclusion": "success",
+        "total_seconds": 18,
+        "steps_seconds": {
+          "Set up job": 0,
+          "Check out repository": 1,
+          "Set up Go": 11,
+          "Regenerate LZMA boundary fixtures": 2,
+          "Check generated fixtures": 0,
+          "Post Set up Go": 0,
+          "Post Check out repository": 0,
+          "Complete job": 0
+        }
+      },
+      {
+        "job": "vulnerability",
+        "conclusion": "success",
+        "total_seconds": 59,
+        "steps_seconds": {
+          "Set up job": 1,
+          "Initialize containers": 28,
+          "Verify prebuilt native dependencies": 0,
+          "Check out repository": 1,
+          "Prepare native Go cache input": 0,
+          "Set up Go and native caches": 16,
+          "Install govulncheck": 1,
+          "Check reachable vulnerabilities": 5,
+          "Post Set up Go and native caches": 1,
+          "Post Check out repository": 0,
+          "Stop containers": 3,
+          "Complete job": 0
+        }
+      }
+    ]
+  }
+]

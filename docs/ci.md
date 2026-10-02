@@ -70,7 +70,9 @@ receive package read access; the other jobs need no registry access. No Go,
 analyzer, GOCACHE or repository source is baked into these dependency images.
 Image refresh does not automatically update CI pins; a reviewed PR must preserve
 all gates and demonstrate a benefit including cold pull and extraction costs.
-The current candidate's measurement/adoption decision is tracked in Issue #115.
+The current candidate's [measurement record](../.github/ci-image/measurements.md)
+shows a small aggregate runner-time change but no proven critical-path win;
+adoption remains gated by Issue #115.
 Ubuntu distribution support remains excluded from v1 and tracked in
 [Issue #98](https://github.com/sh4869221b/azerlay/issues/98).
 The Ubuntu-hosted runner and the pure `fuzz`/`generated-files` jobs do not qualify
