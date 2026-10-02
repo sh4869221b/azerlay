@@ -14,6 +14,12 @@ concurrency:
 
 jobs:
   test:
+    # Temporary #114 measurement cases; removed before final ordinary CI.
+    name: test (${{ matrix.cache-case }})
+    strategy:
+      fail-fast: false
+      matrix:
+        cache-case: [source-only, go-dependency, native-dependency]
     runs-on: ubuntu-latest
     container: archlinux:base
     defaults:
@@ -38,6 +44,17 @@ jobs:
         with:
           go-version: 1.27.1
           cache: false
+
+      - name: Apply bounded cache measurement variation
+        env:
+          CACHE_CASE: ${{ matrix.cache-case }}
+        run: |
+          case "$CACHE_CASE" in
+            source-only) ;;
+            go-dependency) go mod edit -require=github.com/davecgh/go-spew@v1.1.1 ;;
+            native-dependency) pacman -S --noconfirm --needed strace ;;
+            *) exit 1 ;;
+          esac
 
       - name: Prepare Go cache keys
         id: cache-key
@@ -83,7 +100,7 @@ jobs:
       - name: Vet
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          go vet ./...
+          go vet -x ./...
 
       - name: Install Staticcheck
         run: go install honnef.co/go/tools/cmd/staticcheck@2026.2.1
@@ -99,7 +116,7 @@ jobs:
           # Restored tar ownership is not assumed to match this fresh user.
           runuser -u azerlay-test -- test -r "$GOCACHE"
           runuser -u azerlay-test -- test -w "$GOCACHE"
-          runuser -u azerlay-test -- env PATH="$PATH" GOCACHE="$GOCACHE" GOMODCACHE="$GOMODCACHE" scripts/test-wayland.sh go test -race -shuffle=on -count=1 ./...
+          runuser -u azerlay-test -- env PATH="$PATH" GOCACHE="$GOCACHE" GOMODCACHE="$GOMODCACHE" scripts/test-wayland.sh go test -x -race -shuffle=on -count=1 ./...
 
       - name: Build
         run: go build ./cmd/azerlay
