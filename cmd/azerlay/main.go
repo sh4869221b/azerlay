@@ -13,6 +13,7 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
+// Source-only cache acceptance probe: executable behavior is unchanged.
 var version = "dev"
 
 func main() {
