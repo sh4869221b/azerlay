@@ -11,8 +11,7 @@ explicit versions without changing the application's `go.mod` or `go.sum`.
 | --- | --- | --- |
 | `test` | Formatting, vet, Staticcheck, race tests, binary build | GitHub default (360 minutes) |
 | `fuzz` | Seven existing fuzz targets, each with a 10-second fuzz allocation | 10 minutes |
-| `container-build` | Build and run the binary in Arch | 15 minutes |
-| `cgo-smoke` | Compile the native binary, run version, and inspect shared libraries | GitHub default (360 minutes) |
+| `native-build` | Verify default CGo, compile the native binary in Arch, run version, and inspect shared libraries | 15 minutes |
 | `vulnerability` | Reachable Go vulnerability scan | 20 minutes |
 | `licenses` | Third-party Go dependency license CSV | 10 minutes |
 | `generated-files` | Regenerate both LZMA fixtures and reject differences | 15 minutes |
@@ -53,7 +52,7 @@ from this job by `-run='^$'`. Longer fuzz campaigns are outside PR CI.
 
 ## Distribution builds and GTK coverage
 
-`test`, `container-build`, `cgo-smoke`, `vulnerability`, and `licenses` use
+`test`, `native-build`, `vulnerability`, and `licenses` use
 `archlinux:base`. Before checkout and Go setup, they run `pacman -Syu` and install
 `ca-certificates git curl tar gzip base-devel pkgconf gtk4 gtk4-layer-shell
 gobject-introspection`. Ubuntu distribution support is excluded from v1 and
@@ -64,8 +63,12 @@ Ubuntu as a product target. The distribution build runs:
 ```sh
 git config --global --add safe.directory "$GITHUB_WORKSPACE"
 go version
-go build -o /tmp/azerlay ./cmd/azerlay
+go env GOOS GOARCH CGO_ENABLED CC
+test "$(go env CGO_ENABLED)" = 1
+pkg-config --modversion gtk4 gtk4-layer-shell-0
+CGO_ENABLED=1 go build -o /tmp/azerlay ./cmd/azerlay
 /tmp/azerlay version
+readelf -d /tmp/azerlay
 ```
 
 The checkout action's safe-directory setting lives in a temporary Git config
@@ -73,7 +76,7 @@ that is removed after checkout. Container users can differ from the mounted
 workspace's owner, so the build step trusts only that workspace in its own
 global Git config. This preserves normal Go VCS metadata during compilation.
 
-`test`, `container-build`, `cgo-smoke`, `vulnerability`, and `licenses` each
+`test`, `native-build`, `vulnerability`, and `licenses` each
 use an isolated Go cache keyed by `go.mod`, `go.sum`, the job ID, and the
 sorted installed Arch package list. A change to the native package set causes
 that job to build cold. Cache hits and misses are both followed by the full
@@ -88,14 +91,31 @@ path. CLI fixtures retain separate runtime/config/data directories. The launcher
 stops its compositor and removes its private runtime directory on exit. This
 is protocol coverage, not Sway support or physical monitor/device qualification.
 
-`cgo-smoke` performs actual native compilation and inspection:
+`native-build` replaces `container-build` and `cgo-smoke`: both previously
+compiled and ran the same checkout with the same Arch packages and Go version.
+It asserts that the default CGo setting is `1` before the explicit CGo build,
+so a changed default fails rather than silently losing a distinct build condition.
+It retains the Go version, pkg-config versions, version execution and ELF dynamic
+section inspection. All commands fail the job on a nonzero exit; no cache-hit
+condition skips a build or runs a previously saved executable. The final `test`
+job build and the CLI tests' current-checkout build remain independent and unchanged.
 
-```sh
-pkg-config --modversion gtk4 gtk4-layer-shell-0
-CGO_ENABLED=1 go build -o /tmp/azerlay ./cmd/azerlay
-/tmp/azerlay version
-readelf -d /tmp/azerlay
-```
+The job ID is part of the native cache input: `native-build` creates a new
+isolated cache, initially cold, instead of maintaining two equivalent native
+build caches. It uses the existing setup-go restore/save behavior and complete
+sorted package inventory; this does not adopt the separate cache experiment in
+Issue #114. Existing old caches expire under GitHub's normal cache retention.
+
+### Required-check migration
+
+Before merging this job rename, repository administrators should inspect branch
+protection and rulesets. If either `container-build` or `cgo-smoke` is required,
+replace both with the actual successful `native-build` check from this PR, while
+keeping all other required checks. Coordinate the rename with the merge so that
+neither stale check names nor an unprotected gap is left behind. This change does
+not edit repository protection, create always-successful compatibility jobs, or
+skip verification. A successful PR run does not establish post-merge `main`
+success; verify the first `main` run separately after an authorized merge.
 
 The compile check has no skip guard. Hyprland placement, fractional scaling, and
 output lifecycle require separate isolated compositor QA; CI does not establish
