@@ -25,7 +25,7 @@ jobs:
     steps:
       - name: Install native test dependencies
         run: |
-          pacman -Syu --noconfirm --needed ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection sway dbus grim noto-fonts-cjk noto-fonts-emoji
+          pacman -Syu --noconfirm --needed ca-certificates git curl tar gzip zstd libuv base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection sway dbus grim noto-fonts-cjk noto-fonts-emoji
           setcap -r /usr/bin/sway
 
       - name: Check out repository
@@ -124,7 +124,7 @@ jobs:
       GOMODCACHE: /tmp/azerlay-go-mod
     steps:
       - name: Install Arch build dependencies
-        run: pacman -Syu --noconfirm --needed ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection
+        run: pacman -Syu --noconfirm --needed ca-certificates git curl tar gzip zstd libuv base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection
 
       - name: Check out repository
         uses: actions/checkout@v4
@@ -172,7 +172,7 @@ jobs:
       GOMODCACHE: /tmp/azerlay-go-mod
     steps:
       - name: Install native build dependencies
-        run: pacman -Syu --noconfirm --needed ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection
+        run: pacman -Syu --noconfirm --needed ca-certificates git curl tar gzip zstd libuv base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection
 
       - name: Check out repository
         uses: actions/checkout@v4
@@ -219,7 +219,7 @@ jobs:
       GOMODCACHE: /tmp/azerlay-go-mod
     steps:
       - name: Install native build dependencies
-        run: pacman -Syu --noconfirm --needed ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection
+        run: pacman -Syu --noconfirm --needed ca-certificates git curl tar gzip zstd libuv base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection
 
       - name: Check out repository
         uses: actions/checkout@v4
