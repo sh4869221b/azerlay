@@ -112,7 +112,7 @@ jobs:
           go test ./internal/profileraw -run='^$' -fuzz='^FuzzParse$' -fuzztime=10s -parallel=1 -timeout=2m
           go test ./internal/profileadapter -run='^$' -fuzz='^FuzzNormalize$' -fuzztime=10s -parallel=1 -timeout=2m
 
-  container-build:
+  native-build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     container: archlinux:base
@@ -148,51 +148,15 @@ jobs:
             go.sum
             .git/ci-native-cache-input
 
-      - name: Build and run binary
-        run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          go version
-          go build -o /tmp/azerlay ./cmd/azerlay
-          /tmp/azerlay version
-
-  cgo-smoke:
-    runs-on: ubuntu-latest
-    container: archlinux:base
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Install native build dependencies
-        run: pacman -Syu --noconfirm --needed ca-certificates git curl tar gzip base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection
-
-      - name: Check out repository
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Prepare native Go cache input
-        env:
-          CI_CACHE_JOB: ${{ github.job }}
+      - name: Build, run, and inspect native binary
         run: |
           set -euo pipefail
-          {
-            printf 'job=%s\n' "$CI_CACHE_JOB"
-            LC_ALL=C pacman -Q | LC_ALL=C sort
-          } > .git/ci-native-cache-input
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: 1.27.1
-          cache: true
-          cache-dependency-path: |
-            go.mod
-            go.sum
-            .git/ci-native-cache-input
-
-      - name: Compile and inspect native binary
-        run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          go version
+          go env GOOS GOARCH CGO_ENABLED CC
+          # The former default-CGo build and explicit-CGo smoke must agree.
+          # Fail on drift rather than silently dropping a distinct build condition.
+          test "$(go env CGO_ENABLED)" = 1
           pkg-config --modversion gtk4 gtk4-layer-shell-0
           CGO_ENABLED=1 go build -o /tmp/azerlay ./cmd/azerlay
           /tmp/azerlay version
