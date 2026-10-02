@@ -33,25 +33,43 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Prepare native Go cache input
-        env:
-          CI_CACHE_JOB: ${{ github.job }}
-        run: |
-          set -euo pipefail
-          {
-            printf 'job=%s\n' "$CI_CACHE_JOB"
-            LC_ALL=C pacman -Q | LC_ALL=C sort
-          } > .git/ci-native-cache-input
-
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: 1.27.1
-          cache: true
-          cache-dependency-path: |
-            go.mod
-            go.sum
-            .git/ci-native-cache-input
+          cache: false
+
+      - name: Prepare Go cache keys
+        id: cache-key
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          bash scripts/test-ci-go-cache-key.sh
+          bash scripts/ci-go-cache-key.sh "$RUNNER_TEMP/go-cache-environment.txt" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Restore test build cache
+        id: build-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/azerlay-go-build
+          key: ${{ steps.cache-key.outputs.key }}
+          restore-keys: ${{ steps.cache-key.outputs.prefix }}
+
+      # Module caching stays job-local; cross-job sharing belongs to #116.
+      - name: Restore test module cache
+        id: module-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/azerlay-go-mod
+          key: azerlay-test-mod-v1-${{ steps.cache-key.outputs.compatibility }}-${{ steps.cache-key.outputs.dependencies }}
+
+      - name: Record cache restore
+        env:
+          BUILD_KEY: ${{ steps.build-cache.outputs.cache-matched-key }}
+          BUILD_HIT: ${{ steps.build-cache.outputs.cache-hit }}
+        run: |
+          printf 'Build cache exact hit: %s\nRestored key: %s\n' "$BUILD_HIT" "$BUILD_KEY" >> "$GITHUB_STEP_SUMMARY"
+          mkdir -p "$GOCACHE" "$GOMODCACHE"
+          du -sb "$GOCACHE" "$GOMODCACHE"
 
       - name: Check formatting
         shell: bash
@@ -78,10 +96,46 @@ jobs:
           useradd --create-home --user-group azerlay-test
           mkdir -p "$GOCACHE" "$GOMODCACHE"
           chown -R azerlay-test:azerlay-test "$GITHUB_WORKSPACE" "$GOCACHE" "$GOMODCACHE"
+          # Restored tar ownership is not assumed to match this fresh user.
+          runuser -u azerlay-test -- test -r "$GOCACHE"
+          runuser -u azerlay-test -- test -w "$GOCACHE"
           runuser -u azerlay-test -- env PATH="$PATH" GOCACHE="$GOCACHE" GOMODCACHE="$GOMODCACHE" scripts/test-wayland.sh go test -race -shuffle=on -count=1 ./...
 
       - name: Build
         run: go build ./cmd/azerlay
+
+      - name: Record normal and race GTK cache state
+        run: |
+          for mode in normal race; do
+            flags=()
+            if [[ $mode == race ]]; then flags=(-race); fi
+            printf 'GTK cache state (%s):\n' "$mode"
+            go list "${flags[@]}" -deps -f '{{if .Module}}{{if eq .Module.Path "github.com/diamondburned/gotk4/pkg"}}{{.ImportPath}} stale={{.Stale}} reason={{.StaleReason}}{{end}}{{end}}' ./cmd/azerlay | sed '/^$/d'
+          done
+          du -sb "$GOCACHE" "$GOMODCACHE"
+
+      # The test job is the only producer of this namespace, after normal AND
+      # race compilation and every test-job gate succeeds. PR caches remain in
+      # GitHub's merge-ref scope; they are never promoted to main.
+      - name: Save test build cache
+        if: >-
+          success() && steps.build-cache.outputs.cache-hit != 'true' &&
+          (github.event_name == 'push' && github.ref == 'refs/heads/main' ||
+           github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/azerlay-go-build
+          key: ${{ steps.cache-key.outputs.key }}
+
+      - name: Save test module cache
+        if: >-
+          success() && steps.module-cache.outputs.cache-hit != 'true' &&
+          (github.event_name == 'push' && github.ref == 'refs/heads/main' ||
+           github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/azerlay-go-mod
+          key: azerlay-test-mod-v1-${{ steps.cache-key.outputs.compatibility }}-${{ steps.cache-key.outputs.dependencies }}
 
   fuzz:
     runs-on: ubuntu-latest

@@ -73,12 +73,82 @@ that is removed after checkout. Container users can differ from the mounted
 workspace's owner, so the build step trusts only that workspace in its own
 global Git config. This preserves normal Go VCS metadata during compilation.
 
-`test`, `container-build`, `cgo-smoke`, `vulnerability`, and `licenses` each
-use an isolated Go cache keyed by `go.mod`, `go.sum`, the job ID, and the
-sorted installed Arch package list. A change to the native package set causes
-that job to build cold. Cache hits and misses are both followed by the full
-checks for the job; package installation, compilation, and binary execution
-failures block their respective job.
+`container-build`, `cgo-smoke`, `vulnerability`, and `licenses` retain their
+isolated setup-go caches keyed by dependencies, job ID, and the sorted full
+Arch package inventory. The `test` job uses explicit restore/save instead:
+
+- `setup-go` caching is disabled so it does not also own the same paths.
+- The build-cache compatibility fingerprint includes the **entire** sorted
+  `pacman -Q` inventory, distribution/architecture, actual Go version/compiler
+  identity, Go target/toolchain/build/CGO settings, and GTK pkg-config inputs.
+  Unknown native changes fail cold; this is deliberately not a five-package
+  ABI approximation. Dependency hashes also belong to the restore boundary.
+- The exact key adds a hash of the tracked source tree (including embedded
+  assets and fixtures). Repeated runs of the same tree do not create new
+  generations. A changed source tree can restore the newest compatible
+  snapshot and save its updated compilation results. The sole fallback prefix
+  contains the full compatibility and dependency hashes; there is no broader
+  fallback across native or toolchain environments.
+- `/tmp/azerlay-go-build` contains both ordinary and race entries. Only the
+  `test` job writes this namespace, after vet, Staticcheck, the complete
+  non-root race/Wayland tests, and ordinary build succeed. A short job cannot
+  save an incomplete snapshot first. Hits never skip a quality gate.
+- Saves are limited to pushes to `main` and same-repository pull requests.
+  Fork PRs restore only. GitHub scopes PR snapshots to their merge ref; they
+  can speed up the same PR's reruns but are never promoted to `main`. New PRs
+  can restore compatible seeds generated on `main` after this change merges.
+  A first main run can therefore still be cold even after a warm PR run.
+- `/tmp/azerlay-go-mod` keeps a separate, exact, test-job-local dependency
+  cache. Cross-job module sharing is not implemented here and module download
+  savings must not be attributed to build-cache freshness.
+- Before non-root execution the restored cache and workspace are recursively
+  assigned to the test user; readable/writable access is checked. Root still
+  runs vet and the final build. The CLI TestMain keeps its 30-second ordinary
+  build and inherits the same GOCACHE warmed by vet, including on a cold run.
+- Only the two Go cache directories are archived, never HOME, runtime/config
+  directories, credentials, or user profiles. Fixture privacy rules still
+  apply. Cache absence does not suppress compilation or test failures.
+
+The source fingerprint favors correctness and simplicity over minimizing
+snapshots: even a documentation-only tracked change can make a generation.
+GitHub's cache quota/eviction still bounds storage; a run ID or attempt number
+is never included. Transfer cost and eviction pressure must be measured when
+judging whether saving fresh generations is worthwhile.
+
+### Cache measurements and limitations
+
+`Prepare Go cache keys` prints compatibility, dependency, source and exact
+keys. Restore actions report the matched key, compressed bytes and transfer
+time; `Record cache restore` / `Record normal and race GTK cache state` print uncompressed
+bytes. Save steps and the Actions job/step timestamps supply save duration,
+job wall time, and summed runner-seconds across all seven jobs. The GTK state
+step lists Go's ordinary/race stale status and reason without compiling. The temporary
+compatibility manifest contains only the explicit public tool/native inputs,
+not arbitrary environment variables, and is not uploaded.
+
+`bash scripts/test-ci-go-cache-key.sh` checks repeatability, source-only
+fallback, and cold boundaries for changed dependencies, toolchain/settings,
+and a transitive native package. These synthetic contract tests are not
+measurements of real Go or native upgrades.
+
+Measure cold, same-commit warm, source-only, Go dependency/toolchain change,
+and native-package change separately, with repeated successful runs. Keep
+main-versus-PR cache scope and full native fingerprints in each record. Check
+ordinary and race gotk4 compiler invocations with `-x` when needed; repeated
+cached compiler warnings alone are not proof of recompilation. Compare
+end-to-end wall time and runner-seconds, including transfer/save overhead,
+not just the test command's time (which includes compilation).
+
+The pre-change cold example is **not** the usual baseline: main runs
+[36300187973](https://github.com/sh4869221b/azerlay/actions/runs/36300187973)
+and [36297704607](https://github.com/sh4869221b/azerlay/actions/runs/36297704607)
+restored the same approximately 191 MB cache and completed in about three
+minutes. PR #113 then added grim and two font packages, legitimately changing
+the full native boundary. Its PR run and subsequent main run
+[36309312391](https://github.com/sh4869221b/azerlay/actions/runs/36309312391)
+missed the new key in their separate scopes. Source-generation freshness is
+the intended incremental improvement; this change does not avoid required
+native invalidations or establish a 20–26 minute average saving.
 
 The test job also installs Sway and D-Bus, removes Sway's file capability inside
 the container, and runs tests as a dedicated non-root user with writable Go
