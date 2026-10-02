@@ -1,0 +1,90 @@
+name: Build private CI image
+
+on:
+  workflow_dispatch:
+  # Temporary bootstrap: removed before this candidate is proposed for merge.
+  push:
+    branches: [perf/arch-ci-image-115]
+    paths: ['.github/ci-image/**', '.github/workflows/ci-image.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: azerlay-ci-image-publisher
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.repository == 'sh4869221b/azerlay' && github.ref == 'refs/heads/perf/arch-ci-image-115'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify private package destination
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          code=$(curl --silent --show-error --output "$RUNNER_TEMP/package-before.json" --write-out '%{http_code}' \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header 'Accept: application/vnd.github+json' \
+            https://api.github.com/users/sh4869221b/packages/container/azerlay-ci)
+          case "$code" in
+            200) jq -e '.visibility == "private" and .repository.full_name == "sh4869221b/azerlay"' "$RUNNER_TEMP/package-before.json" ;;
+            404) echo 'No accessible existing package; first publication must create a private repository-linked package.' ;;
+            *) echo "Cannot verify package destination: HTTP $code"; exit 1 ;;
+          esac
+      - name: Build dependency-only images
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/image-evidence"
+          docker pull --platform linux/amd64 archlinux:base
+          base=$(docker image inspect archlinux:base --format '{{index .RepoDigests 0}}')
+          [[ "$base" =~ ^archlinux@sha256:[a-f0-9]{64}$ ]]
+          printf '%s\n' "$base" > "$RUNNER_TEMP/image-evidence/base-digest.txt"
+          for target in native wayland; do
+            start=$(date +%s)
+            image="ghcr.io/sh4869221b/azerlay-ci:${target}-${GITHUB_SHA}"
+            docker build --pull --platform linux/amd64 --build-arg ARCH_BASE="$base" \
+              --target "$target" --tag "$image" .github/ci-image
+            docker run --rm "$image" cat /usr/local/share/azerlay-ci/packages.txt > "$RUNNER_TEMP/image-evidence/${target}-packages.txt"
+            docker image inspect "$image" --format '{{.Size}}' > "$RUNNER_TEMP/image-evidence/${target}-bytes.txt"
+            echo "$(( $(date +%s) - start ))" > "$RUNNER_TEMP/image-evidence/${target}-build-seconds.txt"
+          done
+          docker run --rm "ghcr.io/sh4869221b/azerlay-ci:wayland-${GITHUB_SHA}" bash -euc \
+            'test -z "$(getcap /usr/bin/sway)"; pacman -Q sway dbus grim noto-fonts-cjk noto-fonts-emoji; pkg-config --exists gtk4 gtk4-layer-shell-0'
+      - name: Publish approved private images
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          export DOCKER_CONFIG="$RUNNER_TEMP/azerlay-registry-auth"
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true; rm -rf "$DOCKER_CONFIG"' EXIT
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          for target in native wayland; do
+            start=$(date +%s)
+            image="ghcr.io/sh4869221b/azerlay-ci:${target}-${GITHUB_SHA}"
+            docker push "$image"
+            docker image inspect "$image" --format '{{index .RepoDigests 0}}' > "$RUNNER_TEMP/image-evidence/${target}-digest.txt"
+            echo "$(( $(date +%s) - start ))" > "$RUNNER_TEMP/image-evidence/${target}-push-seconds.txt"
+          done
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header 'Accept: application/vnd.github+json' \
+            https://api.github.com/users/sh4869221b/packages/container/azerlay-ci > "$RUNNER_TEMP/package-after.json"
+          jq -e '.visibility == "private" and .repository.full_name == "sh4869221b/azerlay"' "$RUNNER_TEMP/package-after.json"
+          jq '{name, visibility, repository: .repository.full_name}' "$RUNNER_TEMP/package-after.json" > "$RUNNER_TEMP/image-evidence/package-access.json"
+          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/image-evidence/source-sha.txt"
+      - name: Upload image provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-image-evidence
+          path: ${{ runner.temp }}/image-evidence/
+          if-no-files-found: error
+          retention-days: 14
