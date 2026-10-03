@@ -23,6 +23,13 @@ type Controller struct {
 	generation        uint64
 	active            *activeSelection
 	selectionFailure  *Error
+	localFailure      *Error
+	localWatchFailure *Error
+	localEnabled      bool
+	localCancel       context.CancelFunc
+	localDone         <-chan struct{}
+	closed            bool
+	selectionMu       sync.Mutex
 }
 
 func NewController(ctx context.Context, manager *config.Manager, source *profilesource.ImportedSource) (*Controller, error) {
@@ -32,13 +39,9 @@ func NewController(ctx context.Context, manager *config.Manager, source *profile
 	c := &Controller{manager: manager, source: source, started: time.Now(), generation: 1, visibilityChanges: make(chan struct{}, 1)}
 	settings := manager.Snapshot().Config.Profile
 	c.imported = settings.Source != "local"
-	selected, p, err := ResolveConfiguredProfile(ctx, source, settings)
-	if err != nil {
-		c.selectionFailure = selectionError(err)
-	} else {
-		c.active = &activeSelection{selection: selected, profile: p}
-	}
+	c.initializeProfile(ctx, settings)
 	if err := ctx.Err(); err != nil {
+		c.Close()
 		return nil, err
 	}
 	return c, nil
@@ -120,6 +123,20 @@ func (c *Controller) selectProfile(ctx context.Context, request Request) Respons
 	if failure != nil {
 		return FailureResponse(&request.ID, failure)
 	}
+	c.selectionMu.Lock()
+	defer c.selectionMu.Unlock()
+	c.mu.Lock()
+	if ctx.Err() != nil || c.closed {
+		c.mu.Unlock()
+		return FailureResponse(&request.ID, NewError(ERR_CONTROL_UNAVAILABLE))
+	}
+	c.localEnabled = false
+	cancel, done := c.localCancel, c.localDone
+	c.mu.Unlock()
+	if cancel != nil {
+		cancel()
+		<-done
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if ctx.Err() != nil {
@@ -130,5 +147,22 @@ func (c *Controller) selectProfile(ctx context.Context, request Request) Respons
 		c.generation++
 	}
 	c.selectionFailure = nil
+	c.localFailure = nil
+	c.localWatchFailure = nil
 	return SuccessResponse(request, SelectionResult{ActiveProfile: c.active.status(), Generation: c.generation})
+}
+
+// Close joins local reads and watching before the controller is discarded.
+func (c *Controller) Close() {
+	c.selectionMu.Lock()
+	defer c.selectionMu.Unlock()
+	c.mu.Lock()
+	c.closed = true
+	c.localEnabled = false
+	cancel, done := c.localCancel, c.localDone
+	c.mu.Unlock()
+	if cancel != nil {
+		cancel()
+		<-done
+	}
 }

@@ -48,6 +48,14 @@ func NewError(code string) *Error {
 		e.Stage, e.Summary, e.Remediation = "selection", "Profile selection is ambiguous.", "Use a unique profile ID or name."
 	case ERR_PROFILE_SOURCE_UNAVAILABLE:
 		e.Stage, e.Summary, e.Remediation = "selection", "Profile source is unavailable.", "Configure an imported source and restart."
+	case "ERR_PROFILE_LOCAL_UNSUPPORTED":
+		e.Stage, e.Summary, e.Remediation = "profile", "Stored local definition is unsupported.", "Export the profile with Azeron Software 2.0.2 and import the official export."
+	case "ERR_PROFILE_LOCAL_READ":
+		e.Stage, e.Summary, e.Remediation = "profile", "Selected local definition could not be read safely.", "Check the configured local selection or import an official export."
+	case "ERR_PROFILE_LOCAL_WATCH":
+		e.Stage, e.Summary, e.Remediation = "watch", "Local profile watching is unavailable.", "Check the selected profile directory and restart, or import an official export."
+	case "ERR_PROFILE_LOCAL_STATE":
+		e.Stage, e.Summary, e.Remediation = "state", "Local last-good state is unavailable or could not be saved.", "Check Azerlay state directory permissions and keep it outside the local store."
 	default:
 		e.Code = ERR_CONTROL_UNAVAILABLE
 		e.Stage, e.Summary, e.Remediation = "transport", "Control instance is unavailable.", "Check that the instance is running."

@@ -3,6 +3,7 @@ package control
 import (
 	"encoding/json"
 	"io"
+	"strings"
 )
 
 func ReadResponse(reader io.Reader, request Request) (Response, error) {
@@ -128,7 +129,22 @@ func validateProfile(raw []byte) error {
 	if err != nil {
 		return err
 	}
-	if profile.Source != "imported" || profile.SourceRef == "" || profile.ProfileIndex < 1 {
+	if profile.SourceRef == "" || profile.ProfileIndex < 1 {
+		return NewError(ERR_CONTROL_REQUEST)
+	}
+	switch profile.Source {
+	case "imported":
+	case "local":
+		parts := strings.Split(profile.SourceRef, "/")
+		if profile.ProfileIndex != 1 || len(parts) != 5 || parts[0] != "Storage" || parts[1] != "DevicesStorage" || parts[3] != "ProfileStorage" {
+			return NewError(ERR_CONTROL_REQUEST)
+		}
+		for _, component := range []string{parts[2], parts[4]} {
+			if component == "" || component == "." || component == ".." || strings.ContainsAny(component, "\\\x00") {
+				return NewError(ERR_CONTROL_REQUEST)
+			}
+		}
+	default:
 		return NewError(ERR_CONTROL_REQUEST)
 	}
 	return nil

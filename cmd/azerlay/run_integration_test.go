@@ -162,6 +162,35 @@ func TestRunForeground(t *testing.T) {
 	}
 }
 
+func TestRunLocalWithoutImportedHome(t *testing.T) {
+	for _, policy := range []string{"local", "auto"} {
+		t.Run(policy, func(t *testing.T) {
+			fixture := newRunFixture(t)
+			store := filepath.Join(doctorRoot(fixture), "userData")
+			path := filepath.Join(store, "Storage/DevicesStorage/device/ProfileStorage/profile_a.json")
+			if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+				t.Fatal(err)
+			}
+			cliWrite(t, path, []byte(`{"id":"a","name":"Synthetic local","version":1,"inputs":[],"isSoftware":true,"metaData":{"changedLogs":[{"softwareVersion":"2.0.2"}]}}`), 0600)
+			cliWrite(t, fixture.config, []byte("schema_version=1\n[profile]\nsource='"+policy+"'\nlocal_store_path='"+store+"'\nlocal_device='device'\nlocal_profile_file='profile_a.json'\n"), 0600)
+			for index, entry := range fixture.env {
+				if strings.HasPrefix(entry, "HOME=") {
+					fixture.env[index] = "HOME="
+				} else if strings.HasPrefix(entry, "XDG_DATA_HOME=") {
+					fixture.env[index] = "XDG_DATA_HOME=relative"
+				}
+			}
+			process := startRunProcess(t, fixture, "--config", fixture.config)
+			status := readyRunProcess(t, process, fixture)
+			if status.ActiveProfile == nil || status.ActiveProfile.Source != "local" || *status.ActiveProfile.Name != "Synthetic local" {
+				t.Fatalf("import placement blocked explicit local: %+v", status)
+			}
+			controlCLIResult[control.QuitResult](t, fixture.env, "quit")
+			stoppedRunProcess(t, process, fixture)
+		})
+	}
+}
+
 func TestRunLiveVisibility(t *testing.T) {
 	fixture := newRunFixture(t)
 	p := startRunProcess(t, fixture)

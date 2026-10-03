@@ -82,30 +82,50 @@ func collect(ctx context.Context, configPath string, includeBindings bool, disco
 func collectProfile(ctx context.Context, settings config.Profile, includeBindings bool) ([]Check, *ProfileDetails) {
 	var source *profilesource.ImportedSource
 	var target *string
+	var importedUnavailable bool
 	if settings.Source != "local" {
 		home, err := profilesource.ResolveDataHome()
 		if err != nil {
-			return []Check{finding("profile-source", profilesource.ERR_PROFILE_STORAGE, nil)}, nil
+			if settings.Source != "auto" {
+				return []Check{finding("profile-source", profilesource.ERR_PROFILE_STORAGE, nil)}, nil
+			}
+			importedUnavailable = true
+		} else {
+			target = knownTarget(filepath.Join(home, "azerlay"))
+			source = profilesource.NewImportedSource(home)
 		}
-		target = knownTarget(filepath.Join(home, "azerlay"))
-		source = profilesource.NewImportedSource(home)
 	}
 	selected, p, err := control.ResolveConfiguredProfile(ctx, source, settings)
+	if importedUnavailable && selected.ProfileIndex == 0 {
+		return []Check{finding("profile-source", profilesource.ERR_PROFILE_STORAGE, nil)}, nil
+	}
 	if err != nil {
 		code := profilesource.ERR_PROFILE_STORAGE
 		var sourceError *profilesource.Error
 		var controlError *control.Error
-		if errors.As(err, &sourceError) && sourceError.Code == profilesource.ERR_PROFILE_NOT_FOUND {
-			code = sourceError.Code
+		if errors.As(err, &sourceError) {
+			switch sourceError.Code {
+			case profilesource.ERR_PROFILE_NOT_FOUND, profilesource.ERR_PROFILE_LOCAL_READ, profilesource.ERR_PROFILE_LOCAL_UNSUPPORTED,
+				profilesource.ERR_PROFILE_LOCAL_STATE, profilesource.ERR_PROFILE_LOCAL_WATCH:
+				code = sourceError.Code
+			}
 		} else if errors.As(err, &controlError) {
 			switch controlError.Code {
-			case profilesource.ERR_PROFILE_NOT_FOUND, control.ERR_PROFILE_AMBIGUOUS, control.ERR_PROFILE_SOURCE_UNAVAILABLE:
+			case profilesource.ERR_PROFILE_NOT_FOUND, control.ERR_PROFILE_AMBIGUOUS, control.ERR_PROFILE_SOURCE_UNAVAILABLE,
+				profilesource.ERR_PROFILE_LOCAL_READ, profilesource.ERR_PROFILE_LOCAL_UNSUPPORTED,
+				profilesource.ERR_PROFILE_LOCAL_STATE, profilesource.ERR_PROFILE_LOCAL_WATCH:
 				code = controlError.Code
 			}
 		}
 		checks := []Check{finding("profile-source", code, target)}
 		if errors.Is(err, os.ErrPermission) {
 			checks = append(checks, finding("permissions", ERR_DIAGNOSTIC_PERMISSION, target))
+		}
+		if selected.ProfileIndex > 0 {
+			checks = append(checks, finding("profile-source", OK_PROFILE_SOURCE, target))
+			if includeBindings {
+				return checks, ProjectProfileDetails(selected.ProfileIndex, p)
+			}
 		}
 		return checks, nil
 	}
@@ -127,6 +147,8 @@ func socketChecks(probe control.ProbeResult, err error) []Check {
 				control.ERR_CONTROL_TOO_LARGE, control.ERR_CONTROL_TIMEOUT, control.ERR_CONTROL_UNAVAILABLE,
 				control.ERR_CONTROL_PERMISSION, control.ERR_CONTROL_RUNTIME,
 				profilesource.ERR_PROFILE_NOT_FOUND, profilesource.ERR_PROFILE_STORAGE,
+				profilesource.ERR_PROFILE_LOCAL_READ, profilesource.ERR_PROFILE_LOCAL_UNSUPPORTED,
+				profilesource.ERR_PROFILE_LOCAL_STATE, profilesource.ERR_PROFILE_LOCAL_WATCH,
 				control.ERR_PROFILE_AMBIGUOUS, control.ERR_PROFILE_SOURCE_UNAVAILABLE,
 				config.ERR_CONFIG_NOT_FOUND, config.ERR_CONFIG_INVALID:
 				code = failure.Code
@@ -157,6 +179,8 @@ func socketChecks(probe control.ProbeResult, err error) []Check {
 			switch reason.Code {
 			case "DEVICE_UNAVAILABLE", "INPUT_METRICS_UNAVAILABLE", "RENDERER_UNAVAILABLE",
 				profilesource.ERR_PROFILE_NOT_FOUND, profilesource.ERR_PROFILE_STORAGE,
+				profilesource.ERR_PROFILE_LOCAL_READ, profilesource.ERR_PROFILE_LOCAL_UNSUPPORTED,
+				profilesource.ERR_PROFILE_LOCAL_STATE, profilesource.ERR_PROFILE_LOCAL_WATCH,
 				control.ERR_PROFILE_AMBIGUOUS, control.ERR_PROFILE_SOURCE_UNAVAILABLE,
 				config.ERR_CONFIG_NOT_FOUND, config.ERR_CONFIG_INVALID, config.WARN_CONFIG_UNKNOWN_KEY:
 				code = reason.Code
@@ -200,7 +224,11 @@ func finding(category, code string, target *string) Check {
 	case control.ERR_PROFILE_AMBIGUOUS:
 		check.Summary, check.Remediation = "Profile selection is ambiguous.", "Choose a unique configured profile ID."
 	case control.ERR_PROFILE_SOURCE_UNAVAILABLE:
-		check.Summary, check.Remediation = "Local profile source is unavailable.", "Use a supported imported source while local source support awaits issue #22."
+		check.Summary, check.Remediation = "Configured profile source is unavailable.", "Configure an exact local device/file or a supported imported source and restart."
+	case profilesource.ERR_PROFILE_LOCAL_READ, profilesource.ERR_PROFILE_LOCAL_UNSUPPORTED,
+		profilesource.ERR_PROFILE_LOCAL_STATE, profilesource.ERR_PROFILE_LOCAL_WATCH:
+		failure := control.NewError(code)
+		check.Summary, check.Remediation = failure.Summary, failure.Remediation
 	case profilesource.ERR_PROFILE_STORAGE:
 		check.Severity, check.Summary, check.Remediation = SeverityError, "Profile storage could not be read.", "Inspect profile storage access and integrity; doctor does not repair it."
 	case ERR_DIAGNOSTIC_PERMISSION:

@@ -40,6 +40,7 @@ func socketController(t *testing.T) *Controller {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(controller.Close)
 	return controller
 }
 
