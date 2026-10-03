@@ -180,3 +180,37 @@ func TestLatencyHiddenRevealExcluded(t *testing.T) {
 		t.Fatalf("hidden input measured on reveal: %+v", result)
 	}
 }
+
+func TestLiveStatusDiagnosticsGeneration(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	sources, _, _, raw := coordinatorFixture(t)
+	initial := &input.Snapshot{Connected: true, Availability: input.Unconfirmed, Generations: input.Generations{Device: 1}}
+	raw.value.Store(initial)
+	c := Start(t.Context(), sources)
+	t.Cleanup(func() {
+		if err := c.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+	before := awaitView(t, c, func(*View) bool { return true })
+	invalidation := *initial
+	invalidation.Sequence, invalidation.InvalidationCount, invalidation.Reason = 1, 1, input.ERR_INPUT_DROPPED
+	raw.value.Store(&invalidation)
+	raw.changes <- struct{}{}
+	changed := awaitView(t, c, func(view *View) bool { return view.Input.Snapshot.Sequence == 1 })
+	if changed.Render != before.Render || changed.Generation <= before.Generation {
+		t.Fatalf("reason-only change: %d -> %d, same render=%t", before.Generation, changed.Generation, changed.Render == before.Render)
+	}
+	status := c.Status()
+	if len(status.Diagnostics) != 2 || status.Diagnostics[1].Code != input.ERR_INPUT_DROPPED {
+		t.Fatalf("actual dropped diagnostic: %+v", status.Diagnostics)
+	}
+	counters := invalidation
+	counters.Sequence, counters.EventCount = 2, 1
+	raw.value.Store(&counters)
+	raw.changes <- struct{}{}
+	unchanged := awaitView(t, c, func(view *View) bool { return view.Input.Snapshot.Sequence == 2 })
+	if unchanged.Generation != changed.Generation || unchanged.Render != changed.Render {
+		t.Fatal("counters-only publication changed semantic generation")
+	}
+}
