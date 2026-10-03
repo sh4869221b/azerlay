@@ -56,8 +56,10 @@ does. Existing host VID-wide `0666` rules do not qualify this narrower contract.
 ### State and compatibility limits
 
 Qualified use is left-hand Cyborg II, Software2.0.2, displayed firmware111,
-unknown hardware revision, SOFTWARE mode. Hand/mode are explicit context, never
-inferred from USB identity. The official software's notification initialization
+unknown hardware revision, SOFTWARE mode. Software/firmware/mode are documented
+operating prerequisites, with no caller declaration or runtime confirmation.
+Hand comes from the selected layout; mode is never inferred from USB identity.
+The official software's notification initialization
 is a prerequisite. A readable hidraw does not prove notifications or reconnect
 recovery. The library publishes last observed state, not authoritative current
 state; undetected final-report loss can leave stale state. See

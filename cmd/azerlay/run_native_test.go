@@ -32,6 +32,8 @@ func runNativeChild(mode string) int {
 		return runConfigPlacementChild()
 	case "visibility":
 		return runVisibilityChild()
+	case "live-imported", "live-local", "live-missing", "live-latency":
+		return runLiveOverlayChild(mode)
 	default:
 		return 2
 	}
@@ -127,7 +129,11 @@ func runVisibilityChild() int {
 			case 3:
 				failure = call(control.MethodToggle)
 			case 8:
-				if len(status.DegradedReasons) != 4 {
+				overlayFailure := false
+				for _, diagnostic := range status.DegradedReasons {
+					overlayFailure = overlayFailure || diagnostic.Stage == "overlay"
+				}
+				if overlayFailure {
 					failure = errors.New("overlay diagnostic did not clear after recovery")
 					break
 				}
@@ -162,7 +168,7 @@ func runVisibilityChild() int {
 			failure = call(control.MethodShow)
 			phase++
 		case 6:
-			if !status.Visible || status.Overlay.Mapped || status.Overlay.InputRegionApplied || windows.NItems() != 0 || len(status.DegradedReasons) != 5 {
+			if !status.Visible || status.Overlay.Mapped || status.Overlay.InputRegionApplied || windows.NItems() != 0 {
 				return true
 			}
 			found := false

@@ -74,6 +74,17 @@ func TestControlOverlayStatusReport(t *testing.T) {
 	}
 }
 
+func TestControlLiveStatusReport(t *testing.T) {
+	t.Parallel()
+	device, events, draws, dropped := "usb-synthetic-device", 42.5, 60.0, uint64(3)
+	text := renderControlReport(control.Status{Device: &device, EventNodes: []string{}, EventRate: &events, RenderRate: &draws, DroppedCount: &dropped})
+	for _, line := range []string{"Device: usb-synthetic-device", "Event nodes: []", "Event rate: 42.500", "Render rate: 60.000", "Dropped count: 3", "Resync count: unavailable"} {
+		if !strings.Contains(text, line) {
+			t.Fatalf("missing %q: %s", line, text)
+		}
+	}
+}
+
 func TestControlGrammar(t *testing.T) {
 	t.Setenv("XDG_RUNTIME_DIR", "PRIVATE_INVALID_RUNTIME")
 	for _, command := range [][]string{{"show"}, {"hide"}, {"toggle"}, {"reload"}, {"status"}, {"quit"}, {"profiles", "select"}} {

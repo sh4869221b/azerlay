@@ -62,7 +62,11 @@ func renderControlReport(result control.Result) string {
 			fmt.Fprintf(&text, "Overlay mapped: %t\nInput region applied: %t\n", value.Overlay.Mapped, value.Overlay.InputRegionApplied)
 		}
 		renderActiveProfile(&text, value.ActiveProfile)
-		text.WriteString("Device: unavailable\nEvent nodes: []\nEvent rate: unavailable\nDropped count: unavailable\nResync count: unavailable\nRender rate: unavailable\n")
+		device := "unavailable"
+		if value.Device != nil {
+			device = *value.Device
+		}
+		fmt.Fprintf(&text, "Device: %s\nEvent nodes: %v\nEvent rate: %s\nDropped count: %s\nResync count: %s\nRender rate: %s\n", device, value.EventNodes, formatRate(value.EventRate), formatCount(value.DroppedCount), formatCount(value.ResyncCount), formatRate(value.RenderRate))
 		fmt.Fprintf(&text, "Reload request generation: %d\nConfig generation: %d\n", value.LastReload.RequestGeneration, value.LastReload.ConfigGeneration)
 		for _, item := range []struct {
 			name       string
@@ -79,6 +83,19 @@ func renderControlReport(result control.Result) string {
 		}
 	}
 	return text.String()
+}
+
+func formatRate(value *float64) string {
+	if value == nil {
+		return "unavailable"
+	}
+	return strconv.FormatFloat(*value, 'f', 3, 64)
+}
+func formatCount(value *uint64) string {
+	if value == nil {
+		return "unavailable"
+	}
+	return strconv.FormatUint(*value, 10)
 }
 
 func renderActiveProfile(text *strings.Builder, active *control.ProfileStatus) {

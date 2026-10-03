@@ -14,6 +14,7 @@ import (
 type activeSelection struct {
 	selection profilesource.Selection
 	profile   profile.Profile
+	source    profile.SourceMetadata
 }
 
 func (a *activeSelection) status() ProfileStatus {
@@ -89,7 +90,7 @@ func resolveSavedImported(ctx context.Context, source *profilesource.ImportedSou
 	if err == nil {
 		bundle, loadErr := source.Load(ctx, selected.Source)
 		if loadErr == nil {
-			return &activeSelection{selection: selected, profile: bundle.Profiles[selected.ProfileIndex-1]}, nil
+			return &activeSelection{selection: selected, profile: bundle.Profiles[selected.ProfileIndex-1], source: bundle.Source}, nil
 		}
 		err = loadErr
 	}
@@ -111,7 +112,7 @@ func resolveSavedImported(ctx context.Context, source *profilesource.ImportedSou
 		}
 		bundle, loadErr := source.Load(ctx, descriptor.Ref)
 		if loadErr == nil {
-			return &activeSelection{selection: profilesource.Selection{Source: descriptor.Ref, ProfileIndex: 1}, profile: bundle.Profiles[0]}, nil
+			return &activeSelection{selection: profilesource.Selection{Source: descriptor.Ref, ProfileIndex: 1}, profile: bundle.Profiles[0], source: bundle.Source}, nil
 		}
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
@@ -138,7 +139,7 @@ func resolveProfile(ctx context.Context, source *profilesource.ImportedSource, s
 		for i, p := range bundle.Profiles {
 			if p.ID != nil && *p.ID == selector || !idOnly && p.Name != nil && *p.Name == selector {
 				matches++
-				candidate = &activeSelection{selection: profilesource.Selection{Source: descriptor.Ref, ProfileIndex: i + 1}, profile: p}
+				candidate = &activeSelection{selection: profilesource.Selection{Source: descriptor.Ref, ProfileIndex: i + 1}, profile: p, source: bundle.Source}
 			}
 		}
 	}

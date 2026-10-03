@@ -380,7 +380,7 @@ Azeronを外すと「Disconnected」を表示し、読取goroutineを終了す�
 ([#46](https://github.com/sh4869221b/azerlay/issues/46))。FR-064のLong/Double/Macroは静的割当表示のみで、
 press/releaseやcounter、snapshot Sequenceは発火・完了・出力進行の証拠にならない。matcherは実装せず、
 発火・進行表示は明示的な製品要件と別途根拠のある信号がある場合に限る。物理状態は初期unknownで、
-検出できない末尾release欠落ではstaleになり得る最終観測状態であり、runtime/GTKにも未接続である
+検出できない末尾release欠落ではstaleになり得る最終観測状態であり、runtime/GTKへ接続される
 ([構成境界](architecture.md#analog-and-output-state))。
 
 ### 7.6 オーバーレイ表示
@@ -1018,12 +1018,12 @@ last-good状態を維持する。回復は新たな個別通知のみで、状�
 ### 13.3 表示への境界
 
 静的profile/layoutと出力候補は割当表示用に保持し、入力元の決定には使わない。
-ProjectMatchingは明示されたleft-hand Cyborg II、Software2.0.2、表示firmware111、
-unknown revision、keyboard-stick layoutおよびSOFTWARE modeで30領域を投影する。
-SOFTWARE modeとlayoutのkeyboard-stickは別条件である。非対応contextはunknown。
+ProjectMatchingは選択したleft-hand Cyborg II layoutとConnected/Knownから30領域を投影する。
+Software2.0.2、表示firmware111、SOFTWARE modeは文書上の運用前提であり、
+呼び出し側の申告やruntime確認は行わない。実際のsource formatとdevice admissionは保持する。
 analog/live出力キー/long・double・macro発火完了は未対応のままとする。
-入力libraryからrun/controller/GTKへの新規配線は今回行わない。今後のUI接続でも
-GTK main thread上の描画はI/Oや待機を行わず、最新immutable snapshotを使う。
+runは入力libraryとcontrollerの最新immutable snapshotをnon-GTK coordinatorで統合する。
+GTK main thread上のframe preparationと描画はI/Oや待機を行わず、最新の表示状態を使う。
 
 ## 14. レイアウトと描画
 
@@ -1739,7 +1739,7 @@ os/syscallとGo pollerでread-only lifecycleを実装する。
 
 本番bridgeは`internal/layershell`へ隔離し、`Init`/`Apply`とsurface取得をGoのGTK/GDK wrapperで公開する。C型を公開APIへ出さない。surfaceのtransfer-none参照はgotk4の所有権管理で保持し、動的marshalerのuintptr往復を避ける。gtk4-layer-shellをWayland client libraryより先にロードする。
 
-GTK ownerの生成・設定適用・破棄はlocked main OS threadで行う。`run`は起動時にhidden windowを作り、CLI visibility要求を同じthreadへ通知して実際のmappingを切り替える。描画とdevice inputのruntime統合は未実装。
+GTK ownerの生成・設定適用・破棄はlocked main OS threadで行う。`run`は起動時にhidden windowを作り、CLI visibility要求を同じthreadへ通知して実際のmappingを切り替える。non-GTK coordinatorがsource/config/raw inputの最新snapshotを組み立て、一つのpending GTK通知で30/60/120 Hzの変更描画へ接続する。hiddenではframe preparationを行わず、未変更idleとstatus読取りは描画を要求しない。
 
 ### 22.4 非採用
 
@@ -2141,13 +2141,20 @@ trace
 - uptime
 - visible
 - active profile/source
-- active device identity（既存control schemaのevent_nodesは未接続の空配列を維持）
+- active device identity（既存control schemaのevent_nodesはraw-onlyの空配列を維持）
 - event rate
 - detected invalidation count（未検出のreport欠落を数えられるとは主張しない）
 - render rate
 - last reload result
 - current generation
 - degraded reasons
+
+event rateは有効physical report、render rateは実DrawingArea callbackの数である。
+一秒固定windowの直前完了countを返し、初回一秒未満はelapsedで算出する。
+未計測はnull、計測後idleは0で、停止やdegradedの診断は維持する。
+resync_countは未対応のnull。計測用periodic timerやnetwork exporterは設けない。
+native統合testのopt-in collectorは対応するread→実drawのみをbounded numeric CSVへ出し、
+superseded、状態変更、同一内容、古いdrawを除外する。物理press→screen提示性能ではない。
 
 ### 27.3 個人情報抑制
 

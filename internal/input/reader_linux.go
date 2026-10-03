@@ -5,12 +5,14 @@ import (
 	"errors"
 	"io"
 	"syscall"
+	"time"
 )
 
 type physicalReport struct {
 	event     PhysicalEvent
 	malformed bool
 	err       error
+	readAt    time.Time
 }
 type reportReader struct {
 	source  io.Reader
@@ -24,10 +26,11 @@ func (r reportReader) read(ctx context.Context) {
 	var buffer [65]byte
 	for ctx.Err() == nil {
 		n, err := r.source.Read(buffer[:])
+		readAt := time.Now()
 		if n > 0 {
 			event, relevant, invalid := r.decoder.decode(buffer[:n])
 			if relevant || invalid != nil {
-				if !r.send(ctx, physicalReport{event: event, malformed: invalid != nil}) {
+				if !r.send(ctx, physicalReport{event: event, malformed: invalid != nil, readAt: readAt}) {
 					return
 				}
 			}

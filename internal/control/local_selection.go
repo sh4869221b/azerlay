@@ -15,7 +15,8 @@ func localStateSelection(settings config.Profile) profilesource.LocalStateSelect
 }
 
 func localActive(ref profilesource.LocalRef, candidate profilesource.LocalCandidate) *activeSelection {
-	return &activeSelection{selection: profilesource.Selection{Source: profilesource.SourceRef{Local: ref}, ProfileIndex: 1}, profile: candidate.Bundle().Profiles[0]}
+	bundle := candidate.Bundle()
+	return &activeSelection{selection: profilesource.Selection{Source: profilesource.SourceRef{Local: ref}, ProfileIndex: 1}, profile: bundle.Profiles[0], source: bundle.Source}
 }
 
 func localReadError(err error) *Error {
@@ -32,16 +33,23 @@ func localReadError(err error) *Error {
 func (c *Controller) initializeProfile(ctx context.Context, settings config.Profile) {
 	var startWatch func()
 	defer func() {
+		c.publishProfileLocked()
 		if startWatch != nil {
 			startWatch()
 		}
 	}()
 	if settings.SelectedID != "" || settings.Source == "imported" {
-		selected, p, err := ResolveConfiguredProfile(ctx, c.source, settings)
+		var selected *activeSelection
+		var err error
+		if settings.SelectedID != "" {
+			selected, err = resolveProfile(ctx, c.source, settings.SelectedID, true)
+		} else {
+			selected, err = resolveSavedImported(ctx, c.source, false)
+		}
 		if err != nil {
 			c.selectionFailure = selectionError(err)
 		} else {
-			c.active = &activeSelection{selection: selected, profile: p}
+			c.active = selected
 		}
 		return
 	}
@@ -165,17 +173,25 @@ func (c *Controller) consumeLocal(ctx context.Context, state profilesource.Local
 		}
 		c.mu.Lock()
 		if c.localEnabled && ctx.Err() == nil {
+			changed := false
 			if failure != nil {
 				if failure.Code == profilesource.ERR_PROFILE_LOCAL_WATCH {
+					changed = c.localWatchFailure == nil || c.localWatchFailure.Code != failure.Code
 					c.localWatchFailure = failure
 				} else {
+					changed = c.localFailure == nil || c.localFailure.Code != failure.Code
 					c.localFailure = failure
 				}
 			} else if change.Candidate != nil {
 				c.active = localActive(change.Ref.Local, *change.Candidate)
 				c.generation++
+				c.publishProfileLocked()
 				c.localFailure = nil
 				c.selectionFailure = nil
+				changed = true
+			}
+			if changed {
+				c.notifyChangedLocked()
 			}
 		}
 		c.mu.Unlock()

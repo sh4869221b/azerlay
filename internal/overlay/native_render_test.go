@@ -82,8 +82,8 @@ func runNativeRendererChild() int {
 	snapshot := renderer.NewSnapshot(definition, renderer.Content{ProfileName: "Synthetic", Status: renderer.StatusDisconnected, Controls: map[string]renderer.Control{"button": {Known: true, Down: true, Assignments: []renderer.Assignment{{Kind: profile.BindingKeyboard, Label: "日本語 action", BindingDisplay: "K"}}}}})
 	appearance := config.Appearance{Theme: "dark", FontScale: 1}
 	w.SetRenderState(snapshot, appearance, true)
-	if w.area == nil || w.frame != nil || w.area.ContentHeight() <= 150 {
-		fmt.Fprintln(os.Stderr, "render area was not attached with deferred frame")
+	if w.area != nil || w.frame != nil {
+		fmt.Fprintln(os.Stderr, "hidden render state prepared a frame or attached an area")
 		return 1
 	}
 	if err := w.SetVisible(true); err != nil {

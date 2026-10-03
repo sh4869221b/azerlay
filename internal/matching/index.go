@@ -7,10 +7,10 @@ import (
 	"github.com/sh4869221b/azerlay/internal/profile"
 )
 
-func Build(selected profile.Profile, source profile.SourceMetadata, definition layout.Definition, context Context) Index {
-	supported := source.SoftwareRelease == "2.0.2" && source.SourceScope == "azeron-software-export" &&
-		fixedScope(definition.Model, definition.Hand, definition.Applicability) &&
-		fixedScope(context.Model, context.Hand, context.Applicability)
+func Build(selected profile.Profile, source profile.SourceMetadata, definition layout.Definition) Index {
+	supported := source.SoftwareRelease == "2.0.2" &&
+		(source.SourceScope == "azeron-software-export" || source.SourceScope == "azeron-software-local-json") &&
+		definition.Model == "cyborg-ii" && definition.Hand == "left"
 	index := Index{ScopeSupported: supported, Controls: make([]Control, len(selected.Controls))}
 	byID := make(map[int]layout.Control, len(definition.Controls))
 	if supported {
@@ -73,11 +73,6 @@ func Build(selected profile.Profile, source profile.SourceMetadata, definition l
 		index.Outputs[i] = output
 	}
 	return index
-}
-
-func fixedScope(model, hand string, applicability layout.Applicability) bool {
-	return model == "cyborg-ii" && hand == "left" && applicability.SoftwareRelease == "2.0.2" &&
-		applicability.DisplayedFirmware == "111" && applicability.HardwareRevision == nil && applicability.Mode == "keyboard-stick"
 }
 
 func bindingCodes(binding profile.TriggerBinding) []profile.CanonicalCode {

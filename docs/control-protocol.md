@@ -154,12 +154,20 @@ the optional `overlay` object, all fields below are present:
 | `visible` | Requested visibility, boolean; not proof that a surface is mapped. |
 | `overlay` | Optional object with exactly `mapped` and `input_region_applied` boolean fields. Absent or `null` means no overlay backend has published state. |
 | `active_profile` | `null` or `ProfileStatus`. |
-| `device` | `null`; device connection is unavailable. |
+| `device` | `null` until a raw reader is connected, otherwise the selected USB parent identity string. |
 | `event_nodes` | `[]`; no event nodes are monitored. |
-| `event_rate`, `dropped_count`, `resync_count`, `render_rate` | `null`; metrics are unavailable. |
+| `event_rate` | Accepted physical reports per second, including reports whose intermediate UI state was coalesced; `null` until a raw reader has connected or a report has been accepted. |
+| `render_rate` | Actual GTK drawing-area callbacks per second, including compositor redraws; `null` until the first draw. |
+| `dropped_count` | Cumulative detected invalidations (malformed reports and counter discontinuities); not the number of missing reports. `null` before input is measured. |
+| `resync_count` | `null`; full-state resynchronization is unsupported. |
 | `last_reload` | `{request_generation,config_generation,config_failure,watch_failure}`. |
-| `generation` | Runtime counter, initially 1; increments only on a visibility or active-selection change. |
+| `generation` | Runtime counter, initially 1; increments on observable visibility, profile, config, device, render-content or diagnostic changes. Polling and rate changes alone do not increment it. |
 | `degraded_reasons` | Array of `{code,stage,reason}` diagnostics. |
+
+Rates use the previous completed one-second process window; before the first
+second they use elapsed time. No activity over a completed window produces zero
+for a previously measured rate; current degradation remains in diagnostics.
+Counters are rotated on input, draw or status reads, without a periodic timer.
 
 `ProfileStatus` is
 `{source:"imported"|"local",source_ref:string,profile_index:int,name:string|null}`.

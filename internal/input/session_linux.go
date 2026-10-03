@@ -13,6 +13,7 @@ type Session struct {
 	latest     atomic.Pointer[Snapshot]
 	cancel     context.CancelFunc
 	done       chan struct{}
+	changes    chan struct{}
 	err        error
 	cleanupErr error
 }
@@ -28,6 +29,12 @@ type sessionSetupError struct {
 func (e *sessionSetupError) Unwrap() error { return e.error }
 func Start(ctx context.Context, group device.Group, generations Generations) (*Session, error) {
 	return startSession(ctx, group, generations, sessionOps{open: device.OpenGroup})
+}
+
+// StartWithOpener uses a caller-owned admission boundary. Once open returns
+// nodes successfully, the session owns their descriptors, including on failure.
+func StartWithOpener(ctx context.Context, group device.Group, generations Generations, open func(device.Group) ([]device.OpenedNode, error)) (*Session, error) {
+	return startSession(ctx, group, generations, sessionOps{open: open})
 }
 func startSession(ctx context.Context, group device.Group, generations Generations, ops sessionOps) (*Session, error) {
 	if err := ctx.Err(); err != nil {
@@ -63,7 +70,7 @@ func startSession(ctx context.Context, group device.Group, generations Generatio
 		return nil, rollback(&InputError{Code: ERR_INPUT_READ})
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	s := &Session{cancel: cancel, done: make(chan struct{})}
+	s := &Session{cancel: cancel, done: make(chan struct{}), changes: make(chan struct{}, 1)}
 	reducer := newReducer(generations)
 	s.latest.Store(reducer.snapshot())
 	reports := make(chan physicalReport)
@@ -76,6 +83,7 @@ func startSession(ctx context.Context, group device.Group, generations Generatio
 			s.err = errors.Join(s.err, s.cleanupErr)
 			<-readerDone
 			s.latest.Store(reducer.stop())
+			s.notify()
 			close(s.done)
 		}()
 		for {
@@ -94,9 +102,12 @@ func startSession(ctx context.Context, group device.Group, generations Generatio
 				if report.malformed {
 					snapshot = reducer.invalidate(ERR_INPUT_EVENT)
 				} else {
-					snapshot = reducer.apply(report.event)
+					reducer.apply(report.event)
+					reducer.latest.ReadAt = report.readAt
+					snapshot = reducer.snapshot()
 				}
 				s.latest.Store(snapshot)
+				s.notify()
 				if ops.observe != nil {
 					copy := *snapshot
 					ops.observe(&copy)
@@ -106,7 +117,14 @@ func startSession(ctx context.Context, group device.Group, generations Generatio
 	}()
 	return s, nil
 }
-func (s *Session) Latest() *Snapshot     { snapshot := *s.latest.Load(); return &snapshot }
-func (s *Session) Close() error          { s.cancel(); <-s.done; return s.err }
-func (s *Session) Done() <-chan struct{} { return s.done }
-func (s *Session) Err() error            { return s.err }
+func (s *Session) Latest() *Snapshot        { snapshot := *s.latest.Load(); return &snapshot }
+func (s *Session) Close() error             { s.cancel(); <-s.done; return s.err }
+func (s *Session) Done() <-chan struct{}    { return s.done }
+func (s *Session) Err() error               { return s.err }
+func (s *Session) Changes() <-chan struct{} { return s.changes }
+func (s *Session) notify() {
+	select {
+	case s.changes <- struct{}{}:
+	default:
+	}
+}

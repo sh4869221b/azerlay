@@ -56,11 +56,26 @@ func seedDoctorCLI(t *testing.T, fixture runFixture) {
 func TestCLIDoctorLive(t *testing.T) {
 	fixture := newRunFixture(t)
 	seedDoctorCLI(t, fixture)
+	data, err := os.ReadFile(fixture.config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cliWrite(t, fixture.config, append(data, []byte("[device]\nhand='right'\n")...), 0600)
 	process := startRunProcess(t, fixture)
 	readyRunProcess(t, process, fixture)
 	controlCLIResult[control.SelectionResult](t, fixture.env, "profiles", "select", "PRIVATE_ID_SECOND")
 	controlCLIResult[control.VisibilityResult](t, fixture.env, "show")
 	beforeStatus := controlCLIResult[control.Status](t, fixture.env, "status")
+	if beforeStatus.Device != nil {
+		t.Fatal("unsupported right-hand fixture opened a reader")
+	}
+	foundDeviceDiagnostic := false
+	for _, diagnostic := range beforeStatus.DegradedReasons {
+		foundDeviceDiagnostic = foundDeviceDiagnostic || diagnostic.Code == "DEVICE_UNAVAILABLE"
+	}
+	if !foundDeviceDiagnostic {
+		t.Fatal("unsupported selection missing live device diagnostic")
+	}
 	root := doctorRoot(fixture)
 	beforeFiles := cliTree(t, root)
 	socketInfo, err := os.Lstat(fixture.socket)

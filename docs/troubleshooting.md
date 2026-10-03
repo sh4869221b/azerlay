@@ -128,11 +128,14 @@ The [CLI contract](design-research.md#1711-devices-implemented) defines the sche
 
 ## Internal input recovery
 
-The internal library is raw-only and remains unconnected to `run`, the
-controller, GTK or CLI status. Devices and doctor only check metadata and access;
+Runtime input is raw-only and `run` connects its observations to the overlay and
+CLI status. Devices and doctor only check metadata and access;
 they do not consume reports or initialize notifications.
 
-Start the official Azeron Software in SOFTWARE mode. Initial state and every
+Use Software 2.0.2, displayed firmware 111 and left-hand Cyborg II, and start the
+official Azeron Software in SOFTWARE mode. These are documented operating
+prerequisites; no caller confirmation or runtime mode detection is required.
+Initial state and every
 reopen are unknown. Each valid type57 report establishes the last observed state
 of its own physical button. Malformed physical reports invalidate all knowledge;
 counter discontinuity, including wrap/reset, conservatively invalidates older
@@ -143,7 +146,9 @@ proof of release or of a required initialization action.
 Disconnect clears observations. `StartManaged` retries discovery/open every
 250ms while degraded and retains the selected serial, or the same USB parent
 when no serial exists. A duplicate known serial is ambiguous even if one node
-is unreadable. New sessions increment Device generation and retain Profile
+is unreadable. `device.auto_reconnect=false` makes one admission/session attempt;
+after failure or disconnect it stays unknown until a different device setting is
+adopted. New sessions increment Device generation and retain Profile
 generation. Only new reports recover individual observations. The library does
 not issue state requests, monitor evdev or infer analog/output/trigger state.
 
@@ -210,7 +215,7 @@ not descriptors already open before the ACL changed.
 A successful read-only open proves access for the invoking process only. It
 does not prove that the specific uaccess rule is installed, that access is
 least-privilege, or that seat ACL grant/revocation works. Discovery does not
-install rules or repair access. Input remains unconnected to the runtime overlay; doctor implements passive
+install rules or repair access. Runtime input supplies the overlay; doctor implements passive
 device/access checks. Successful discovery does not establish overlay readiness.
 
 The packaged rule grants only hidraw USB `16d0:12f7:0111`, interface04, before

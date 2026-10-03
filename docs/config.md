@@ -61,8 +61,8 @@ deferred beyond v1.
 
 | Key | Default | Meaning and accepted values |
 | --- | --- | --- |
-| `input.source` | `"auto"` | Accepted legacy setting: `"auto"` or `"evdev"`; currently unwired. Neither value starts evdev; the input library is raw-only. |
-| `input.refresh_hz` | `60` | Refresh frequency; integer `30`, `60`, or `120`. |
+| `input.source` | `"auto"` | Accepted legacy setting: `"auto"` or `"evdev"`; neither value starts evdev. Runtime input is raw-only. |
+| `input.refresh_hz` | `60` | Maximum changed-content render request frequency; integer `30`, `60`, or `120`. Idle does not request redraws. |
 | `input.show_ambiguous` | `true` | Ambiguous-input visibility setting; boolean. |
 
 ### Profile

@@ -67,8 +67,13 @@ removing notification sources, disconnecting handlers, and destroying the GTK
 window. CLI visibility requests are applied asynchronously by the GTK owner.
 Status keeps requested visibility separate from observed mapping and reports
 whether the empty-region call was applied. GDK provides no compositor
-acknowledgement for that call. Profile rendering and device input remain
-separate work.
+acknowledgement for that call. A single non-GTK coordinator consumes config,
+controller and input notifications and publishes immutable latest render state.
+It caches static profile/label matching and rejects obsolete source generations.
+The GTK bridge keeps one pending dispatch and applies changed render content at
+the configured 30/60/120 Hz cap. Hidden state is retained without frame
+preparation; idle and status reads do not request redraws. Shutdown joins the
+coordinator and raw reader before destroying the GTK owner.
 
 ### Reader and reducer contract
 
@@ -123,8 +128,9 @@ is fabricated. Malformed reports invalidate knowledge within the current session
 Cleanup failures remain available through `Err`/`Close` even after a retry.
 
 Official Azeron Software running in SOFTWARE mode is an explicit prerequisite.
-A readable fd does not prove notifications have been initialized. These APIs
-remain unconnected to `run`, the controller and GTK. Synthetic lifecycle tests
+A readable fd does not prove notifications have been initialized. `run` owns
+the selected raw reader and connects observations to GTK through the coordinator.
+Synthetic lifecycle tests
 and the opt-in owner-operated hardware test have separate evidence; neither
 silence nor metadata alone establishes successful hardware recovery.
 
@@ -143,18 +149,19 @@ physical press or release does not establish that one of those triggers fired,
 completed, or advanced output; counters and snapshot sequence numbers do not
 provide that evidence either. A future firing or progress display would first
 need an explicit product requirement and an independently justified signal.
-This reassessment does not implement a matcher or connect the projection to
-`run`, the controller or GTK. Physical state remains last-observed: it starts
+This reassessment does not implement a sequence matcher. `run` connects the
+physical projection to the overlay. Physical state remains last-observed: it starts
 unknown, and an undetected terminal release loss can leave stale state.
 
 ### Physical matching and snapshot projection
 
 `profileadapter` keeps version-specific source fields behind the normalized
 model. `matching.Build` consumes a selected normalized profile and a validated
-layout; it does not inspect opaque raw fields or input events. The caller must
-provide the model, hand, and applicability explicitly. Mapping is supported
-only for the evidenced left-hand Cyborg II Software 2.0.2 export, displayed
-firmware 111, unknown hardware revision, and Keyboard-stick mode. A missing
+layout and actual source metadata; it does not inspect opaque raw fields or
+input events. Static mapping accepts the normalized Software 2.0.2 export and
+limited local-JSON source for the validated left-hand Cyborg II layout. Software
+2.0.2, displayed firmware 111 and SOFTWARE mode are operating prerequisites in
+documentation only; callers do not supply a prerequisite declaration. A missing
 source ID, invalid identity, conflicting present pin, or ID outside the layout
 leaves the control unresolved. A proven ID can map when a pin is absent; source
 array order and pins alone never establish a region.
@@ -168,11 +175,11 @@ Unknown binding's output.
 
 `input.ProjectMatching` retains the static index and separately projects all 30
 physical regions from the snapshot, independent of duplicate, unbound or unknown
-output assignments. `PhysicalContext` explicitly supplies the researched
-model/hand/applicability and SOFTWARE mode; USB identity cannot infer them.
-Unsupported context and disconnection never produce known physical state.
-Static output candidates have no live known/down fields. This library projection
-is not wired into `run`, the controller or a renderer.
+output assignments or profile availability. Valid layout, connection and raw
+observation knowledge determine physical state; USB identity does not establish
+mode or firmware prerequisites. Disconnection produces unknown physical state.
+Static output candidates have no live known/down fields. The coordinator supplies
+the projection and selected-profile assignments to the renderer.
 
 ## Repository growth
 
