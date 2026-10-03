@@ -8,11 +8,11 @@ require (
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/ulikunitz/xz v0.5.16
 	github.com/urfave/cli/v3 v3.11.0
+	golang.org/x/sys v0.44.0
 )
 
 require (
 	github.com/ebitengine/purego v0.10.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.44.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
 )
