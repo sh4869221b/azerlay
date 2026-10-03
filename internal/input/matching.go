@@ -1,15 +1,12 @@
 package input
 
 import (
+	"slices"
+
 	"github.com/sh4869221b/azerlay/internal/layout"
 	"github.com/sh4869221b/azerlay/internal/matching"
-	"slices"
 )
 
-type PhysicalContext struct {
-	matching.Context
-	SoftwareMode bool
-}
 type PhysicalControl struct {
 	RegionID    string
 	SourceID    int
@@ -27,8 +24,8 @@ type MatchingState struct {
 }
 
 // ProjectMatching keeps static assignment candidates separate from physical
-// observations. SOFTWARE mode is explicit; USB identity cannot establish it.
-func ProjectMatching(snapshot *Snapshot, index matching.Index, context PhysicalContext) MatchingState {
+// observations, including when no static profile assignment can be mapped.
+func ProjectMatching(snapshot *Snapshot, index matching.Index, definition layout.Definition) MatchingState {
 	state := MatchingState{Connected: snapshot.Connected, Sequence: snapshot.Sequence, Generations: snapshot.Generations, HasUnknownBindings: index.HasUnknownBindings}
 	for _, control := range index.Controls {
 		control.Bindings = slices.Clone(control.Bindings)
@@ -38,12 +35,10 @@ func ProjectMatching(snapshot *Snapshot, index matching.Index, context PhysicalC
 		output.Candidates = slices.Clone(output.Candidates)
 		state.Outputs = append(state.Outputs, output)
 	}
-	definition, err := layout.LoadEmbedded(context.Model, context.Hand)
-	if err != nil {
+	state.ScopeSupported = definition.Model == "cyborg-ii" && definition.Hand == "left"
+	if !state.ScopeSupported {
 		return state
 	}
-	a := context.Applicability
-	state.ScopeSupported = index.ScopeSupported && context.SoftwareMode && a.SoftwareRelease == "2.0.2" && a.DisplayedFirmware == "111" && a.HardwareRevision == nil && a.Mode == "keyboard-stick"
 	for _, control := range definition.Controls {
 		if control.ID == "stick.main" {
 			continue

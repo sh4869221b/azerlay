@@ -1,15 +1,6 @@
 package matching
 
-import (
-	"github.com/sh4869221b/azerlay/internal/layout"
-	"github.com/sh4869221b/azerlay/internal/profile"
-)
-
-type Context struct {
-	Model         string
-	Hand          string
-	Applicability layout.Applicability
-}
+import "github.com/sh4869221b/azerlay/internal/profile"
 
 type MappingState string
 
