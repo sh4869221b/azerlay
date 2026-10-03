@@ -12,7 +12,11 @@ import (
 )
 
 type SourceID string
-type SourceRef struct{ Hash string }
+type LocalRef struct{ Root, Device, File string }
+type SourceRef struct {
+	Hash  string
+	Local LocalRef
+}
 type Selection struct {
 	Source       SourceRef
 	ProfileIndex int // One-based source ordinal, not an Azeron ID.

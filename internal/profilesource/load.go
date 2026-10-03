@@ -62,7 +62,7 @@ func (s *ImportedSource) snapshot(ctx context.Context) (root *os.Root, index dis
 }
 
 func indexedSource(index diskIndex, ref SourceRef) (diskSource, error) {
-	if !validSourceHash(ref.Hash) {
+	if !validSourceHash(ref.Hash) || ref.Local != (LocalRef{}) {
 		return diskSource{}, &Error{Code: ERR_PROFILE_STORAGE, Cause: errCodecShape}
 	}
 	for _, source := range index.Sources {
