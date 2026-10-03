@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"syscall"
@@ -159,6 +160,107 @@ func TestRunForeground(t *testing.T) {
 				t.Fatal("missing profile command guidance")
 			}
 		})
+	}
+}
+
+func TestRunLocalWithoutImportedHome(t *testing.T) {
+	for _, policy := range []string{"local", "auto"} {
+		t.Run(policy, func(t *testing.T) {
+			fixture := newRunFixture(t)
+			store := filepath.Join(doctorRoot(fixture), "userData")
+			path := filepath.Join(store, "Storage/DevicesStorage/device/ProfileStorage/profile_a.json")
+			if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+				t.Fatal(err)
+			}
+			cliWrite(t, path, []byte(`{"id":"a","name":"Synthetic local","version":1,"inputs":[],"isSoftware":true,"metaData":{"changedLogs":[{"softwareVersion":"2.0.2"}]}}`), 0600)
+			cliWrite(t, fixture.config, []byte("schema_version=1\n[profile]\nsource='"+policy+"'\nlocal_store_path='"+store+"'\nlocal_device='device'\nlocal_profile_file='profile_a.json'\n"), 0600)
+			for index, entry := range fixture.env {
+				if strings.HasPrefix(entry, "HOME=") {
+					fixture.env[index] = "HOME="
+				} else if strings.HasPrefix(entry, "XDG_DATA_HOME=") {
+					fixture.env[index] = "XDG_DATA_HOME=relative"
+				}
+			}
+			process := startRunProcess(t, fixture, "--config", fixture.config)
+			status := readyRunProcess(t, process, fixture)
+			if status.ActiveProfile == nil || status.ActiveProfile.Source != "local" || *status.ActiveProfile.Name != "Synthetic local" {
+				t.Fatalf("import placement blocked explicit local: %+v", status)
+			}
+			controlCLIResult[control.QuitResult](t, fixture.env, "quit")
+			stoppedRunProcess(t, process, fixture)
+		})
+	}
+}
+
+func TestRunLocalLifecycle(t *testing.T) {
+	fixture := newRunFixture(t)
+	store := filepath.Join(doctorRoot(fixture), "userData")
+	ref := "Storage/DevicesStorage/device/ProfileStorage/profile_a.json"
+	path := filepath.Join(store, ref)
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		t.Fatal(err)
+	}
+	data := `{"id":"a","name":"Initial local","version":1,"inputs":[],"isSoftware":true,"metaData":{"changedLogs":[{"softwareVersion":"2.0.2"}]}}`
+	cliWrite(t, path, []byte(data), 0600)
+	cliWrite(t, fixture.config, []byte("schema_version=1\n[profile]\nsource='local'\nlocal_store_path='"+store+"'\nlocal_device='device'\nlocal_profile_file='profile_a.json'\n"), 0600)
+	process := startRunProcess(t, fixture)
+	initial := readyRunProcess(t, process, fixture)
+	if initial.ActiveProfile == nil || initial.ActiveProfile.Source != "local" || initial.ActiveProfile.SourceRef != ref || initial.ActiveProfile.ProfileIndex != 1 || *initial.ActiveProfile.Name != "Initial local" {
+		t.Fatalf("local startup: %+v", initial)
+	}
+	await := func(name, code string) control.Status {
+		t.Helper()
+		deadline := time.Now().Add(10 * time.Second)
+		for {
+			status := controlCLIResult[control.Status](t, fixture.env, "status")
+			failure := ""
+			for _, diagnostic := range status.DegradedReasons {
+				if strings.HasPrefix(diagnostic.Code, "ERR_PROFILE_LOCAL_") {
+					failure = diagnostic.Code
+					if strings.Contains(diagnostic.Reason, store) || strings.Contains(diagnostic.Reason, "PRIVATE_") {
+						t.Fatalf("private local failure: %+v", diagnostic)
+					}
+				}
+			}
+			if status.ActiveProfile != nil && status.ActiveProfile.Source == "local" && status.ActiveProfile.SourceRef == ref && status.ActiveProfile.ProfileIndex == 1 && *status.ActiveProfile.Name == name && failure == code {
+				return status
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("local transition name=%q code=%q: %+v", name, code, status)
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+	cliWrite(t, path, []byte(`{"PRIVATE_PARTIAL":`), 0600)
+	failed := await("Initial local", "ERR_PROFILE_LOCAL_UNSUPPORTED")
+	if failed.Generation != initial.Generation {
+		t.Fatal("partial write changed active generation")
+	}
+	repaired := strings.Replace(data, "Initial local", "Repaired local", 1)
+	temporary := filepath.Join(filepath.Dir(path), "writer.tmp")
+	cliWrite(t, temporary, []byte(repaired), 0600)
+	if err := os.Rename(temporary, path); err != nil {
+		t.Fatal(err)
+	}
+	updated := await("Repaired local", "")
+	if updated.Generation <= failed.Generation {
+		t.Fatal("rename repair did not change generation")
+	}
+	cliWrite(t, path, []byte(strings.Replace(repaired, "2.0.2", "9.9.9", 1)), 0600)
+	await("Repaired local", "ERR_PROFILE_LOCAL_UNSUPPORTED")
+	controlCLIResult[control.QuitResult](t, fixture.env, "quit")
+	stoppedRunProcess(t, process, fixture)
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	before := cliTree(t, store)
+	restarted := startRunProcess(t, fixture)
+	readyRunProcess(t, restarted, fixture)
+	await("Repaired local", "ERR_PROFILE_LOCAL_READ")
+	controlCLIResult[control.QuitResult](t, fixture.env, "quit")
+	stoppedRunProcess(t, restarted, fixture)
+	if current := cliTree(t, store); !reflect.DeepEqual(before, current) {
+		t.Fatal("restart wrote into source store")
 	}
 }
 

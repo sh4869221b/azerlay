@@ -109,12 +109,18 @@ the control server before removing its owned socket and closing `Done()`.
 
 ## Active selection
 
-The controller initializes once from configuration. `profile.source = "auto"`
-or `"imported"` uses the imported store. A nonempty `profile.selected_id` must
-match exactly one normalized string ID across stored sources. With an empty ID,
-the saved source and one-based ordinal are used. Missing, ambiguous, or corrupt
-data leaves no active profile and adds a degraded reason; status remains usable.
-`profile.source = "local"` is unavailable and does not fall back to imports.
+The controller initializes once from configuration. A nonempty
+`profile.selected_id` selects an exact unique imported ID and its failure is
+sticky. Explicit `imported` otherwise uses the saved import and ordinal.
+Explicit `local` uses the configured device/file ref or matching durable
+last-good, without switching source. `auto` tries that local ref, matching
+last-good, saved import, then the newest loadable single-profile import when
+saved selection is unavailable. It skips multi-profile imports without a usable
+saved ordinal.
+See [configuration](config.md#profile) for root resolution and admission.
+Failures add safe degraded reasons; status remains usable. Partial or
+unsupported local updates retain the active definition. Restart can restore
+matching last-good as degraded when the current source cannot be loaded.
 
 `profile.select` matches the exact selector against normalized string IDs or
 names in all stored imports. Matching both fields of one profile counts once;
@@ -123,6 +129,11 @@ ID-first priority or ordinal interpretation. An unreadable source causes a
 storage error rather than an assumed unique match. A failed selection preserves
 the current profile; a successful selection clears its prior initialization
 failure.
+
+In `auto`, a successful imported session selection stops and joins the local
+watcher before publication, so pending local work cannot replace that selection.
+A failed selection leaves local watching active. Explicit `local` rejects
+imported session selection.
 
 Selection is session-only and does not write configuration, catalog, caches, or
 saved selection. Explicit and watcher-driven configuration reloads preserve the
@@ -151,9 +162,12 @@ the optional `overlay` object, all fields below are present:
 | `degraded_reasons` | Array of `{code,stage,reason}` diagnostics. |
 
 `ProfileStatus` is
-`{source:"imported",source_ref:string,profile_index:int,name:string|null}`.
-The source reference is the existing stored source identifier and the index is
-one-based. Reports permit profile names but exclude raw Azeron IDs, labels,
+`{source:"imported"|"local",source_ref:string,profile_index:int,name:string|null}`.
+Imported references retain the existing stored source identifier and one-based
+ordinal. A local reference is slash-separated
+`Storage/DevicesStorage/<device>/ProfileStorage/profile_<id>.json`, with ordinal
+1 and no absolute userData root. This intentional selected-file reference may
+contain its profile ID. Reports permit profile names but exclude other raw IDs, labels,
 bindings, macros, origin paths, original exports, and configuration warning key
 text. Text output quotes and escapes profile names.
 
@@ -200,6 +214,10 @@ client/server versions.
 | `ERR_PROFILE_AMBIGUOUS` | `selection` | More than one matching profile. |
 | `ERR_PROFILE_SOURCE_UNAVAILABLE` | `selection` | Initial profile source is unsupported. |
 | `ERR_PROFILE_STORAGE` | `storage` | Imported storage cannot be read. |
+| `ERR_PROFILE_LOCAL_UNSUPPORTED` | `profile` | Local schema/release/history is outside admission. |
+| `ERR_PROFILE_LOCAL_READ` | `profile` | Selected local file cannot be read as a stable complete definition. |
+| `ERR_PROFILE_LOCAL_WATCH` | `watch` | Local watching is unavailable or stopped; retained state remains usable. |
+| `ERR_PROFILE_LOCAL_STATE` | `state` | Private durable local state cannot be read or published safely. |
 
 `azerlay show|hide|toggle|reload|status|quit [--json]` takes no positional
 arguments. `azerlay profiles select [--json] [--] <id|name>` takes exactly one

@@ -128,7 +128,7 @@ func TestControlController(t *testing.T) {
 	}
 	accepted := response.Result.(ReloadResult).RequestGeneration
 	awaitControllerConfig(t, m, func(s config.Snapshot) bool { return s.Status.ConfigGeneration >= accepted })
-	writeControllerConfig(t, path, "selected_id = \"second-id\"\nsource = \"local\"\n")
+	writeControllerConfig(t, path, "source = \"local\"\n")
 	awaitControllerConfig(t, m, func(s config.Snapshot) bool { return s.Config.Profile.Source == "local" })
 	s = controllerStatus(t, c)
 	if s.ActiveProfile.ProfileIndex != 1 || s.Generation != 6 {

@@ -22,10 +22,13 @@ type Input struct {
 	ShowAmbiguous bool   `toml:"show_ambiguous"`
 }
 type Profile struct {
-	Source     string `toml:"source"`
-	SelectedID string `toml:"selected_id"`
-	Game       string `toml:"game"`
-	Watch      bool   `toml:"watch"`
+	Source           string `toml:"source"`
+	SelectedID       string `toml:"selected_id"`
+	LocalStorePath   string `toml:"local_store_path"`
+	LocalDevice      string `toml:"local_device"`
+	LocalProfileFile string `toml:"local_profile_file"`
+	Game             string `toml:"game"`
+	Watch            bool   `toml:"watch"`
 }
 type Overlay struct {
 	Monitor         string  `toml:"monitor"`

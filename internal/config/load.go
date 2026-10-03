@@ -5,7 +5,9 @@ import (
 	"errors"
 	"math"
 	"os"
+	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/pelletier/go-toml/v2"
 )
@@ -52,6 +54,13 @@ func loadFile(path string) (Config, []Warning, error) {
 }
 
 func validate(c Config) error {
+	local := c.Profile.LocalDevice != "" || c.Profile.LocalProfileFile != ""
+	if local && (!validLocalComponent(c.Profile.LocalDevice) || !validLocalComponent(c.Profile.LocalProfileFile)) {
+		return &Error{Code: ERR_CONFIG_INVALID, Stage: "validation", Reason: "profile local device and file must be complete single path components"}
+	}
+	if c.Profile.SelectedID != "" && (local || c.Profile.Source == "local") || local && c.Profile.Source == "imported" {
+		return &Error{Code: ERR_CONFIG_INVALID, Stage: "validation", Reason: "profile selectors conflict with the source policy"}
+	}
 	for _, field := range []struct {
 		name, value string
 		allowed     []string
@@ -93,4 +102,8 @@ func validate(c Config) error {
 		}
 	}
 	return nil
+}
+
+func validLocalComponent(value string) bool {
+	return value != "" && value != "." && value != ".." && !filepath.IsAbs(value) && !strings.ContainsAny(value, "/\\\x00")
 }

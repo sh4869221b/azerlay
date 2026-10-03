@@ -14,9 +14,37 @@ import (
 	"github.com/sh4869221b/azerlay/internal/config"
 	"github.com/sh4869221b/azerlay/internal/control"
 	"github.com/sh4869221b/azerlay/internal/diagnostics"
+	"github.com/sh4869221b/azerlay/internal/profilesource"
 )
 
 const doctorCLIBundle = `{"profiles":[{"id":"PRIVATE_ID_FIRST","name":"PRIVATE_NAME","inputs":[{"label":"SELECTED_LABEL\n\u001b","types":["1","11","11"],"keyValues":["KeyU","0","0","0"],"metaValues":["ControlLeft","0","0"],"isHold":false,"isTurbo":false,"isToggleOnHold":false,"keyValuesLong":["0","0","0","0"],"metaValuesLong":["0","0","0"],"keyValuesDouble":["0","0","0","0"],"metaValuesDouble":["0","0","0"],"future":"PRIVATE_FIELD"},{"macro":"PRIVATE_MACRO"}]},{"id":"PRIVATE_ID_SECOND","name":"Other profile","inputs":[{"label":"OTHER_LABEL"}]}]}`
+
+func TestCLIDoctorLocalReadOnly(t *testing.T) {
+	fixture := newRunFixture(t)
+	root := doctorRoot(fixture)
+	store := filepath.Join(root, "userData")
+	path := filepath.Join(store, "Storage/DevicesStorage/device/ProfileStorage/profile_a.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		t.Fatal(err)
+	}
+	data := `{"id":"a","name":"PRIVATE_NAME","version":1,"inputs":[],"isSoftware":true,"metaData":{"changedLogs":[{"softwareVersion":"2.0.2"}]}}`
+	cliWrite(t, path, []byte(data), 0600)
+	cliWrite(t, fixture.config, []byte("schema_version=1\n[profile]\nsource='local'\nlocal_store_path='"+store+"'\nlocal_device='device'\nlocal_profile_file='profile_a.json'\n"), 0600)
+	before := cliTree(t, root)
+	output := invokeCLI(t, fixture.env, nil, "doctor", "--config", fixture.config, "--json")
+	checkCLIStatus(t, output, 1, true)
+	requireDoctorCode(t, parsedDoctorReport(t, output), diagnostics.OK_PROFILE_SOURCE)
+	if strings.Contains(output.stdout, "PRIVATE_NAME") || strings.Contains(output.stdout, store) {
+		t.Fatalf("private local diagnostics: %s", output.stdout)
+	}
+	requireDoctorNoWrites(t, root, before)
+	cliWrite(t, path, []byte(strings.Replace(data, "2.0.2", "9.9.9", 1)), 0600)
+	before = cliTree(t, root)
+	output = invokeCLI(t, fixture.env, nil, "doctor", "--config", fixture.config, "--json")
+	checkCLIStatus(t, output, 1, true)
+	requireDoctorCode(t, parsedDoctorReport(t, output), profilesource.ERR_PROFILE_LOCAL_UNSUPPORTED)
+	requireDoctorNoWrites(t, root, before)
+}
 
 func seedDoctorCLI(t *testing.T, fixture runFixture) {
 	t.Helper()

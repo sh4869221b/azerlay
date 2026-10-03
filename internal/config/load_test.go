@@ -66,6 +66,15 @@ func TestConfigLoad(t *testing.T) {
 		want       Config
 	}{
 		{"defaults", "schema_version = 1", want},
+		{"local selection", "schema_version=1\n[profile]\nsource='local'\nlocal_store_path='../userData'\nlocal_device='device-1'\nlocal_profile_file='profile_local.json'", func() Config {
+			c := want
+			c.Profile.Source = "local"
+			c.Profile.LocalStorePath = "../userData"
+			c.Profile.LocalDevice = "device-1"
+			c.Profile.LocalProfileFile = "profile_local.json"
+			return c
+		}()},
+		{"root without selection", "schema_version=1\n[profile]\nlocal_store_path='userData'", func() Config { c := want; c.Profile.LocalStorePath = "userData"; return c }()},
 		{"example", example, func() Config { c := want; c.Overlay.Monitor = "DP-2"; return c }()},
 		{"explicit zero values", `schema_version=1
 [device]

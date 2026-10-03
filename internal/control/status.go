@@ -78,6 +78,12 @@ func (c *Controller) status() Status {
 	if c.selectionFailure != nil {
 		s.DegradedReasons = append(s.DegradedReasons, Diagnostic{Code: c.selectionFailure.Code, Stage: c.selectionFailure.Stage, Reason: c.selectionFailure.Summary})
 	}
+	if c.localFailure != nil {
+		s.DegradedReasons = append(s.DegradedReasons, Diagnostic{Code: c.localFailure.Code, Stage: c.localFailure.Stage, Reason: c.localFailure.Summary})
+	}
+	if c.localWatchFailure != nil {
+		s.DegradedReasons = append(s.DegradedReasons, Diagnostic{Code: c.localWatchFailure.Code, Stage: c.localWatchFailure.Stage, Reason: c.localWatchFailure.Summary})
+	}
 	for _, failure := range []*Diagnostic{s.LastReload.ConfigFailure, s.LastReload.WatchFailure} {
 		if failure != nil {
 			s.DegradedReasons = append(s.DegradedReasons, *failure)

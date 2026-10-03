@@ -123,16 +123,32 @@ func runForeground(ctx context.Context, configPath string, stdout, stderr io.Wri
 			window.Close()
 		}
 	}()
-	dataHome, err := profilesource.ResolveDataHome()
-	if err != nil {
-		return writeRunError(control.NewError(profilesource.ERR_PROFILE_STORAGE), stdout, stderr)
+	var source *profilesource.ImportedSource
+	var importedUnavailable bool
+	if manager.Snapshot().Config.Profile.Source != "local" {
+		dataHome, err := profilesource.ResolveDataHome()
+		if err != nil {
+			if manager.Snapshot().Config.Profile.Source != "auto" {
+				return writeRunError(control.NewError(profilesource.ERR_PROFILE_STORAGE), stdout, stderr)
+			}
+			importedUnavailable = true
+		} else {
+			source = profilesource.NewImportedSource(dataHome)
+		}
 	}
-	controller, err := control.NewController(managerCtx, manager, profilesource.NewImportedSource(dataHome))
+	controller, err := control.NewController(managerCtx, manager, source)
 	if err != nil {
 		return runStartupFailure(ctx, err, stdout, stderr)
 	}
+	defer controller.Close()
 	if !stopStartup() || ctx.Err() != nil {
 		return 0
+	}
+	if importedUnavailable {
+		initial := controller.Dispatch(managerCtx, control.Request{Version: control.ProtocolVersion, ID: "startup", Method: control.MethodStatus}).Result.(control.Status)
+		if initial.ActiveProfile == nil || initial.ActiveProfile.Source != "local" {
+			return writeRunError(control.NewError(profilesource.ERR_PROFILE_STORAGE), stdout, stderr)
+		}
 	}
 	initialConfig := manager.Snapshot()
 	window, err = overlay.New(initialConfig.Config.Overlay)
@@ -157,7 +173,7 @@ func runForeground(ctx context.Context, configPath string, stdout, stderr io.Wri
 	if response.Error != nil {
 		return runStartupFailure(ctx, response.Error, stdout, stderr)
 	}
-	server, err = owner.Start(ctx, controller, stopConfig)
+	server, err = owner.Start(ctx, controller, func() { controller.Close(); stopConfig() })
 	if err != nil {
 		return runStartupFailure(ctx, err, stdout, stderr)
 	}

@@ -69,6 +69,7 @@ func startControlCLI(t *testing.T) *liveControlCLI {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(controller.Close)
 	server, err := control.Start(ctx, controller)
 	if err != nil {
 		t.Fatal(err)
@@ -201,6 +202,7 @@ func TestCLIControlLive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(restarted.Close)
 	server, err := control.Start(t.Context(), restarted)
 	if err != nil {
 		t.Fatal(err)
