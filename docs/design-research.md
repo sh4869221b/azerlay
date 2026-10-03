@@ -972,9 +972,10 @@ USB device親ごとにgroupを作り、一意にadmittedなinterface04をcomplet
 
 ### 12.2 権限
 
-Issue #37の配布要件はhidraw subsystem、VID/PID/release、interface04限定の
+native packagingの`71-azerlay.rules`はhidraw subsystem、VID/PID/release、interface04限定の
 uaccessとする。恒久input-group加入、root、VIDだけの広いgrantは要求しない。
-この実装ではruleを作成・インストールしない。uaccess自体がread-onlyを強制する
+Arch packageがruleをインストールし、manual archiveでは管理者が明示的に導入する。
+アプリのCLIは権限を変更しない。uaccess自体がread-onlyを強制する
 わけではなく、アプリのopen flagsと非書込契約で制限する。旧event-node ruleと
 既存hostの広い0666 grantは新経路の権限検証ではない。
 
@@ -1843,11 +1844,11 @@ azerlay/
 │   ├── arch/
 │   │   └── PKGBUILD
 │   ├── systemd/
-│   │   └── azerlay.service
+│   │   └── azerlay.service.in
 │   ├── udev/
-│   │   └── 70-azerlay.rules
+│   │   └── 71-azerlay.rules
 │   └── desktop/
-│       └── io.github.<owner>.azerlay.desktop
+│       └── io.github.@OWNER@.azerlay.desktop.in
 ├── docs/
 │   ├── architecture.md
 │   ├── profile-format.md
@@ -1891,17 +1892,18 @@ native test fixtureには追加で`sway`と`dbus`が必要。非rootで`scripts/
 ### 24.2 ビルド
 
 ```bash
-CGO_ENABLED=1 go build -trimpath -buildvcs=true -o build/azerlay ./cmd/azerlay
+CGO_ENABLED=1 go build -trimpath -buildvcs=false -ldflags '-X main.version=0.0.0' -o build/azerlay ./cmd/azerlay
 ```
 
-version、commit、build dateは`-ldflags`で埋め込む。再現可能性を損なう非決定的値は配布方針に合わせる。
+現在のpublic version項目はversionだけであり、commit・build dateは追加しない。
+Go 1.27.xとnative依存が必要。配布用の実際の手順は`scripts/package.sh VERSION OUTPUT_DIR`を使う。
 
 ### 24.3 配布形式
 
-1. GitHub Releasesのx86_64 tarball。
-2. Arch Linux向けPKGBUILD / AUR。
-3. ソースビルド手順。
-4. 将来、deb/rpmを追加可能。
+現在はローカルsource/binary tarballとlocal-source Arch PKGBUILDを提供する。
+PKGBUILDのchecksum placeholderは一時recipeで通常の`updpkgsums`により置換する。
+未公開Release URLや`SKIP`は使わない。GitHub Release/AUR公開、deb/rpmは今回の範囲外。
+license grantとdesktop ownerは未確定であり、local smoke packageも再配布許諾ではない。
 
 GTK4等を内包した巨大なAppImageは初期の必須配布形式としない。Layer Shell、GObject、フォント、Wayland統合でDistribution側ライブラリとの相性確認が必要なためである。
 
@@ -1909,13 +1911,13 @@ GTK4等を内包した巨大なAppImageは初期の必須配布形式としな�
 
 ```ini
 [Unit]
-Description=Azerlay Wayland Azeron overlay
+Description=Azerlay
 After=graphical-session.target
 PartOf=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/azerlay run --foreground
+ExecStart=@BINDIR@/azerlay run --foreground
 Restart=on-failure
 RestartSec=2
 
@@ -1923,7 +1925,11 @@ RestartSec=2
 WantedBy=graphical-session.target
 ```
 
-実際のPATHとWayland環境変数継承をDistribution/Compositor別に検証する。Compositorの`exec-once`等を代替として文書化する。
+templateの`@BINDIR@`は実際のabsolute binary directoryへ置換する。Arch packageは`/usr/bin`。
+serviceは自動enable/startしない。manual startは到達可能なWayland displayと利用者所有の
+runtime directory、user managerへの環境importを前提とする。将来の自動起動をenableするのは
+compositorがactiveな`graphical-session.target`を管理する場合に限る。targetを管理しない
+plain Hyprlandの自動起動はforeground `exec-once`を代替とする。具体的な導入・削除はREADME参照。
 
 ### 24.5 リリース成果物
 
