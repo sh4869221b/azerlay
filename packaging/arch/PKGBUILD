@@ -1,0 +1,31 @@
+pkgname=azerlay
+pkgver=0.0.0
+pkgrel=1
+pkgdesc='Azeron profile and overlay application for Linux Wayland'
+arch=('x86_64')
+url='https://github.com/sh4869221b/azerlay'
+depends=('gtk4' 'gtk4-layer-shell' 'libgirepository' 'glib2' 'pango' 'harfbuzz'
+         'gdk-pixbuf2' 'cairo' 'vulkan-icd-loader' 'graphene' 'glibc')
+makedepends=('go' 'gcc' 'pkgconf' 'gobject-introspection')
+source=("azerlay-${pkgver}-source.tar.gz")
+sha256sums=('REPLACE_WITH_LOCAL_SOURCE_SHA256')
+
+build() {
+  cd "$srcdir/azerlay-$pkgver"
+  GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -trimpath -buildvcs=false \
+    -ldflags "-X main.version=$pkgver" -o azerlay ./cmd/azerlay
+}
+
+package() {
+  cd "$srcdir/azerlay-$pkgver"
+  install -Dm755 azerlay "$pkgdir/usr/bin/azerlay"
+  install -Dm644 packaging/udev/71-azerlay.rules \
+    "$pkgdir/usr/lib/udev/rules.d/71-azerlay.rules"
+  install -Dm644 packaging/systemd/azerlay.service.in \
+    "$pkgdir/usr/lib/systemd/user/azerlay.service"
+  sed -i 's|@BINDIR@|/usr/bin|g' "$pkgdir/usr/lib/systemd/user/azerlay.service"
+  install -Dm644 'packaging/desktop/io.github.@OWNER@.azerlay.desktop.in' \
+    "$pkgdir/usr/share/azerlay/integration/io.github.@OWNER@.azerlay.desktop.in"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/azerlay/README.md"
+  cp -a docs "$pkgdir/usr/share/doc/azerlay/"
+}
