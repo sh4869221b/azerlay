@@ -245,10 +245,14 @@ Layer Shellを実装する以下の環境は、動作確認後に「準対応」
 - NVIDIA proprietary driver
 - Hyprland
 - 複数モニター
-- 高リフレッシュレート、VRR
-- Proton上のBodycam
+- 高リフレッシュレート
+- Proton上の実ゲーム（v1の表示確認はCyberpunk 2077で実施済み）
 
-HDR、VRR、Direct Scanoutとの相互作用は要調査であり、正式サポート表に結果を記載する。
+Bodycamのbuilt-in profileとキーバインド調査は別要件として維持する。
+ゲーム上への通常overlay表示をv1の完了条件とし、詳細な性能・モード比較、
+HDR、VRR、Direct Scanout、Gamescopeとの相互作用は未検証のv1後調査とする。
+[表示確認と予備測定](decisions/fullscreen-performance.md)、
+[後続Issue #132](https://github.com/sh4869221b/azerlay/issues/132)を参照。
 Niriの実機検証はv1の必須マトリクスに含めず、v1後に行う。
 
 ---
@@ -1143,12 +1147,13 @@ Swayは隔離されたnative test fixtureに限り、製品適合の根拠にし
 
 Compositorによってはoverlay surfaceが存在するとDirect Scanoutを無効化し、性能、VRR、遅延、消費電力へ影響する可能性がある。
 
-- v1対象のHyprlandで実測する。NiriとGamescopeの実測はv1後の別課題とする。
+- HyprlandのDirect Scanout、VRR、HDR、Gamescopeの詳細実測は[Issue #132](https://github.com/sh4869221b/azerlay/issues/132)でv1後に行う。Niriもv1後の対象とする。
 - オーバーレイ非表示時はsurfaceをunmapまたは破棄し、Direct Scanout復帰可能性を高める。
 - 単にopacity 0にするだけで隠さない。
 - 影響をREADMEへ明記する。
 
-これは**要調査・性能リリース阻害**。
+v1ではゲーム上への表示を確認済み。予備測定ではoverlay不在時もDirect Scanoutが成立しておらず、overlayの因果的影響やhide後の復帰は未検証である。
+詳細な性能調査はv1を阻害せず、性能保証も行わない。[決定と観測範囲](decisions/fullscreen-performance.md)を参照。
 
 ---
 
@@ -2036,17 +2041,19 @@ CIで再現できないDirect Scanout、VRR、HDR、Protonフルスクリーン�
 | 環境 | 必須 |
 |---|---:|
 | Hyprland + NVIDIA | 必須 |
-| Bodycam + Proton + borderless | 必須 |
-| Bodycam + Proton + fullscreen | 必須 |
+| Proton実ゲーム上への通常overlay表示（Cyberpunk 2077 + borderlessで確認済み） | v1必須 |
+| 実ゲームのfullscreen / borderless比較 | v1後 |
 | 複数モニター、DP-2指定 | 必須 |
 | 100% / fractional / 200% scale | 必須 |
-| VRR on/off | 必須 |
-| HDR on/off | 必須 |
-| Gamescope nested | 推奨 |
+| VRR on/off | v1後 |
+| HDR on/off | v1後 |
+| Gamescope nested | v1後 |
 | Sway | 推奨 |
 | KDE Plasma Wayland | 推奨 |
 
 Niriはv1後の対象で、実機動作は未検証。v1の必須試験には含めない。
+ゲーム性能の反復測定、Direct Scanout、各モードの詳細検証は未完了で、
+[Issue #132](https://github.com/sh4869221b/azerlay/issues/132)に延期する。
 
 ### 25.7 長時間試験
 
@@ -2194,7 +2201,11 @@ Cyborg IIの確認済みinterface04だけを検出し、他機器・evdevを監�
 
 ### AC-006 リアルタイム表示
 
-v1ではHyprland上で、Bodycamのフルスクリーンまたはborderless表示より上にオーバーレイを表示し、入力p95 20ms以下でハイライトする。Niriはv1後の対象で、動作未検証とする。
+v1ではHyprland上の実ゲームより上に通常オーバーレイを表示できることを完了条件とする。
+Cyberpunk 2077のborderless表示で確認済み。
+入力p95 20msの目標を含む詳細な遅延・性能・ゲームモード条件はv1後の[Issue #132](https://github.com/sh4869221b/azerlay/issues/132)で検証し、v1完了を阻害しない。
+予備的なsynthetic read-returnからGTK draw終了までの測定は物理入力から画面提示までの保証を意味しない。
+Niriはv1後の対象で、動作未検証とする。
 
 ### AC-007 透過
 
@@ -2253,7 +2264,7 @@ fuzz testでpanic、無制限メモリ確保、部分保存が発生しない。
 | R-007 | [Hyprland v1配置の実測と決定](decisions/compositor-placement.md)：anchor、exclusive zone、monitor指定。Niriはv1後、動作未検証 | 正しい配置 | Overlay正式対応 |
 | R-008 | GDK empty input regionのmap/remap/hotplug後挙動（[アプリ起点のremap実測](decisions/overlay-abi.md)あり。compositor起点のremapと物理hotplugは未検証） | 完全click-through | Overlay正式対応 |
 | R-009 | [connector選択、fractional scale、一時出力の消失・再作成](decisions/compositor-placement.md)。同じキーへの復帰は未検証、物理hotplugも未検証 | 複数モニター | Multi-monitor正式対応 |
-| R-010 | Direct Scanout、VRR、HDR、Gamescopeへの影響 | 性能・ゲーム互換性 | 性能保証 |
+| R-010 | [ゲーム上の表示確認済み、詳細性能・Direct Scanout・VRR・HDR・Gamescopeはv1後のIssue #132](decisions/fullscreen-performance.md) | 性能・ゲーム互換性 | v1非阻害。性能保証は未検証 |
 | R-011 | Bodycam現行バージョンの全キーバインドとアクション名 | built-in game profile | Bodycamプロファイル |
 | R-012 | プロジェクト名、GitHub名、商標、依存ライセンス | 公開上の安全 | 公開リリース |
 | R-013 | Azeron exportのSoftware 2.x各版、bundle/single、str8/fixstrの実在例 | parser互換性 | インポート互換表 |
@@ -2278,8 +2289,8 @@ fuzz testでpanic、無制限メモリ確保、部分保存が発生しない。
 - single/long/double/macro/turbo/analog全種を含む匿名化fixture。
 - `lsusb -v`、`udevadm info`、`evtest`能力情報。
 - `/proc/bus/input/devices`。
-- v1対象Hyprlandのversion。Niri/Gamescopeはv1後に検証する場合のversion。
-- fractional scaling、VRR、HDR別の挙動。
+- v1のゲーム表示確認に用いたHyprland、GPU/driver、Proton、ゲームのversionと表示状態。Niri/Gamescopeはv1後に検証する場合のversion。
+- fractional scalingの挙動。ゲームモード、Direct Scanout、VRR、HDR別の詳細と反復測定はv1後のIssue #132で収集する。
 
 秘密や個人ラベルを除去し、公開fixtureはsynthetic化する。
 

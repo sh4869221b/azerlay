@@ -1,0 +1,5 @@
+scenario,samples,window_start_s,window_end_s,mean_ms,p50_ms,p95_ms,max_ms,quantile
+game-absent-one-run,2334,25,60,14.996589,14.8557,18.2336,,nearest-rank
+game-visible-one-run,2311,25,60,15.144349,15.1124,18.5269,,nearest-rank
+game-hidden-one-run,2310,25,60,15.152762,15.0588,18.4998,,nearest-rank
+synthetic-read-return-to-GTK-draw-end-60hz,225,,,,1.262557,1.737491,7.784565,floor((n-1)*percentile/100)
