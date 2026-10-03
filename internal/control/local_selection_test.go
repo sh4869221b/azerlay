@@ -336,6 +336,9 @@ func TestLocalConsumerRejectsCanceledCandidate(t *testing.T) {
 	if c.active.selection.Source.Local != (profilesource.LocalRef{}) || *c.active.profile.Name != "First" {
 		t.Fatal("canceled queued candidate replaced imported selection")
 	}
+	if snapshot := c.ProfileSnapshot(); snapshot.Selection.Source.Local != (profilesource.LocalRef{}) || snapshot.Source.SourceScope != "azeron-software-export" || *snapshot.Profile.Name != "First" {
+		t.Fatal("canceled queued candidate replaced published render state")
+	}
 	select {
 	case <-done:
 	default:

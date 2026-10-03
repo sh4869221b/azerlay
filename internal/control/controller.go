@@ -18,6 +18,9 @@ type Controller struct {
 	mu                sync.Mutex
 	visible           bool
 	visibilityChanges chan struct{}
+	changes           chan struct{}
+	profileSnapshot   *ProfileSnapshot
+	profileGeneration uint64
 	overlay           *OverlayStatus
 	overlayDiagnostic *Diagnostic
 	generation        uint64
@@ -36,7 +39,7 @@ func NewController(ctx context.Context, manager *config.Manager, source *profile
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	c := &Controller{manager: manager, source: source, started: time.Now(), generation: 1, visibilityChanges: make(chan struct{}, 1)}
+	c := &Controller{manager: manager, source: source, started: time.Now(), generation: 1, visibilityChanges: make(chan struct{}, 1), changes: make(chan struct{}, 1)}
 	settings := manager.Snapshot().Config.Profile
 	c.imported = settings.Source != "local"
 	c.initializeProfile(ctx, settings)
@@ -139,13 +142,19 @@ func (c *Controller) selectProfile(ctx context.Context, request Request) Respons
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	changed := c.selectionFailure != nil || c.localFailure != nil || c.localWatchFailure != nil
 	if c.active == nil || c.active.selection != candidate.selection {
 		c.active = candidate
 		c.generation++
+		c.publishProfileLocked()
+		changed = true
 	}
 	c.selectionFailure = nil
 	c.localFailure = nil
 	c.localWatchFailure = nil
+	if changed {
+		c.notifyChangedLocked()
+	}
 	return SuccessResponse(request, SelectionResult{ActiveProfile: c.active.status(), Generation: c.generation})
 }
 
