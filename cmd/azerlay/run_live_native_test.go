@@ -223,11 +223,13 @@ func runLiveOverlayChild(mode string) int {
 	if err := os.WriteFile(filepath.Join(games, "native.toml"), []byte("schema_version=1\nid='native-live'\nname='Synthetic labels'\n[controls]\n'input:4:single'='Synthetic action'\n"), 0600); err != nil {
 		return liveChildFailure(err)
 	}
-	manager, err := config.Start(ctx, path)
+	managerCtx, stopManager := context.WithCancel(ctx)
+	defer stopManager()
+	manager, err := config.Start(managerCtx, path)
 	if err != nil {
 		return liveChildFailure(err)
 	}
-	defer func() { cancel(); <-manager.Done() }()
+	defer func() { stopManager(); <-manager.Done() }()
 	source := profilesource.NewImportedSource(os.Getenv("XDG_DATA_HOME"))
 	if !local && mode != "live-missing" {
 		prepared, err := profilesource.PrepareText(profileJSON, profile.SourceMetadata{SoftwareRelease: "2.0.2", SourceScope: "azeron-software-export"})
@@ -279,7 +281,7 @@ func runLiveOverlayChild(mode string) int {
 		return liveChildFailure(fmt.Errorf("instance: %v", err))
 	}
 	defer owner.Close()
-	server, err := owner.Start(ctx, controller, func() { coordinator.Close(); controller.Close(); cancel(); <-manager.Done() })
+	server, err := owner.Start(ctx, controller, func() { coordinator.Close(); controller.Close(); stopManager(); <-manager.Done() })
 	if err != nil {
 		return liveChildFailure(err)
 	}
