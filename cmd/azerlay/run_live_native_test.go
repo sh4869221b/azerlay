@@ -432,6 +432,11 @@ func exerciseLiveOverlay(ctx context.Context, mode, path, dir, profilePath, prof
 		view := coordinator.Latest()
 		return view != nil && view.Visible && drawn.Load() == view.Render
 	}
+	gtkCondition := func(check func() bool) bool {
+		matched := false
+		err := liveGTK(ctx, func() error { matched = check(); return nil })
+		return err == nil && matched
+	}
 	if err := call(control.MethodShow); err != nil {
 		return err
 	}
@@ -592,8 +597,13 @@ func exerciseLiveOverlay(ctx context.Context, mode, path, dir, profilePath, prof
 		if err := call(control.MethodHide); err != nil {
 			return err
 		}
-		if err := awaitLive(ctx, func() bool { return !coordinator.Latest().Visible }); err != nil {
-			return err
+		if err := awaitLive(ctx, func() bool {
+			return !coordinator.Latest().Visible && gtkCondition(func() bool {
+				widget, err := liveOverlayWidget()
+				return err == nil && !widget.Visible() && !widget.Mapped()
+			})
+		}); err != nil {
+			return fmt.Errorf("hidden GTK window: %w", err)
 		}
 		time.Sleep(40 * time.Millisecond)
 		baseline := requests.Load()
@@ -702,23 +712,27 @@ func exerciseLiveOverlay(ctx context.Context, mode, path, dir, profilePath, prof
 		if err := awaitLive(ctx, func() bool { return coordinator.Latest().Generations.Config > generation }); err != nil {
 			return err
 		}
-		if err := liveGTK(ctx, func() error {
-			if gtk.WindowGetToplevels().NItems() != 1 {
-				return errors.New("missing-monitor window not removed")
-			}
-			return nil
+		if err := awaitLive(ctx, func() bool {
+			return gtkCondition(func() bool { return gtk.WindowGetToplevels().NItems() == 1 })
 		}); err != nil {
-			return err
+			return fmt.Errorf("missing-monitor window not removed: %w", err)
 		}
 		counter++
 		if err := raw.write(4, 1, counter); err != nil {
 			return err
 		}
+		generation = coordinator.Latest().Generations.Config
 		if err := os.WriteFile(path, []byte(settings(60, os.Getenv("AZERLAY_TEST_LIVE_MONITOR"))), 0600); err != nil {
 			return err
 		}
-		if err := awaitLive(ctx, func() bool { return currentDraw() && coordinator.Latest().Input.Snapshot.Physical("grid.c1.r1").Down }); err != nil {
-			return err
+		if err := awaitLive(ctx, func() bool {
+			view := coordinator.Latest()
+			return view.Generations.Config > generation && currentDraw() && view.Input.Snapshot.Physical("grid.c1.r1").Down && gtkCondition(func() bool {
+				widget, err := liveOverlayWidget()
+				return err == nil && gtk.WindowGetToplevels().NItems() == 2 && widget.Visible() && widget.Mapped()
+			})
+		}); err != nil {
+			return fmt.Errorf("recreated GTK window latest draw: %w", err)
 		}
 		if _, err := capture("recreated-latest"); err != nil {
 			return err
