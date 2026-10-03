@@ -655,7 +655,8 @@ func exerciseLiveOverlay(ctx context.Context, mode, path, dir, profilePath, prof
 				return err
 			}
 			if err := awaitLive(ctx, func() bool { return coordinator.Latest().Generations.Config > generation && currentDraw() }); err != nil {
-				return err
+				view := coordinator.Latest()
+				return fmt.Errorf("%dHz config draw: generation=%d want>%d refresh_hz=%d drawn_latest=%t: %w", hz, view.Generations.Config, generation, view.Config.Config.Input.RefreshHz, drawn.Load() == view.Render, err)
 			}
 			time.Sleep(60 * time.Millisecond)
 			if err := liveGTK(ctx, func() error { *requestTimes = nil; return nil }); err != nil {
@@ -667,10 +668,16 @@ func exerciseLiveOverlay(ctx context.Context, mode, path, dir, profilePath, prof
 				if err := raw.write(4, byte((i+1)%2), counter); err != nil {
 					return err
 				}
+				// The pipe must preserve hidraw's report boundaries without waiting
+				// for the coordinator or GTK to consume the resulting state.
+				if err := awaitLive(ctx, func() bool { return raw.Latest().Snapshot.EventCount >= events+uint64(i)+1 }); err != nil {
+					return fmt.Errorf("%dHz backlog report %d: %w", hz, i+1, err)
+				}
 				time.Sleep(time.Millisecond)
 			}
 			if err := awaitLive(ctx, func() bool { return coordinator.Latest().Input.Snapshot.EventCount >= events+80 && currentDraw() }); err != nil {
-				return err
+				view := coordinator.Latest()
+				return fmt.Errorf("%dHz backlog draw: events=%d want>=%d reader_events=%d drawn_latest=%t: %w", hz, view.Input.Snapshot.EventCount, events+80, raw.Latest().Snapshot.EventCount, drawn.Load() == view.Render, err)
 			}
 			time.Sleep(40 * time.Millisecond)
 			if err := liveGTK(ctx, func() error {
