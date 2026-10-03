@@ -6,12 +6,13 @@
 blocker remain open.** This records the Linux AppImage release observed on
 2026-10-03 and a proposed future source policy. It does not admit a local-store
 adapter. The evidence identifies profile-shaped JSON files and separately
-persisted selection metadata, but does not establish the official main
-process's file adapter, update ordering, or a coherent view across those stores.
+persisted selection metadata. An owner-approved isolated runtime observation
+establishes GlobalStore's adapter and publication/backup ordering, but not the
+profile adapter, profile update ordering, or a coherent view across stores.
 Those gaps prevent a safe, supported LocalSource procedure from being specified.
 
 This decision covers R-003, R-004, and R-014. LocalSource, configuration changes,
-watching, controller changes, hardware reads, and Software setting changes are
+watching, controller changes, hardware reads, and real Software setting changes are
 outside this research. No version-wide Software 2.x support follows from the
 observed release. Current Azerlay behavior is described separately below.
 
@@ -20,8 +21,11 @@ observed release. Current Azerlay behavior is described separately below.
 The installed AppImage was inspected with `stat -c '%s'` (176718832 bytes), then
 its runtime `--appimage-extract` operation in a task-owned temporary directory
 (exit 0). Python standard-library `struct`, `json`, and file reads inspected the
-ASAR header and extracted packaged static files. No application entry point,
-bytecode loader, or hardware API was executed. No dependencies were installed.
+ASAR header and extracted packaged static files. The initial static phase
+executed no application entry point or bytecode loader. An explicitly approved
+isolated runtime phase later executed the official application with synthetic
+settings, blocked USB access and external networking, as described below.
+No dependencies were installed.
 Only anonymous structure, counts, types, and relationship predicates were
 reported from the real store; its contents were never copied into scratch.
 
@@ -33,12 +37,14 @@ reported from the real store; its contents were never copied into scratch.
 | ASAR `out/renderer/assets/index-cLscnKLH.js` | Readable state getters/setters, IndexedDB wrapper and persistence configuration | Main handlers and device truth are separate; this is a minified bundle, so named functions and nearby expressions identify the evidence. |
 | Bundled `lowdb` 7.0.1 and `steno` 4.0.2 | Exact dependency read/write APIs below | Presence and bytecode imports do not establish the adapter chosen for each official store. |
 | Anonymous real-store structural inspection | JSON profile files coexist with Electron browser stores | No live DB was opened, repaired, copied, or decoded. |
+| Isolated official application and passive filesystem observer | Runtime `app.getVersion()` / `app.getPath("userData")`, GlobalStore read/write adapter, main/backup publication ordering, marker location, and disconnected IPC registration | All writable settings were synthetic. No real profiles, device state or private store entered the sandbox. Profile save/load handlers were unavailable without USB devices. |
 
 [Electron's app API](https://www.electronjs.org/docs/latest/api/app) describes
 `userData` as app-specific configuration under `appData`, and permits an app to
-change it. The packaged main bytecode contains `userData` and `Storage`, but its
-`getPath`/`setPath` call sequence is unresolved. The observed location is evidence
-for this installation, not proof of an unmodified Electron default.
+change it. Isolated `app.getPath("userData")` returned the expected root under
+the synthetic absolute `XDG_CONFIG_HOME`. The full main `getPath`/`setPath`
+sequence remains unreadable, so this is an observed resulting path, not proof
+that every environment or release uses an unmodified Electron default.
 [Azeron's download page](https://azeron.com/pages/downloads) offers a Linux
 Software 2.0.2 distribution; it is distribution context, not a schema contract.
 
@@ -68,21 +74,24 @@ Observation: Linux x86-64, AppImage distribution, 2026-10-03. Package release
 independently carry the `.442` build suffix.
 
 The observed root corresponds to `$HOME/.config/Azeron Software` on this host.
-`$XDG_CONFIG_HOME/Azeron Software` is a future detection candidate when the base
-is absolute, but was not independently observed or proven from main code.
+The isolated official app returned `$XDG_CONFIG_HOME/Azeron Software` when
+`XDG_CONFIG_HOME` was an absolute synthetic directory, and `app.getVersion()`
+returned `2.0.2`. Other environment/base-path combinations remain unobserved.
 
 | Root-relative location | Anonymous observation | Authority conclusion |
 | --- | --- | --- |
-| `Storage/GlobalStore.json`, `Storage/GlobalStore.bak.json` | Each 151 bytes, JSON object with `settings` object | Not a profile catalog in this observation. Backup/recovery constants exist in main bytecode; authoritative read/write and restoration order remain unresolved. Azerlay must never restore it. |
+| `Storage/GlobalStore.json`, `Storage/GlobalStore.bak.json` | Each 151 bytes in the real-store observation, JSON object with `settings` object | Isolated official runtime reads the final main file through `LowSync` / `JSONFileSync` / `TextFileSync` and refreshes the backup. A real renderer setting update publishes the main file before the backup. Corrupt-store restoration was not exercised; Azerlay must never restore it. |
 | `Storage/DevicesStorage/<device>/ProfileStorage/profile_<profile>.json` | One device directory; seven JSON objects. All have string `id`, boolean `isSoftware`/`isFavorite`, integer `version`, and 43-element `inputs` arrays; every `isSoftware` is true. Every filename equals `profile_` plus its contained ID plus `.json`. Profile root key sets are not identical. | Strong candidate for persisted Software profile bodies, consistent with main constants `DevicesStorage`, `ProfileStorage`, `profile_` and `.json` and renderer IPC saves. Official path construction, reader and writer handlers still need confirmation. |
 | `Local Storage/leveldb` | Directory exists | Presence does not establish profile authority. The persistence middleware's default is localStorage, but the relevant state overrides that default. |
 | `IndexedDB/file__0.indexeddb.leveldb` | Directory exists | Renderer explicitly persists per-device Software selection/favorite metadata in IndexedDB. Association of this physical directory with that database was not decoded. |
+| `StorageMigratedV2` | Isolated startup creates this file directly under `userData`, alongside `Storage` | A migration marker, not a demonstrated exact-release/schema admission token. Marker contents and lifetime do not establish which release last wrote a profile. |
 
 The profile `version` values share a type and value in the observed files, but
 that scalar is not a Software release identifier. No published local schema
 revision or reliable marker binding this root to this exact build was
-established. `StorageMigratedV2` exists as a bytecode constant; its persisted
-location, meaning and role in admission remain unresolved.
+established. Runtime establishes the location and startup creation of
+`StorageMigratedV2`, but not its full migration semantics or version-admission
+role. Azerlay must neither create it nor use its existence as sole admission.
 
 ### Admission limits
 
@@ -155,11 +164,66 @@ file, awaits it, then awaits rename (with bounded rename retries).
 The steno `#locked` flag is in-process serialization, not an OS file lock. These
 adapter bodies contain no `fsync`, directory flush, or cross-file transaction.
 They establish per-file publication behavior **if selected by a caller**, not
-crash durability, main's selected adapter, backup ordering, or bundle-wide
-atomicity. Main also contains `writeFileSync`, `writeFile`, `renameSync`,
-`lowdb`, and `lowdb/node` constants. Those constants cannot prove which API
-writes a profile, backup, or settings file. A safe official-writer claim remains
-blocked on the main handlers and their call order.
+crash durability or bundle-wide atomicity. Isolated runtime below establishes
+that GlobalStore selects the synchronous adapter and its backup ordering.
+The corresponding profile adapter/handler remains unverified. Main's
+`writeFileSync`, `writeFile`, `renameSync`, `lowdb` and `lowdb/node` constants
+alone cannot establish the profile writer.
+
+### Isolated official runtime observation
+
+The owner explicitly approved this additional observation on 2026-10-03.
+Invocation was `sh <task-owned-scratch>/launch.sh`: `timeout 55s bwrap
+--unshare-all` with read-only system libraries and extracted app, writable
+synthetic HOME and temporary output, minimal `/dev`, private `/proc` and `/tmp`,
+and only the owner's Wayland display socket. The environment was cleared and
+HOME / XDG_CONFIG_HOME set to synthetic paths. No host HOME, store, DBus socket,
+USB bus, hidraw, input device or external network was mounted/exposed.
+
+A Python preflight ran before each launch. Its captured predicates were
+`home=/home/synthetic`, `real_store_reachable=false`, no `hidraw`/`input`/`bus`
+entries under `/dev`, runtime sockets exactly `["wayland-1"]`, and external TCP
+connect errno 101 (`ENETUNREACH`). The app then ran with `--no-sandbox
+--disable-gpu --ozone-platform=wayland --inspect-brk=127.0.0.1:9229`; inspector
+and its controller shared only the isolated loopback namespace.
+
+Before main execution resumed, inspector installed passive filesystem
+observers that recorded call/completion paths and stacks for synthetic paths.
+Each wrapper delegated the original operation, arguments and return value; no
+storage implementation, adapter, handler, device state or app package was
+replaced. Read/write stacks and ordered operations were recorded in temporary
+`operations.jsonl`; runtime paths/registration and preflight were captured
+separately for the coordinator's independent review. Public evidence is retained
+here after temporary cleanup.
+
+Observed startup reads `GlobalStore.json` through `LowSync.read`,
+`JSONFileSync.read`, and `TextFileSync.read`. On an existing valid synthetic
+store it calls `copyFileSync(main, backup.tmp)`, then
+`renameSync(backup.tmp, backup)`. Through an actual BrowserWindow renderer,
+`window.ipcRender.invoke("set-global-zoom", 1)` completed successfully and
+produced this exact call/completion order:
+
+1. `TextFileSync.write` / `JSONFileSync.write` / `LowSync.write` call
+   `writeFileSync(Storage/.GlobalStore.json.tmp, ...)`, then complete it.
+2. `renameSync(Storage/.GlobalStore.json.tmp, Storage/GlobalStore.json)`
+   completes main publication.
+3. Main helper `Di`, called after `Si` writes, performs
+   `copyFileSync(Storage/GlobalStore.json, Storage/GlobalStore.bak.json.tmp)`.
+4. `renameSync(Storage/GlobalStore.bak.json.tmp, Storage/GlobalStore.bak.json)`
+   completes backup publication.
+
+The completed controller invocation exited 0. This proves the observed
+GlobalStore setting path, not profile publication. With USB absent, 45 actual
+IPC invoke handlers were registered, including `sw-profile-activate` and
+`fav-profile-update`; `sw-profile-save`, `sw-profiles-save` and
+`sw-profile-request` were absent. Read-only reflection of the activation
+handler's closures established `Storage`, `DevicesStorage` and `ProfileStorage`
+path bindings, but did not identify an independently callable profile storage
+class/API. A final bounded inspection found 54 early function locations; cached
+dummy source and obfuscated names did not identify their profile semantics.
+No function was invoked by guessing its offset or signature, and no device was
+fabricated. Profile save/load authority and ordering therefore remain blocked
+on a reachable actual API or readable main implementation.
 
 A candidate per-file procedure was evaluated: open only a final JSON file with
 `O_RDONLY`, record `fstat`, read through EOF into owned memory, compare the
@@ -177,6 +241,14 @@ listings, debounce, copying files, repeated mtime/size checks nor a read-only
 open establishes a transaction across those stores. No such transaction or
 published coherent snapshot API was found. Do not ship this candidate as a
 LocalSource implementation.
+
+A single explicitly selected profile need not inherently share a generation
+with every independent profile file. Such a restricted future contract could
+avoid unrelated cross-file state, but still needs proven profile authority,
+writer behavior and release/schema admission. It would not supply the
+unavailable active/favorite state or silently satisfy the complete candidate
+procedure required by this approved plan. Read-only access prevents source
+writes; it does not establish the candidate's authority or consistency.
 
 Do not open the live LevelDB/IndexedDB through a database library, take its
 lock, repair it, copy a running database as an alleged snapshot, or start an
@@ -281,10 +353,11 @@ permanent script, private dump, or routine digest is part of the change.
 
 Remaining requirements before #12 can close and #22 can implement LocalSource:
 
-1. Exact-release main storage code or a compatible, independently readable
-   offline disassembly must identify `userData` resolution, profile read/write
-   handlers, selected adapters, backup/migration behavior and update order.
-   Readable dependency APIs alone do not satisfy this requirement.
+1. Exact-release main code, readable offline disassembly or an actual reachable
+   profile API must establish profile read/write authority, selected adapter,
+   migration behavior and update order. Runtime established the observed
+   `userData` root and GlobalStore path, adapter and backup order; those findings
+   do not establish the profile writer.
 2. Establish local-store release/schema admission, including roots left behind
    by upgrades; installed binary metadata alone is insufficient.
 3. Establish a coherent external read-only view of all required profiles and
@@ -297,7 +370,10 @@ Remaining requirements before #12 can close and #22 can implement LocalSource:
    without replacing last-good. The current mixed-file result fails this
    criterion, so IS-1/IS-3 and overall plan completion are not claimed.
 
-The AppImage extract and temporary experiment/tool sources were removed after
-the coordinator's independent review and rerun of the synthetic experiment.
-The source store and official application were never changed, started, stopped
-or repaired.
+The initial static extract/experiment/tool sources were removed after
+independent review and rerun of the synthetic experiment. After the coordinator
+independently reviewed the runtime evidence, all owned runtime processes were
+confirmed absent and the additional extract, controller, synthetic settings
+and temporary runtime evidence were removed. The real source store and original
+Software session were never changed, started, stopped or repaired; only the
+explicitly approved isolated application used synthetic settings.
