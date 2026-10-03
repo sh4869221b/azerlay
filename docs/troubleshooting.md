@@ -29,8 +29,8 @@ azerlay import --software-release 2.0.2 --profile-index N <export-file> --json
 azerlay profiles show --json
 ```
 
-Replace `N` with the intended one-based export ordinal. Use `source = "imported"`
-and restart to use the saved import with explicit local configuration. `auto`
+Replace `N` with the intended one-based export ordinal. Set `source = "imported"`,
+remove both `local_device` and `local_profile_file`, and restart to use the saved import. `auto`
 can fall back initially to a saved import, or a newest loadable single-profile
 import when saved selection is unavailable. An active local last-good remains sticky
 after update failure. Azerlay never follows official UI active/favorite state,
