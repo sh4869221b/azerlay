@@ -200,11 +200,3 @@ func (s *AzeronLocalSource) Discover(ctx context.Context) ([]SourceDescriptor, e
 	}
 	return descriptors, nil
 }
-
-// Watch implementation follows in the local watch task; never claim watch support.
-func (s *AzeronLocalSource) Watch(ctx context.Context, ref SourceRef) (<-chan SourceChange, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	return nil, &Error{Code: ERR_PROFILE_LOCAL_WATCH}
-}

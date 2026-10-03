@@ -32,7 +32,11 @@ type SourceDescriptor struct {
 	ImportedAt   time.Time
 	ProfileCount int
 }
-type SourceChange struct{ Ref SourceRef }
+type SourceChange struct {
+	Ref       SourceRef
+	Candidate *LocalCandidate
+	Failure   *Error
+}
 type ProfileSource interface {
 	ID() SourceID
 	Discover(context.Context) ([]SourceDescriptor, error)
