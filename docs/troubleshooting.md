@@ -139,13 +139,35 @@ whether the specific supported-device uaccess packaging is installed and
 applicable. Reconnect the device after the applicable session or packaging
 conditions have been corrected, then enumerate again.
 
-The earlier event-node rule is historical. Hidraw uaccess packaging is
-**not shipped or installed by this discovery implementation**. Packaging and target-distribution rule
-ordering, active-session grants, and revocation validation belong to
-[#37](https://github.com/sh4869221b/azerlay/issues/37). See the
-[permission decision](decisions/device-identity.md#permission-contract) for
-what has and has not been validated. Do not broaden device grants or alter node
-modes or group membership to work around this missing packaging.
+The earlier event-node rule is historical. Native packaging supplies
+`71-azerlay.rules`, installed under `/usr/lib/udev/rules.d/` by the Arch package
+or explicitly under `/etc/udev/rules.d/` for the manual archive. See
+[installation](../README.md#native-installation) and the
+[permission decision](decisions/device-identity.md#permission-contract).
+Do not broaden device grants or alter node modes or group membership to work
+around a session or rule problem.
+
+After installation, reload rules and reconnect/re-enumerate the device. To
+reapply only to an existing qualified interface04 node, replace the example
+path with the current supported node reported by discovery:
+
+```sh
+node=/dev/hidrawN
+azerlay devices inspect "$node"
+syspath=$(udevadm info --query=path --name="$node")
+sudo udevadm control --reload-rules
+sudo udevadm trigger --action=change "/sys$syspath"
+sudo udevadm settle
+```
+
+Inspect includes private device metadata; review it before sharing. Do not
+trigger all devices. Check the active local session with
+`loginctl show-session "$XDG_SESSION_ID" -p Active -p Seat` and inspect this
+node's ACL with `getfacl "$node"`. An inactive or remote session is not an
+active local-seat access qualification. A broad VID-only or `MODE="0666"` rule
+can mask failure of this narrower rule; review existing administrator rules
+without automatically deleting unrelated rules. Revocation denies fresh opens,
+not descriptors already open before the ACL changed.
 
 A successful read-only open proves access for the invoking process only. It
 does not prove that the specific uaccess rule is installed, that access is
@@ -153,10 +175,36 @@ least-privilege, or that seat ACL grant/revocation works. Discovery does not
 install rules or repair access. Input remains unconnected to the runtime overlay; doctor implements passive
 device/access checks. Successful discovery does not establish overlay readiness.
 
-Raw-only packaging for #37 must grant only hidraw USB `16d0:12f7:0111`
-interface04. Event-node permissions are not required. No permission rules are
-installed or changed here, and uaccess does not enforce read-only operations.
+The packaged rule grants only hidraw USB `16d0:12f7:0111`, interface04, before
+the platform's `73-seat-late.rules`. It imports `usb_id` when `ID_BUS` is absent
+and matches USB-device attributes together with `ID_USB_INTERFACE_NUM`.
+Event-node permissions are not required. Discovery
+and doctor do not install or change rules, and uaccess does not enforce
+read-only operations.
 The historical host's broad `0666` grants do not validate this packaging scope.
+
+## Configuration and session startup failures
+
+`ERR_CONFIG_NOT_FOUND` means the explicit or default configuration is missing.
+Follow the [default configuration setup](../README.md#configuration-and-optional-autostart)
+to create `schema_version = 1` without replacing an existing configuration.
+For `ERR_CONFIG_INVALID`, correct the existing file using the
+[configuration contract](config.md); reinstalling the package does not repair it.
+
+`ERR_RUNTIME_WAYLAND` means the display environment is missing or the display
+cannot be reached. Start from the current user's active Wayland session, check
+`XDG_RUNTIME_DIR`, and import that session's `WAYLAND_DISPLAY` into the user
+manager. Import `XDG_CURRENT_DESKTOP` only when it is set. Do not invent a display
+name or use X11 as a fallback. `ERR_LAYER_SHELL_UNAVAILABLE` requires a supported
+Layer Shell compositor; Hyprland is the v1 target.
+
+The optional user service retries failures every two seconds. Stop it with
+`systemctl --user stop azerlay.service` while correcting configuration or
+environment, then start it explicitly again and inspect `azerlay status --json`.
+Check `systemctl --user status azerlay.service` for a missing library or incorrect
+`ExecStart` path; manual units require the actual absolute binary path.
+If the compositor does not manage `graphical-session.target`, use the documented
+Hyprland `exec-once` alternative instead of forcing the target active.
 
 ### Production lifecycle observation, 2026-09-27
 
@@ -168,4 +216,23 @@ The owner performed each operation. The official software stayed running;
 notifications resumed after reconnect without restarting it. The run took
 120.881 seconds including owner interaction; this is not a reconnect-latency
 measurement or a continuous-current-state guarantee. Analog, other firmware,
-right-hand hardware and least-privilege uaccess packaging remain unqualified.
+right-hand hardware remain unqualified. The later permission observation below
+qualifies the packaging rule separately from this input lifecycle test.
+
+### Packaging access observation, 2026-10-03
+
+In a disposable Arch guest with the supported USB device passed through,
+`16d0:12f7:0111` interface04 had no ordinary-user access before the rule.
+After applying `71-azerlay.rules`, the active local seat user gained a uaccess
+ACL and a fresh read-only open succeeded. Switching to a second local session
+removed the first user's ACL and denied a fresh open on the same still-present
+device node; reactivating the first session restored both ACL and access.
+The checks used zero-byte reads and did not consume input reports.
+
+Actual udev traces showed no candidate grant for interfaces01/02/03, unrelated
+hidraw, event nodes, or the whole USB device. A joystick event node already had
+an active-user grant from Arch's standard `70-uaccess.rules`; that existing
+platform grant is separate from Azerlay's hidraw-only rule. Other physical
+products/releases/revisions remain untested. This isolated result does not rely
+on the historical host's broad VID-only `0666` permissions and does not qualify
+notifications, input runtime wiring, or authoritative current button state.

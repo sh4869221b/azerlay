@@ -18,8 +18,10 @@ reports and OS-held identity/report-descriptor getters are permitted. No HID
 writes, Feature/Output requests, GET_INPUT requests, onboard profile access or
 evdev fallback are allowed, including in diagnostics.
 
-Issue #37 must restrict any future uaccess packaging to hidraw, USB
-`16d0:12f7:0111`, interface04. No rules are installed by this implementation.
+Native packaging supplies `71-azerlay.rules`, restricted to hidraw, USB
+`16d0:12f7:0111`, interface04. The Arch package installs it; manual installation
+requires an explicit administrator action. Application commands do not install
+rules or repair permissions.
 A uaccess ACL does not itself enforce read-only opens; that is the application's
 contract. Existing broad host grants do not prove least-privilege packaging.
 

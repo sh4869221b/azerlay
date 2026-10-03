@@ -42,11 +42,14 @@ is closed before any report reader starts.
 
 ### Permission contract
 
-Issue #37's current packaging requirement is narrowly targeted hidraw uaccess
-for `16d0:12f7:0111`, interface04. Event-node permissions, whole-USB access,
-permanent input-group membership and root are not requirements. Rule creation,
-installation, distribution-specific interface property imports, active-seat
-access and revocation remain packaging work. No new rule is supplied here.
+Native packaging supplies `packaging/udev/71-azerlay.rules` for narrowly targeted
+hidraw uaccess on `16d0:12f7:0111`, interface04. It imports `usb_id` if `ID_BUS`
+is absent and uses `ID_USB_INTERFACE_NUM`, without combining USB-device and
+USB-interface attributes in one parent match. It precedes `73-seat-late.rules`.
+Event-node permissions, whole-USB access, permanent input-group membership and
+root are not requirements. Installation and session checks are documented in
+[README](../../README.md#native-installation) and
+[troubleshooting](../troubleshooting.md#permission-checks-and-packaging-status).
 Uaccess grants do not themselves enforce read-only access; application behavior
 does. Existing host VID-wide `0666` rules do not qualify this narrower contract.
 

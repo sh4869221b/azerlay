@@ -58,6 +58,173 @@ The [placement decision](docs/decisions/compositor-placement.md) records
 the measured Hyprland scope and a successful same-name headless return on the
 tested host. The cause of an earlier compositor crash remains unresolved.
 
+## Native installation
+
+Local packaging targets Arch/CachyOS x86-64 and Hyprland. It packages the current
+behavior described above; it does not connect input or profiles to the renderer.
+GTK4, gtk4-layer-shell and their native shared-library dependencies must be
+installed on the destination. The binary archive does not bundle them.
+There is no published release assumed by these commands. The local smoke
+version `0.0.0` and package recipe make no redistribution license grant;
+the license and desktop application owner remain unresolved.
+
+From a source checkout with the [development dependencies](#development):
+
+```sh
+archive_dir=$(mktemp -d)
+scripts/package.sh 0.0.0 "$archive_dir"
+```
+
+This produces `azerlay-0.0.0-source.tar.gz` and
+`azerlay-0.0.0-linux-x86_64.tar.gz`, each rooted at `azerlay-0.0.0/`.
+The source archive includes current working files and embedded assets, without
+Git metadata, `.omo`, or the output directory. Existing final archives are
+refused. Other versions must be explicit numeric dotted versions, optionally
+with a prerelease suffix.
+
+### Arch package
+
+Install the local build tools, then build as an ordinary user:
+
+```sh
+sudo pacman -S --needed base-devel go pkgconf gtk4 gtk4-layer-shell gobject-introspection pacman-contrib
+build_dir=$(mktemp -d)
+cp packaging/arch/PKGBUILD "$archive_dir/azerlay-0.0.0-source.tar.gz" "$build_dir/"
+(cd "$build_dir" && updpkgsums && makepkg --verifysource && makepkg --cleanbuild)
+sudo pacman -U "$build_dir/azerlay-0.0.0-1-x86_64.pkg.tar.zst"
+azerlay version
+```
+
+`updpkgsums` replaces the clearly named checksum placeholder in the temporary
+recipe with the normal makepkg source checksum. Keep the source archive beside
+that recipe. Maintainers changing the version must update `pkgver` and the local
+source before generating checksums. No remote release URL or `SKIP` is used.
+
+The package installs `/usr/bin/azerlay`,
+`/usr/lib/systemd/user/azerlay.service`, `/usr/lib/udev/rules.d/71-azerlay.rules`,
+and documentation under `/usr/share/doc/azerlay/`. The unresolved desktop
+template stays under `/usr/share/azerlay/integration/`, outside applications.
+Installation neither enables nor starts the service.
+
+### Manual binary archive
+
+On a destination with the native runtime libraries installed:
+
+```sh
+sudo pacman -S --needed gtk4 gtk4-layer-shell libgirepository
+tar -xzf "$archive_dir/azerlay-0.0.0-linux-x86_64.tar.gz" -C "$archive_dir"
+install -Dm755 "$archive_dir/azerlay-0.0.0/bin/azerlay" "$HOME/.local/bin/azerlay"
+"$HOME/.local/bin/azerlay" version
+```
+
+Add `$HOME/.local/bin` to the shell's PATH if needed. The archive's `integration/`
+directory contains the permission rule, user-unit template and desktop template.
+An administrator can install the permission rule explicitly:
+
+```sh
+sudo install -Dm644 "$archive_dir/azerlay-0.0.0/integration/71-azerlay.rules" /etc/udev/rules.d/71-azerlay.rules
+sudo udevadm control --reload-rules
+```
+
+Reloading does not by itself reapply permissions to an existing node. Reconnect
+the device and enumerate again, or follow the
+[targeted permission checks](docs/troubleshooting.md#permission-checks-and-packaging-status).
+Do not install `io.github.@OWNER@.azerlay.desktop.in` as a launcher; application
+identity has not been finalized.
+
+### Configuration and optional autostart
+
+Create the default configuration explicitly, preserving an existing file:
+
+```sh
+case "${XDG_CONFIG_HOME:-}" in
+  /*) config_home=$XDG_CONFIG_HOME ;;
+  *) config_home=$HOME/.config ;;
+esac
+mkdir -p "$config_home/azerlay"
+if [ ! -e "$config_home/azerlay/config.toml" ]; then
+  (set -C; printf 'schema_version = 1\n' > "$config_home/azerlay/config.toml")
+fi
+```
+
+A missing saved profile is allowed. Device input and profile rendering remain
+unavailable in `run`; readable hardware does not initialize notifications.
+The raw input library requires the official Azeron Software in SOFTWARE mode
+and publishes last-observed state, with the loss limits described above.
+
+For the manual archive, substitute the absolute binary directory into the unit:
+
+```sh
+mkdir -p "$config_home/systemd/user"
+sed "s|@BINDIR@|$HOME/.local/bin|g" "$archive_dir/azerlay-0.0.0/integration/azerlay.service.in" > "$config_home/systemd/user/azerlay.service"
+```
+
+The installed unit's `ExecStart` must contain the actual absolute binary path,
+not a literal `~` or `$HOME`. The Arch package already uses `/usr/bin`.
+In the active Wayland terminal, confirm the session and target first:
+
+```sh
+printf 'WAYLAND_DISPLAY=%s\nXDG_RUNTIME_DIR=%s\n' "$WAYLAND_DISPLAY" "$XDG_RUNTIME_DIR"
+loginctl show-session "$XDG_SESSION_ID" -p Active -p Seat
+systemctl --user is-active graphical-session.target
+```
+
+A one-off service start requires a reachable display and a runtime directory
+owned by the current user. An inactive `graphical-session.target` does not
+prevent this manual start: `After` and `PartOf` do not require that target.
+Import the variables actually set in the session, then start and inspect the
+application:
+
+```sh
+systemctl --user import-environment WAYLAND_DISPLAY
+if [ -n "${XDG_CURRENT_DESKTOP:-}" ]; then
+  systemctl --user import-environment XDG_CURRENT_DESKTOP
+fi
+systemctl --user daemon-reload
+systemctl --user start azerlay.service
+azerlay status --json
+azerlay quit
+```
+
+After normal quit the service becomes inactive and the control socket is
+removed. To opt into future session startup, explicitly run
+`systemctl --user enable azerlay.service` only when the compositor manages an
+active `graphical-session.target`. The unit follows that graphical session
+lifecycle; enabling it does not start the target.
+
+If plain Hyprland does not manage this target, use its foreground autostart
+alternative in your own Hyprland configuration, with an actual absolute path:
+
+```ini
+exec-once = /usr/bin/azerlay run --foreground
+```
+
+For a manual installation, replace `/usr/bin/azerlay` with the expanded absolute
+`$HOME/.local/bin/azerlay` path. Do not combine both autostart routes or force
+`graphical-session.target` active just for Azerlay.
+
+### Removal
+
+Remove any Hyprland `exec-once` entry you added. For the service route:
+
+```sh
+systemctl --user disable --now azerlay.service
+```
+
+Remove an Arch installation with `sudo pacman -R azerlay`. For a manual
+installation, remove only the files you installed:
+
+```sh
+rm -- "$HOME/.local/bin/azerlay" "$config_home/systemd/user/azerlay.service"
+sudo rm -- /etc/udev/rules.d/71-azerlay.rules
+```
+
+If you did not install a manual unit or rule, omit its removal command.
+Then run `systemctl --user daemon-reload` and
+`sudo udevadm control --reload-rules`; reconnect/re-enumerate or reapply to the
+identified node as above. User configuration and saved imports are retained.
+Removing an ACL does not invalidate descriptors that were already open.
+
 ## Development
 
 Go 1.27.x, CGo, a C compiler, `pkgconf`, GTK4, gtk4-layer-shell, and
