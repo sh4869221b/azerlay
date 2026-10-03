@@ -70,18 +70,61 @@ deferred beyond v1.
 | Key | Default | Meaning and accepted values |
 | --- | --- | --- |
 | `profile.source` | `"auto"` | Profile source setting; `"auto"`, `"imported"`, or `"local"`. |
-| `profile.selected_id` | `""` | Selected profile identifier; an opaque string. |
+| `profile.selected_id` | `""` | Exact imported profile ID; an opaque string. |
+| `profile.local_store_path` | `""` | Azeron Software userData root; empty enables root detection. |
+| `profile.local_device` | `""` | Selected device directory component. |
+| `profile.local_profile_file` | `""` | Selected final filename, `profile_<id>.json`. |
 | `profile.game` | `"bodycam"` | Game identifier; an opaque string. |
-| `profile.watch` | `true` | Future profile-source watch setting; boolean. |
+| `profile.watch` | `true` | Watch the selected local file; boolean. |
 
-The loader does not resolve `selected_id` through the saved import catalog or
-change the saved selection. On controller initialization, `source = "auto"` or
-`"imported"` uses saved imports. A nonempty `selected_id` must match exactly one
-normalized profile ID across those sources. When `selected_id` is empty, the
-controller uses the saved source and one-based profile ordinal. Missing,
-ambiguous, or corrupt data
-leaves no active profile and is reported as degraded status. `source = "local"`
-is unavailable and never falls back to imported profiles.
+The device and filename must both be empty or both supplied. Each is a single
+path component: absolute paths, separators, NUL, `.` and `..` are rejected.
+`selected_id` conflicts with a local pair or `source = "local"`; a local pair
+conflicts with `source = "imported"`. A root alone never selects a profile.
+
+```toml
+schema_version = 1
+[profile]
+source = "local"
+local_store_path = "/home/example/.config/Azeron Software"
+local_device = "example-device"
+local_profile_file = "profile_example-id.json"
+```
+
+The root is userData, not `Storage` or a database directory. Relative explicit
+roots resolve once from the startup working directory, without environment or
+`~` expansion and without directory creation. An explicit root never searches
+elsewhere. An empty root checks absolute `$XDG_CONFIG_HOME/Azeron Software` and
+`$HOME/.config/Azeron Software`. Aliases of the same directory count once;
+two distinct roots containing the selected path are ambiguous.
+
+At startup, a nonempty `selected_id` must match exactly one imported profile ID;
+failure is sticky. Explicit `imported` uses the saved source and ordinal when
+the ID is empty. Explicit `local` loads only the exact ref or its matching durable
+last-good definition, with no implicit import fallback. `auto` tries the exact
+local ref, matching local last-good, saved imported selection, then the newest
+loadable single-profile import if saved selection is unavailable. Multi-profile
+imports without a saved ordinal are skipped. A corrupt import index remains a
+storage error. Local failure stays visible when initial auto fallback succeeds.
+
+Only the observed Software 2.0.2 saved-JSON subset is admitted; see
+[local admission](profile-format.md#local-saved-definitions). Two complete,
+admitted reads 200 ms apart must match. Relevant parent-directory events debounce
+for 200 ms; loading retries at most three times with 200 ms between attempts.
+Exhaustion retains last-good and waits for another event. Watch failure stops
+watching and remains visible independently of load failure. `watch = false`
+still performs one stable startup load.
+
+Before adopting a definition, Azerlay atomically saves its validated original
+bytes and source policy/ref in `$XDG_STATE_HOME/azerlay/last-good.json`, or
+`$HOME/.local/state/azerlay/last-good.json` when the XDG base is not absolute.
+The application directory is `0700` and file `0600`; unsafe existing state or
+overlap with userData is rejected. Publication failure preserves prior active
+and saved state. Restart revalidates saved bytes and restores only a matching
+policy, root and ref, including when the current file is absent. Restoration is
+degraded. The selected definition does not establish the official UI's active
+profile or completion of an official writer transaction. Source files and
+browser databases are never modified.
 
 `profiles select` changes only the active session selection. Neither explicit
 nor watcher-driven configuration reload changes that selection or its initial

@@ -7,7 +7,7 @@ profile JSON** in the observed Azeron Software 2.0.2 subset. Azerlay owns the
 selection: a device-directory and profile-file reference chosen explicitly or
 persisted by Azerlay. Discover lists admitted definitions, Load reads the
 selected definition, and Watch reloads that same definition. This contract is
-for Issue #22; LocalSource is not implemented by this document.
+for Issue #22; the implementation now follows the boundary below.
 
 This resolves R-003, R-004 and R-014 within UC-003/UC-006 and FR-031–037's
 local-reading requirement. The amended research plan does not require complete
@@ -85,9 +85,9 @@ adoption. Device-directory metadata does not admit a keypad model, hand,
 firmware or hardware mode.
 
 Use a distinct adapter source scope, `azeron-software-local-json`, with Software
-release `2.0.2`. The current normalizer admits only
-`azeron-software-export`; it must not silently receive local files labeled as
-exports. Issue #22 can introduce the local admission boundary and reuse only
+release `2.0.2`. Export `Normalize` still admits only
+`azeron-software-export`; `NormalizeLocal` provides the separate complete local
+admission boundary and reuses only
 the existing [closed binding semantics](binding-conversion.md), preserving
 Unknown for everything outside those evidenced rules. No new physical-device
 matching or inferred binding conversion follows from a local file.
@@ -212,13 +212,14 @@ Fixtures were regular files; no general filesystem-security coverage is claimed.
 | S6: unrelated profile changes | Stable selected definition accepted; another profile's update does not invalidate it or change selection. |
 | S7: valid intermediate definition quiet for 20 ms | Accepted as a stable saved definition. Explicitly confirms the transaction-completion limitation rather than official atomicity. |
 
-These cases validate the selected-file reader boundary and LKG model. Production
-integration, complete normalization, parent watching and actual official profile
-writer behavior were not exercised and remain Issue #22 verification work.
+These original research cases validated the selected-file reader boundary and
+LKG model. They did not exercise production integration, complete normalization
+or parent watching; the implementation now covers those with synthetic tests.
+Actual official writer transaction boundaries remain unclaimed.
 
 ## Explicit path contract
 
-Future `local_store_path` denotes the **userData root**, not `Storage`, a
+`local_store_path` denotes the **userData root**, not `Storage`, a
 profile, backup or DB directory. Required relative layout is
 `Storage/DevicesStorage/<device>/ProfileStorage/profile_<id>.json`; only the
 selected file and its containing directories are required. GlobalStore,
@@ -241,9 +242,10 @@ diagnostics state the failed release/schema condition without private contents.
 
 ## Failure and fallback contract
 
-Future source priority is explicit selected source > detected loadable local >
-last selected imported source > newest valid imported source, following
-[design section 10.4](../design-research.md). Explicit selection is sticky;
+Source priority is explicit selected imported ID > exact loadable local >
+matching durable local last-good > last selected imported source > newest
+loadable single-profile imported source when saved selection is unavailable,
+following [design section 10.4](../design-research.md). Explicit selection is sticky;
 subsequent failures do not silently choose another root, profile or source.
 
 | Mode | Failure | Initial load without local last-good | Failure after successful local load |
@@ -260,13 +262,15 @@ not hidden by selecting a different source. Official UI active/favorite/mode
 metadata being unavailable does not invalidate an otherwise admitted
 Azerlay-selected definition: report those states as unknown/unsupported.
 
-**Current behavior:** `internal/control/selection.go` returns
-`ERR_PROFILE_SOURCE_UNAVAILABLE` for `source="local"` without fallback.
-`auto`/`imported` use exact configured `selected_id` or the saved import
-selection; missing/corrupt selection does not search for a new source.
-`local_store_path`, local watching and the priority/failure behavior above are
-future Issue #22 work. Configuration reload does not change initial source
-policy. See [current profile configuration](../config.md#profile).
+**Current behavior:** local admission, exact configuration selection, stable
+two-read loading, parent watching, bounded retries and durable matching
+last-good are implemented. Explicit local never falls back; initial auto
+fallback retains its local diagnostic. Auto skips multi-profile imports without
+a saved ordinal and does not scan orphan originals on index failure. Successful
+imported session selection stops local watching. Configuration reload preserves
+initial source policy/ref; changed settings apply at the next start. See
+[current profile configuration](../config.md#profile) for state paths,
+permissions, timing and config examples.
 
 Unsupported local data always offers the official Software export UI and
 [current export CLI](../../README.md#profile-export-cli):
@@ -277,17 +281,19 @@ it never manufactures an import from local data or bypasses export admission.
 
 ## Implementation boundary
 
-This decision adds no product code, configuration or dependencies. Issue #22
-implements the local-specific admission/adapter scope, device/file selection,
+Issue #22 implements the local-specific admission/adapter scope, device/file
+selection,
 Discover/Load/Watch, bounded retries, LKG and source priority described here.
 Retain existing raw ownership, closed binding semantics and Unknown handling.
 Do not add official UI auto-follow, live DB access, source writes/repair,
 hardware queries or a cross-store transaction mechanism for this contract.
 
-Local Go tests/build were not run for this docs-only work; existing hosted CI
-may run for the PR. Final delivery requires `git diff --check`, not an inferred
-test result. This decision contains the public evidence; no separate ledger,
-manifest, permanent research script or private dump is part of the change.
+The original research was documentation-only. Production regression tests now
+cover local admission, stable reads, watching, state and controller behavior;
+the run CLI integration exercises update retention, rename repair and restart.
+These synthetic scenarios do not qualify broader releases or actual official
+writer transaction boundaries. No permanent research script or private dump is
+part of the implementation.
 
 Initial static/experimental materials and all approved isolated-runtime
 processes, extracted app, controller, synthetic settings and temporary output

@@ -500,6 +500,32 @@ Decode errors are typed as `DecodeError`. Its `Code` is stable for machine use:
 | `ERR_IMPORT_ROOT` | The JSON root isn't exactly one provisional bundle or single shape. |
 | `ERR_IMPORT_LIMIT_EXCEEDED` | The source, compressed input, dictionary, known output, or produced output exceeds its stage limit. |
 
+## Local saved definitions
+
+`profileadapter.NormalizeLocal(raw, basename)` admits the observed Azeron
+Software **2.0.2 saved-JSON subset**, with source scope
+`azeron-software-local-json`. This is separate from export normalization and
+does not broaden `import` or `validate` admission.
+
+The root must be one profile with a nonempty string `id`, exact basename
+`profile_<id>.json`, integer token `version: 1`, `isSoftware: true`, string
+`name`, and bounded `inputs`. `metaData` must be an object with a nonempty
+`changedLogs` array of objects, each carrying string `softwareVersion: "2.0.2"`.
+Missing, mixed or unknown history rejects the entire candidate. Strict JSON
+validation rejects duplicate keys and existing shape/size limit violations.
+Optional and unknown fields are preserved; binding interpretation retains the
+closed export semantics. There is no required 43-input count or general 2.x
+support claim.
+
+The selected file is read-only, regular, root-contained and at most 16 MiB.
+Descriptor/path identity and metadata must remain stable during reading; two
+complete admitted reads 200 ms apart must have equal bytes. Writer temporary
+files and browser databases are not sources. Valid intermediate JSON can pass
+these checks; equality does not prove an official transaction has completed.
+See [configuration](config.md#profile) for exact selection, watching and durable
+last-good recovery, and the [local-source decision](decisions/local-source.md)
+for the underlying observed evidence.
+
 ## Downstream ownership
 
 This boundary stops at owned JSON and provisional classification.

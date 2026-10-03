@@ -7,6 +7,12 @@ Wayland-native Azeron profile and live input overlay for Linux.
 Bootstrap phase. The CLI can validate and save Azeron Software 2.0.2 profile
 exports. A successful `import` saves the exact export and a one-based selected
 profile ordinal; `profiles show` reads that saved selection in a later process.
+Configuration can also select one saved Software 2.0.2 local JSON definition by
+userData root, device and filename. Azerlay reads it without source writes,
+watches updates, and retains validated last-good state across failed updates
+and restart. This covers the observed subset, not all Software 2.x formats or
+the official UI's active/favorite selection. See
+[local profile configuration](docs/config.md#profile).
 `devices list` and `devices inspect` report qualified interface04 hidraw identity
 and read-only access without consuming reports. Their JSON schema is version2.
 The internal input library reads only USB `16d0:12f7:0111` and the qualified
@@ -27,7 +33,7 @@ remain unsupported. Static profile labels, assignments, stick configuration and
 output candidates remain available. See [input recovery](docs/troubleshooting.md#internal-input-recovery)
 for lifecycle limits and the opt-in owner-operated hardware test.
 
-Normalization requires an explicitly
+Export normalization requires an explicitly
 attributed Software 2.0.2 export and the closed predicates in
 [binding conversion](docs/decisions/binding-conversion.md). Legacy numeric
 conversion is outside v1 and tracked in
@@ -472,7 +478,7 @@ azerlay doctor --help
 ```
 
 `--config=PATH` is also accepted. No positional arguments are allowed, and help
-performs no checks. The configuration and imported profile are those that would
+performs no checks. The configuration and selected profile are those that would
 be used at the next start; a running process is optional. Live socket status is
 reported separately, and a session-only profile selection does not replace the
 configured profile in the report.

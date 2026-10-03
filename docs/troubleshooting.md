@@ -1,5 +1,41 @@
 # Device and permission troubleshooting
 
+## Local profile selection and recovery
+
+Use `azerlay status --json` to inspect `active_profile` and `degraded_reasons`.
+The selected definition is configured through the userData root, device and
+final filename; see [configuration](config.md#profile). Profile settings apply
+at the next start. Reloading configuration preserves the running selection.
+
+`ERR_PROFILE_LOCAL_READ` means the selected file is absent, unreadable,
+or changed during stable reading. After three bounded attempts, the watcher
+waits for another relevant event. Repair the selected file or replace it at the
+same filename, then inspect status again. An active last-good definition remains
+selected; restart may restore matching private state as degraded.
+`ERR_PROFILE_LOCAL_WATCH` means watching stopped or could not start. Correct the
+directory/watch condition and restart; a load alone does not clear watch failure.
+`ERR_PROFILE_LOCAL_STATE` means the private state destination is unsafe,
+overlaps userData, or publication failed. Azerlay preserves prior state and does
+not repair permissions or switch an explicit local selection to imports.
+
+`ERR_PROFILE_LOCAL_UNSUPPORTED` means strict JSON validation or the closed
+Software 2.0.2 saved-JSON schema/history predicates were not met. Incomplete JSON
+also has this code; repairing the same selected file may recover on a new event.
+For unsupported format/history, use the official Software export UI,
+then the existing export route:
+
+```sh
+azerlay import --software-release 2.0.2 --profile-index N <export-file> --json
+azerlay profiles show --json
+```
+
+Replace `N` with the intended one-based export ordinal. Use `source = "imported"`
+and restart to use the saved import with explicit local configuration. `auto`
+can fall back initially to a saved import, or a newest loadable single-profile
+import when saved selection is unavailable. An active local last-good remains sticky
+after update failure. Azerlay never follows official UI active/favorite state,
+opens its browser databases, or writes its store.
+
 ## Overlay click-through and monitor recovery
 
 `show`, `hide`, and `toggle` report accepted requested visibility; GTK applies
