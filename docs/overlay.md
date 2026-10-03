@@ -27,8 +27,25 @@ of a new report does not mean release. The optional
 profile title and status band are separate from the controls. Status can show
 device disconnection, missing profile, or reload failure.
 
-The renderer accepts snapshots, but the running application does not yet feed
-live profile and input state into it; that connection is tracked in issue #35.
+The running application assembles the selected imported/local profile, game
+labels and raw physical observations into immutable latest snapshots. Profile
+absence does not suppress known physical-button highlights. Failed source or
+label reloads retain last-good content. Changes are coalesced at the configured
+`input.refresh_hz` cap of 30, 60 or 120 Hz. Hidden updates retain latest state
+without preparing frames; showing or recreating the surface displays that state.
+Idle and status reads do not request redraws.
+
+Native integration and opt-in read-to-actual-GTK-draw samples can be produced with
+`AZERLAY_TEST_LIVE_EVIDENCE="$PWD/.omo/evidence/issue-35/native" scripts/test-wayland.sh go test ./cmd/azerlay -run '^TestRunLiveOverlay(Native|Latency)$' -count=1 -v`.
+On an existing compositor, set `AZERLAY_TEST_WAYLAND_DISPLAY` to its absolute
+Wayland socket path and optionally `AZERLAY_TEST_LIVE_MONITOR` to an output
+connector. The test uses isolated config/source/control state and synthetic pipe
+reports, records app-surface images over an owned solid background, and writes
+bounded numeric timing CSV outside GTK callbacks. It reports matching sample and
+exclusion counts, p50/p95/max and actual output refresh. This measures the app's
+read-to-draw interval, not physical button-to-screen presentation. The 20 ms p95
+target remains distinct from hardware and compositor presentation qualification.
+
 Synthetic Cairo samples can be produced with
 `AZERLAY_RENDER_QA_DIR="$PWD/.omo/evidence/issue-34/cairo" go test ./internal/renderer -run '^TestRenderSamples$' -count=1 -v`.
 With the repository's native test dependencies installed, Sway output-scale

@@ -22,7 +22,7 @@ import (
 const runHelp = `Usage: azerlay run [--config PATH] [--foreground]
 
 Run in foreground until quit, SIGINT or SIGTERM. Requires a Wayland session.
-Configuration must exist; a saved profile is optional. Renderer and device input are unavailable.
+Configuration must exist; a saved profile is optional. Show selected profile assignments and last-observed raw input.
 
 Options:
   --config PATH  Read this configuration instead of the default XDG path

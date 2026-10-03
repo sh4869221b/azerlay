@@ -32,6 +32,8 @@ func runNativeChild(mode string) int {
 		return runConfigPlacementChild()
 	case "visibility":
 		return runVisibilityChild()
+	case "live-imported", "live-local", "live-missing", "live-latency":
+		return runLiveOverlayChild(mode)
 	default:
 		return 2
 	}

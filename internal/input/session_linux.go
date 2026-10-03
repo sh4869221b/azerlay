@@ -30,6 +30,12 @@ func (e *sessionSetupError) Unwrap() error { return e.error }
 func Start(ctx context.Context, group device.Group, generations Generations) (*Session, error) {
 	return startSession(ctx, group, generations, sessionOps{open: device.OpenGroup})
 }
+
+// StartWithOpener uses a caller-owned admission boundary. Once open returns
+// nodes successfully, the session owns their descriptors, including on failure.
+func StartWithOpener(ctx context.Context, group device.Group, generations Generations, open func(device.Group) ([]device.OpenedNode, error)) (*Session, error) {
+	return startSession(ctx, group, generations, sessionOps{open: open})
+}
 func startSession(ctx context.Context, group device.Group, generations Generations, ops sessionOps) (*Session, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err

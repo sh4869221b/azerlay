@@ -11,6 +11,8 @@ import (
 
 func (w *Window) SetDrawObserver(observer func(*renderer.OverlaySnapshot)) { w.drawObserver = observer }
 
+func (w *Window) SetRenderRequestObserver(observer func()) { w.renderRequestObserver = observer }
+
 func (w *Window) SetRenderContent(snapshot *renderer.OverlaySnapshot, overlay config.Overlay, appearance config.Appearance, showAmbiguous bool) {
 	w.overlay = overlay
 	w.SetRenderState(snapshot, appearance, showAmbiguous)
@@ -105,6 +107,9 @@ func (w *Window) prepareRender(force bool) {
 		w.frame = renderer.Prepare(w.snapshot, options, float64(w.renderWidth), float64(w.renderHeight))
 	}
 	w.area.QueueDraw()
+	if w.renderRequestObserver != nil {
+		w.renderRequestObserver()
+	}
 }
 
 func (w *Window) detachRender() {

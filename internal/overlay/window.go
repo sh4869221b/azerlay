@@ -65,6 +65,7 @@ type Window struct {
 	renderSettings                *gtk.Settings
 	preparedSnapshot              *renderer.OverlaySnapshot
 	drawObserver                  func(*renderer.OverlaySnapshot)
+	renderRequestObserver         func()
 	preparedOptions               renderer.Options
 	preparedWidth, preparedHeight int
 }
@@ -298,6 +299,9 @@ func (w *Window) surfaceChanged() {
 func (w *Window) applyInputRegion() {
 	w.surface.SetInputRegion(w.region)
 	w.widget.QueueDraw()
+	if w.renderRequestObserver != nil {
+		w.renderRequestObserver()
+	}
 	w.applied = true
 	w.diagnostic = ""
 	w.publish()

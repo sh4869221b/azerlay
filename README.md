@@ -4,7 +4,7 @@ Wayland-native Azeron profile and live input overlay for Linux.
 
 ## Status
 
-Bootstrap phase. The CLI can validate and save Azeron Software 2.0.2 profile
+The CLI can validate and save Azeron Software 2.0.2 profile
 exports. A successful `import` saves the exact export and a one-based selected
 profile ordinal; `profiles show` reads that saved selection in a later process.
 Configuration can also select one saved Software 2.0.2 local JSON definition by
@@ -27,8 +27,9 @@ establishes only the reported button's state. Detected counter discontinuity is
 conservative loss suspicion, not continuity proof; an undetected final lost
 release can leave stale state indefinitely. No timeout fabricates release.
 Managed reconnect retains the selected serial or, without serial, the same USB
-parent, while allowing hidraw renumbering. Input is not wired into `run`, the
-controller or GTK. Live analog/output-key state and long/double/macro completion
+parent, while allowing hidraw renumbering. `run` connects those observations to
+the selected imported or local profile and game labels in the overlay.
+Live analog/output-key state and long/double/macro completion
 remain unsupported. Static profile labels, assignments, stick configuration and
 output candidates remain available. See [input recovery](docs/troubleshooting.md#internal-input-recovery)
 for lifecycle limits and the opt-in owner-operated hardware test.
@@ -51,7 +52,12 @@ live window; when mapped, its empty pointer input region lets pointer events
 reach the application below while keyboard focus remains below. Status reports
 requested visibility separately from whether the surface is mapped and whether
 the empty input-region call was applied. The call is not compositor
-acknowledgement. Profile rendering and device input remain unavailable.
+acknowledgement. Rendering follows changed state at a maximum of 30, 60 or
+120 Hz; unchanged idle and status reads do not request redraws. Status reports
+measured raw-event and actual GTK draw rates, detected invalidations, runtime
+generation and degraded conditions. Software 2.0.2, displayed firmware 111 and
+SOFTWARE mode are documented operating prerequisites; the application does not
+request a confirmation or infer them from USB identity.
 `doctor` reads configuration, the next-start profile selection, and live socket
 status without changing state; unavailable backend checks remain warnings.
 
@@ -67,7 +73,7 @@ tested host. The cause of an earlier compositor crash remains unresolved.
 ## Native installation
 
 Local packaging targets Arch/CachyOS x86-64 and Hyprland. It packages the current
-behavior described above; it does not connect input or profiles to the renderer.
+behavior described above, including live profile and physical-button rendering.
 GTK4, gtk4-layer-shell and their native shared-library dependencies must be
 installed on the destination. The binary archive does not bundle them.
 There is no published release assumed by these commands. The local smoke
@@ -153,8 +159,9 @@ if [ ! -e "$config_home/azerlay/config.toml" ]; then
 fi
 ```
 
-A missing saved profile is allowed. Device input and profile rendering remain
-unavailable in `run`; readable hardware does not initialize notifications.
+A missing saved profile is allowed; raw physical highlights remain available.
+`run` displays the selected profile and raw observations, but readable hardware
+does not initialize notifications.
 The raw input library requires the official Azeron Software in SOFTWARE mode
 and publishes last-observed state, with the loss limits described above.
 
@@ -448,8 +455,8 @@ The latter means the empty input-region call was applied to the currently
 mapped surface; it is not compositor acknowledgement or proof of pointer
 routing. If the configured monitor is unavailable, the request remains true,
 the surface stays hidden, and status reports an overlay diagnostic. Restore the
-same monitor or hide the overlay, then check status again. Device input and
-profile rendering remain unavailable. A successful status response can still
+same monitor or hide the overlay, then check status again. Live input and
+profile rendering are reflected in the overlay. A successful status response can still
 describe degraded state.
 
 Use matching client and server versions for the extended status response.
