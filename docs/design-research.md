@@ -862,6 +862,8 @@ type ProfileSource interface {
 
 ### 10.3 AzeronLocalSource
 
+[保存済みJSONの安全読取契約](decisions/local-source.md)を参照。LocalSourceの製品実装は別Issueで行う。
+
 必須機能だが、次が要調査である。
 
 - Linux版Azeron Software 2.xの保存場所。
