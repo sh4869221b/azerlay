@@ -125,10 +125,12 @@ is established by a readable fd. `Close` cancels retries, closes the fd and join
 all reader/session work before `Done`; cleanup failures are retained.
 
 Synthetic tests cover mapping, unknown state, loss suspicion, same-device
-reconnect, denied access and fd cleanup. Owner-operated production verification
+reconnect, recovery after denied access or absence, generation retention and
+joined session/fd cleanup. Owner-operated production verification
 uses `AZERLAY_TEST_PHYSICAL_HID=1 go test -v ./internal/input -run
 '^TestPhysicalHardwareLifecycle$' -count=1 -timeout=5m`: source15/16 press/release,
-unplug/replug, restored notifications and close. Without the opt-in it skips;
+unplug/replug, observed endpoint-add-to-reopen timing, restored notifications
+and close. Without the opt-in it skips;
 a skip is not a hardware pass.
 
 ## Permission checks and packaging status
@@ -218,6 +220,32 @@ notifications resumed after reconnect without restarting it. The run took
 measurement or a continuous-current-state guarantee. Analog, other firmware,
 right-hand hardware remain unqualified. The later permission observation below
 qualifies the packaging rule separately from this input lifecycle test.
+
+### Production reconnect measurement, 2026-10-03
+
+The opt-in command above passed without the race detector on the qualified
+left-hand Cyborg II: USB `16d0:12f7:0111`, interface04, Software 2.0.2,
+displayed firmware 111, hardware revision unknown. The owner kept the official
+software running in SOFTWARE mode and operated source15/16 press/release,
+USB unplug/replug, and the same button sequence after reopening.
+
+With udevadm 262, the KERNEL add receive-handler observation to
+`ManagedConnected` publication interval was **361.030245ms**, within the
+two-second criterion. The monitor was ready before unplug; one post-disconnect
+add matched the freshly opened hidraw endpoint. The test used the printed
+KERNEL timestamp and callback-entry `CLOCK_MONOTONIC` on the same host.
+Kernel-to-monitor delivery and scheduling before that receive observation,
+physical cable insertion, time unplugged and owner button response are outside
+this interval. The full test took 85.677 seconds including owner interaction.
+
+Initial and reopened snapshots were unknown. Device generation increased and
+Profile generation stayed at 9; valid source15/16 notifications resumed after
+reopening. Close joined the production reader, closed its descriptor, and
+terminated/joined the monitor and scanner. These observations qualify this
+setup and run; they do not establish a universal timing or notification
+initialization guarantee, authoritative current state, or input integration
+with `run`, the controller or GTK. Packaging ACL qualification remains the
+separate observation below.
 
 ### Packaging access observation, 2026-10-03
 
