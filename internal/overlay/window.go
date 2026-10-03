@@ -125,18 +125,25 @@ func New(overlay config.Overlay) (*Window, error) {
 }
 
 func (w *Window) ApplyConfig(overlay config.Overlay) error {
+	if err := w.ApplyPlacement(overlay); err != nil {
+		return err
+	}
+	w.overlay = overlay
+	w.prepareRender(false)
+	w.updateRenderSize()
+	return nil
+}
+
+func (w *Window) ApplyPlacement(overlay config.Overlay) error {
 	if _, err := layershell.Place(layershell.PlacementInput{Anchor: overlay.Anchor}); err != nil {
 		return err
 	}
 	w.invalidated = w.invalidated || w.selector != overlay.Monitor
 	w.selector, w.anchor = overlay.Monitor, overlay.Anchor
 	w.marginX, w.marginY = overlay.MarginX, overlay.MarginY
-	w.overlay = overlay
 	if err := w.reconcile(); err != nil {
 		return err
 	}
-	w.prepareRender(false)
-	w.updateRenderSize()
 	return nil
 }
 
@@ -210,6 +217,11 @@ func (w *Window) reconcile() error {
 		return nil
 	}
 	if w.requested {
+		w.attachRender()
+		if !w.widget.Visible() {
+			w.prepareRender(false)
+			w.updateRenderSize()
+		}
 		if w.region == nil {
 			region, err := w.newRegion()
 			if err != nil || region == nil {

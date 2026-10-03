@@ -8,12 +8,12 @@ import (
 	"os"
 	"os/signal"
 	"strings"
-	"sync"
 	"syscall"
 
 	"github.com/diamondburned/gotk4/pkg/glib/v2"
 	"github.com/sh4869221b/azerlay/internal/config"
 	"github.com/sh4869221b/azerlay/internal/control"
+	"github.com/sh4869221b/azerlay/internal/live"
 	"github.com/sh4869221b/azerlay/internal/overlay"
 	"github.com/sh4869221b/azerlay/internal/profilesource"
 	"github.com/urfave/cli/v3"
@@ -108,8 +108,18 @@ func runForeground(ctx context.Context, configPath string, stdout, stderr io.Wri
 	var server *control.Server
 	var window *overlay.Window
 	var stopEvents func() error
+	var coordinator *live.Coordinator
+	var controller *control.Controller
 	defer func() {
 		if server == nil {
+			if coordinator != nil {
+				if err := coordinator.Close(); err != nil {
+					status = writeRunError(err, stdout, stderr)
+				}
+			}
+			if controller != nil {
+				controller.Close()
+			}
 			stopConfig()
 		} else if err := server.Close(); err != nil {
 			status = writeRunError(err, stdout, stderr)
@@ -136,11 +146,10 @@ func runForeground(ctx context.Context, configPath string, stdout, stderr io.Wri
 			source = profilesource.NewImportedSource(dataHome)
 		}
 	}
-	controller, err := control.NewController(managerCtx, manager, source)
+	controller, err = control.NewController(managerCtx, manager, source)
 	if err != nil {
 		return runStartupFailure(ctx, err, stdout, stderr)
 	}
-	defer controller.Close()
 	if !stopStartup() || ctx.Err() != nil {
 		return 0
 	}
@@ -173,7 +182,10 @@ func runForeground(ctx context.Context, configPath string, stdout, stderr io.Wri
 	if response.Error != nil {
 		return runStartupFailure(ctx, response.Error, stdout, stderr)
 	}
-	server, err = owner.Start(ctx, controller, func() { controller.Close(); stopConfig() })
+	device := live.StartDevice(managerCtx, initialConfig.Config.Device)
+	coordinator = live.Start(managerCtx, live.Sources{Config: manager, Profile: controller, Input: device})
+	var liveError error
+	server, err = owner.Start(ctx, controller, func() { liveError = coordinator.Close(); controller.Close(); stopConfig() })
 	if err != nil {
 		return runStartupFailure(ctx, err, stdout, stderr)
 	}
@@ -186,81 +198,15 @@ func runForeground(ctx context.Context, configPath string, stdout, stderr io.Wri
 		}
 	}
 	loop := glib.NewMainLoop(nil, false)
-	stopEvents = watchOverlay(manager, controller, server, window, loop, initialConfig.Status.ConfigGeneration)
+	stopEvents = watchLive(coordinator, server, window, loop)
 	loop.Run()
-	return 0
-}
-
-func watchOverlay(manager *config.Manager, controller *control.Controller, server *control.Server, window *overlay.Window, loop *glib.MainLoop, lastGeneration uint64) func() error {
-	stop := make(chan struct{})
-	done := make(chan struct{})
-	var mu sync.Mutex
-	var pending glib.SourceHandle
-	var quitPending glib.SourceHandle
-	var applyError error
-	go func() {
-		defer close(done)
-		changes := manager.Changes()
-		visibility := controller.VisibilityChanges()
-		for {
-			select {
-			case <-server.Done():
-				mu.Lock()
-				quitPending = glib.IdleAdd(func() {
-					mu.Lock()
-					quitPending = 0
-					mu.Unlock()
-					loop.Quit()
-				})
-				mu.Unlock()
-				return
-			case <-stop:
-				return
-			case _, ok := <-changes:
-				if !ok {
-					changes = nil
-					continue
-				}
-			case <-visibility:
-			}
-			mu.Lock()
-			if pending == 0 {
-				pending = glib.IdleAdd(func() {
-					mu.Lock()
-					pending = 0
-					mu.Unlock()
-					snapshot := manager.Snapshot()
-					if snapshot.Status.ConfigGeneration > lastGeneration {
-						lastGeneration = snapshot.Status.ConfigGeneration
-						if err := window.ApplyConfig(snapshot.Config.Overlay); err != nil {
-							applyError = err
-							loop.Quit()
-							return
-						}
-					}
-					if err := window.SetVisible(controller.RequestedVisible()); err != nil {
-						applyError = err
-						loop.Quit()
-					}
-				})
-			}
-			mu.Unlock()
-		}
-	}()
-	return func() error {
-		close(stop)
-		<-done
-		mu.Lock()
-		if pending != 0 {
-			glib.SourceRemove(pending)
-		}
-		if quitPending != 0 {
-			glib.SourceRemove(quitPending)
-		}
-		mu.Unlock()
-		window.SetObserver(nil)
-		return applyError
+	if err := server.Close(); err != nil {
+		return writeRunError(err, stdout, stderr)
 	}
+	if liveError != nil {
+		return writeRunError(liveError, stdout, stderr)
+	}
+	return 0
 }
 
 func runStartupFailure(ctx context.Context, err error, stdout, stderr io.Writer) int {

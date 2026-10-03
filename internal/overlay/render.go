@@ -9,12 +9,20 @@ import (
 	"github.com/sh4869221b/azerlay/internal/renderer"
 )
 
+func (w *Window) SetRenderContent(snapshot *renderer.OverlaySnapshot, overlay config.Overlay, appearance config.Appearance, showAmbiguous bool) {
+	w.overlay = overlay
+	w.SetRenderState(snapshot, appearance, showAmbiguous)
+}
+
 // SetRenderState updates the drawing area on the GTK owner thread.
 func (w *Window) SetRenderState(snapshot *renderer.OverlaySnapshot, appearance config.Appearance, showAmbiguous bool) {
 	if w.closed {
 		return
 	}
 	w.snapshot, w.appearance, w.showAmbiguous = snapshot, appearance, showAmbiguous
+	if !w.requested {
+		return
+	}
 	if snapshot == nil {
 		w.detachRender()
 		return
@@ -56,7 +64,7 @@ func (w *Window) attachRender() {
 }
 
 func (w *Window) updateRenderSize() {
-	if w.area == nil || w.snapshot == nil {
+	if !w.requested || w.area == nil || w.snapshot == nil {
 		return
 	}
 	frame := w.frame
@@ -74,7 +82,7 @@ func (w *Window) updateRenderSize() {
 }
 
 func (w *Window) prepareRender(force bool) {
-	if w.area == nil || w.snapshot == nil {
+	if !w.requested || w.area == nil || w.snapshot == nil {
 		return
 	}
 	options := renderer.NewOptions(w.overlay, w.appearance, w.showAmbiguous)
