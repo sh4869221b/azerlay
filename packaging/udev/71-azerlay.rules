@@ -1,0 +1,2 @@
+ACTION!="remove", SUBSYSTEM=="hidraw", ATTRS{idVendor}=="16d0", ATTRS{idProduct}=="12f7", ATTRS{bcdDevice}=="0111", ENV{ID_BUS}=="", IMPORT{builtin}="usb_id"
+ACTION!="remove", SUBSYSTEM=="hidraw", ATTRS{idVendor}=="16d0", ATTRS{idProduct}=="12f7", ATTRS{bcdDevice}=="0111", ENV{ID_USB_INTERFACE_NUM}=="04", TAG+="uaccess"
