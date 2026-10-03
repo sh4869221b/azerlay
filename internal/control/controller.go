@@ -139,9 +139,6 @@ func (c *Controller) selectProfile(ctx context.Context, request Request) Respons
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if ctx.Err() != nil {
-		return FailureResponse(&request.ID, NewError(ERR_CONTROL_UNAVAILABLE))
-	}
 	if c.active == nil || c.active.selection != candidate.selection {
 		c.active = candidate
 		c.generation++

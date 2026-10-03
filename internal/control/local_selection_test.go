@@ -248,6 +248,36 @@ func TestLocalSessionSelectStopsAndJoins(t *testing.T) {
 	}
 }
 
+func TestLocalSessionSelectCompletesAfterRequestCancellationDuringJoin(t *testing.T) {
+	root, _ := localControllerFixture(t)
+	source := profilesource.NewImportedSource(t.TempDir())
+	importControllerProfiles(t, source, controllerBundle)
+	c, _, _ := startLocalController(t, localControllerSettings(root, "auto", true), source)
+	ctx, cancelRequest := context.WithCancel(t.Context())
+	defer cancelRequest()
+	stopLocal := c.localCancel
+	c.localCancel = func() {
+		stopLocal()
+		cancelRequest()
+	}
+	response := c.Dispatch(ctx, controllerRequest(MethodSelect, "First"))
+	if ctx.Err() != context.Canceled {
+		t.Fatal("request cancellation did not occur during local shutdown")
+	}
+	if !response.OK {
+		t.Fatalf("accepted selection failed after stopping its watcher: %+v", response.Error)
+	}
+	status := controllerStatus(t, c)
+	if status.ActiveProfile.Source != "imported" || *status.ActiveProfile.Name != "First" {
+		t.Fatalf("accepted imported selection did not finish: %+v", status.ActiveProfile)
+	}
+	select {
+	case <-c.localDone:
+	default:
+		t.Fatal("accepted selection returned before local work joined")
+	}
+}
+
 func TestLocalWatchFailurePersists(t *testing.T) {
 	root, path := localControllerFixture(t)
 	c, _, _ := startLocalController(t, localControllerSettings(root, "local", true), nil)
