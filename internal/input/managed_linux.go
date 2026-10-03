@@ -24,12 +24,14 @@ type ManagedSnapshot struct {
 }
 
 type Managed struct {
-	mu      sync.Mutex
-	session *Session
-	latest  ManagedSnapshot
-	cancel  context.CancelFunc
-	done    chan struct{}
-	err     error
+	mu                    sync.Mutex
+	session               *Session
+	latest                ManagedSnapshot
+	cancel                context.CancelFunc
+	done                  chan struct{}
+	changes               chan struct{}
+	events, invalidations uint64
+	err                   error
 }
 
 type managedOps struct {
@@ -52,7 +54,7 @@ func startManaged(ctx context.Context, target device.ReconnectTarget, generation
 		return nil, &d
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	m := &Managed{cancel: cancel, done: make(chan struct{}), latest: ManagedSnapshot{State: ManagedDegraded, Snapshot: &Snapshot{Generations: generations, Availability: Unavailable}}}
+	m := &Managed{cancel: cancel, done: make(chan struct{}), changes: make(chan struct{}, 1), latest: ManagedSnapshot{State: ManagedDegraded, Snapshot: &Snapshot{Generations: generations, Availability: Unavailable}}}
 	go m.run(ctx, target, generations, ops)
 	return m, nil
 }
@@ -63,6 +65,8 @@ func (m *Managed) Latest() ManagedSnapshot {
 	result := m.latest
 	if m.session != nil {
 		result.Snapshot = m.session.Latest()
+		result.Snapshot.EventCount += m.events
+		result.Snapshot.InvalidationCount += m.invalidations
 		if !result.Snapshot.Connected {
 			<-m.session.Done()
 			err := m.session.Err()
@@ -76,8 +80,9 @@ func (m *Managed) Latest() ManagedSnapshot {
 	return copyManagedSnapshot(result)
 }
 
-func (m *Managed) Done() <-chan struct{} { return m.done }
-func (m *Managed) Close() error          { m.cancel(); <-m.done; return m.err }
+func (m *Managed) Done() <-chan struct{}    { return m.done }
+func (m *Managed) Changes() <-chan struct{} { return m.changes }
+func (m *Managed) Close() error             { m.cancel(); <-m.done; return m.err }
 
 // Err returns a terminal or retained cleanup error after Done closes.
 func (m *Managed) Err() error { return m.err }
@@ -91,6 +96,8 @@ func (m *Managed) run(ctx context.Context, target device.ReconnectTarget, genera
 		if current != nil {
 			m.err = errors.Join(m.err, current.Close())
 			last = current.Latest()
+			last.EventCount += m.events
+			last.InvalidationCount += m.invalidations
 		}
 		m.publish(nil, ManagedSnapshot{Snapshot: last, State: ManagedStopped, Diagnostic: managedDiagnostic(m.err)}, ops.observe)
 		close(m.done)
@@ -115,7 +122,14 @@ func (m *Managed) run(ctx context.Context, target device.ReconnectTarget, genera
 			if started {
 				next.Device++
 			}
-			current, err = startSession(ctx, group, next, ops.session)
+			sessionOps := ops.session
+			sessionOps.observe = func(snapshot *Snapshot) {
+				m.notify()
+				if ops.session.observe != nil {
+					ops.session.observe(snapshot)
+				}
+			}
+			current, err = startSession(ctx, group, next, sessionOps)
 			if ctx.Err() != nil {
 				if err != nil && err != ctx.Err() {
 					m.err = errors.Join(m.err, err)
@@ -132,6 +146,8 @@ func (m *Managed) run(ctx context.Context, target device.ReconnectTarget, genera
 				}
 				err = current.Err()
 				last = current.Latest()
+				last.EventCount += m.events
+				last.InvalidationCount += m.invalidations
 				if invalidManagedInput(err) {
 					m.err = errors.Join(m.err, err)
 					current = nil
@@ -177,10 +193,22 @@ func managedCleanupFailure(err error) error {
 
 func (m *Managed) publish(session *Session, state ManagedSnapshot, observe func(ManagedSnapshot)) {
 	m.mu.Lock()
+	if session != nil {
+		m.events, m.invalidations = m.latest.Snapshot.EventCount, m.latest.Snapshot.InvalidationCount
+		state.Snapshot.EventCount += m.events
+		state.Snapshot.InvalidationCount += m.invalidations
+	}
 	m.session, m.latest = session, copyManagedSnapshot(state)
 	m.mu.Unlock()
+	m.notify()
 	if observe != nil {
 		observe(copyManagedSnapshot(state))
+	}
+}
+func (m *Managed) notify() {
+	select {
+	case m.changes <- struct{}{}:
+	default:
 	}
 }
 

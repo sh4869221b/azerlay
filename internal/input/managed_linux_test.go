@@ -112,10 +112,16 @@ func TestPhysicalManagedReconnect(t *testing.T) {
 	if next.Snapshot.Generations != (Generations{8, 9}) || next.Snapshot.Availability != Unconfirmed || len(next.Snapshot.Controls()) != 0 {
 		t.Fatal("reopen baseline fabricated")
 	}
+	if next.Snapshot.EventCount != 1 || next.Snapshot.InvalidationCount != 0 || !next.Snapshot.ReadAt.IsZero() {
+		t.Fatal("reconnect counters lost", next)
+	}
 	if _, err := w2.Write(physicalBytes(8, 0, 20)); err != nil {
 		t.Fatal(err)
 	}
 	fresh := awaitSnapshot(t, events)
+	if latest := m.Latest().Snapshot; latest.EventCount != 2 || latest.ReadAt.IsZero() {
+		t.Fatal("reconnect metrics", latest)
+	}
 	if fresh.Generations != (Generations{8, 9}) || fresh.Physical("grid.c2.r1") != (PhysicalState{false, true}) || len(fresh.Controls()) != 1 || fresh.Physical("grid.c1.r1").Known || !old.Physical("grid.c1.r1").Known {
 		t.Fatal("generation contamination")
 	}
