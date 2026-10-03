@@ -9,6 +9,8 @@ import (
 	"github.com/sh4869221b/azerlay/internal/renderer"
 )
 
+func (w *Window) SetDrawObserver(observer func(*renderer.OverlaySnapshot)) { w.drawObserver = observer }
+
 func (w *Window) SetRenderContent(snapshot *renderer.OverlaySnapshot, overlay config.Overlay, appearance config.Appearance, showAmbiguous bool) {
 	w.overlay = overlay
 	w.SetRenderState(snapshot, appearance, showAmbiguous)
@@ -43,6 +45,13 @@ func (w *Window) attachRender() {
 		frame := w.frame
 		if frame != nil {
 			frame.Draw(cr)
+		}
+		if w.drawObserver != nil {
+			var drawn *renderer.OverlaySnapshot
+			if frame != nil {
+				drawn = w.preparedSnapshot
+			}
+			w.drawObserver(drawn)
 		}
 	})
 	w.resizeHandler = area.ConnectResize(func(width, height int) {

@@ -12,6 +12,7 @@ import (
 // Controller owns requested visibility and the session-only active profile.
 type Controller struct {
 	manager           *config.Manager
+	liveStatus        func() *LiveStatus
 	source            *profilesource.ImportedSource
 	started           time.Time
 	imported          bool

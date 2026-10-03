@@ -184,6 +184,7 @@ func runForeground(ctx context.Context, configPath string, stdout, stderr io.Wri
 	}
 	device := live.StartDevice(managerCtx, initialConfig.Config.Device)
 	coordinator = live.Start(managerCtx, live.Sources{Config: manager, Profile: controller, Input: device})
+	controller.SetLiveStatusProvider(coordinator.Status)
 	var liveError error
 	server, err = owner.Start(ctx, controller, func() { liveError = coordinator.Close(); controller.Close(); stopConfig() })
 	if err != nil {

@@ -52,6 +52,13 @@ type Status struct {
 func (c *Controller) status() Status {
 	reload := c.manager.Snapshot().Status
 	c.mu.Lock()
+	provider := c.liveStatus
+	c.mu.Unlock()
+	var live *LiveStatus
+	if provider != nil {
+		live = provider()
+	}
+	c.mu.Lock()
 	defer c.mu.Unlock()
 	s := Status{
 		SchemaVersion: 1, UptimeSeconds: time.Since(c.started).Seconds(),
@@ -67,6 +74,10 @@ func (c *Controller) status() Status {
 	if c.active != nil {
 		active := c.active.status()
 		s.ActiveProfile = &active
+	}
+	if live != nil {
+		s.Device, s.EventRate, s.RenderRate, s.DroppedCount = live.Device, live.EventRate, live.RenderRate, live.DroppedCount
+		s.DegradedReasons = append([]Diagnostic{}, live.Diagnostics...)
 	}
 	if c.overlay != nil {
 		copy := *c.overlay

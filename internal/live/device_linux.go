@@ -193,7 +193,7 @@ func (d *Device) run(ctx context.Context, settings config.Device, baseline *inpu
 						if !snapshot.Connected {
 							state = input.ManagedDegraded
 						}
-						d.publish(input.ManagedSnapshot{Snapshot: snapshot, State: state})
+						d.publish(input.ManagedSnapshot{Snapshot: snapshot, State: state, Device: group.USBParent})
 						select {
 						case <-ctx.Done():
 							return

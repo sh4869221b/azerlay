@@ -233,8 +233,8 @@ func TestRunLocalLifecycle(t *testing.T) {
 	}
 	cliWrite(t, path, []byte(`{"PRIVATE_PARTIAL":`), 0600)
 	failed := await("Initial local", "ERR_PROFILE_LOCAL_UNSUPPORTED")
-	if failed.Generation != initial.Generation {
-		t.Fatal("partial write changed active generation")
+	if failed.Generation < initial.Generation || failed.ActiveProfile.ProfileIndex != initial.ActiveProfile.ProfileIndex || failed.ActiveProfile.SourceRef != initial.ActiveProfile.SourceRef {
+		t.Fatal("partial write replaced the last good profile or regressed runtime generation")
 	}
 	repaired := strings.Replace(data, "Initial local", "Repaired local", 1)
 	temporary := filepath.Join(filepath.Dir(path), "writer.tmp")

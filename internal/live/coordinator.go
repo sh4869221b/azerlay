@@ -2,6 +2,7 @@ package live
 
 import (
 	"context"
+	"reflect"
 	"sync"
 	"sync/atomic"
 
@@ -36,6 +37,7 @@ type Sources struct {
 }
 type Generations struct{ Config, Profile, Device, Layout uint64 }
 type View struct {
+	Generation  uint64
 	Config      config.Snapshot
 	Profile     *control.ProfileSnapshot
 	Input       input.ManagedSnapshot
@@ -45,6 +47,7 @@ type View struct {
 	Diagnostics []control.Diagnostic
 }
 type Coordinator struct {
+	metrics   *Metrics
 	sources   Sources
 	latest    atomic.Pointer[View]
 	changes   chan struct{}
@@ -56,13 +59,14 @@ type Coordinator struct {
 
 func Start(ctx context.Context, sources Sources) *Coordinator {
 	ctx, cancel := context.WithCancel(ctx)
-	c := &Coordinator{sources: sources, changes: make(chan struct{}, 1), done: make(chan struct{}), cancel: cancel}
+	c := &Coordinator{metrics: NewMetrics(), sources: sources, changes: make(chan struct{}, 1), done: make(chan struct{}), cancel: cancel}
 	go c.run(ctx)
 	return c
 }
 func (c *Coordinator) Latest() *View            { return c.latest.Load() }
 func (c *Coordinator) Changes() <-chan struct{} { return c.changes }
 func (c *Coordinator) Done() <-chan struct{}    { return c.done }
+func (c *Coordinator) Metrics() *Metrics        { return c.metrics }
 func (c *Coordinator) Close() error {
 	c.closeOnce.Do(c.cancel)
 	<-c.done
@@ -116,6 +120,25 @@ func (c *Coordinator) run(ctx context.Context) {
 		if currentConfig != generations.Config || currentProfile != generations.Profile || currentInput.Generations.Device != generations.Device {
 			continue
 		}
+		previous := c.latest.Load()
+		view.Generation = 1
+		if previous != nil {
+			view.Generation = previous.Generation
+			if view.Generations != previous.Generations || view.Visible != previous.Visible || view.Render != previous.Render || view.Input.State != previous.Input.State || view.Input.Device != previous.Input.Device || view.Input.Snapshot.Availability != previous.Input.Snapshot.Availability || view.Input.Snapshot.Reason != previous.Input.Snapshot.Reason || view.Input.Snapshot.Connected != previous.Input.Snapshot.Connected || !reflect.DeepEqual(view.Input.Diagnostic, previous.Input.Diagnostic) || !reflect.DeepEqual(view.Diagnostics, previous.Diagnostics) || view.Config.Status != previous.Config.Status {
+				view.Generation++
+			}
+		}
+		if owner, ok := c.sources.Profile.(interface {
+			RuntimeGeneration() uint64
+			AdvanceRuntimeGeneration() uint64
+		}); ok {
+			changed := previous != nil && view.Generation != previous.Generation
+			view.Generation = owner.RuntimeGeneration()
+			if changed {
+				view.Generation = owner.AdvanceRuntimeGeneration()
+			}
+		}
+		c.metrics.publish(view, previous)
 		c.latest.Store(view)
 		select {
 		case c.changes <- struct{}{}:

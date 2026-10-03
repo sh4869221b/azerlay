@@ -13,6 +13,7 @@ import (
 )
 
 func watchLive(coordinator *live.Coordinator, server *control.Server, window *overlay.Window, loop *glib.MainLoop) func() error {
+	window.SetDrawObserver(coordinator.Metrics().Draw)
 	stop, done := make(chan struct{}), make(chan struct{})
 	var mu sync.Mutex
 	var pending glib.SourceHandle
@@ -120,6 +121,7 @@ func watchLive(coordinator *live.Coordinator, server *control.Server, window *ov
 			glib.SourceRemove(pending)
 		}
 		window.SetObserver(nil)
+		window.SetDrawObserver(nil)
 		return applyError
 	}
 }

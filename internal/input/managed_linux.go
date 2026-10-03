@@ -18,6 +18,7 @@ const (
 )
 
 type ManagedSnapshot struct {
+	Device     string
 	Snapshot   *Snapshot
 	State      ManagedState
 	Diagnostic *device.Diagnostic
@@ -138,7 +139,7 @@ func (m *Managed) run(ctx context.Context, target device.ReconnectTarget, genera
 			}
 			if err == nil {
 				generations, started = next, true
-				m.publish(current, ManagedSnapshot{Snapshot: current.Latest(), State: ManagedConnected}, ops.observe)
+				m.publish(current, ManagedSnapshot{Snapshot: current.Latest(), State: ManagedConnected, Device: group.USBParent}, ops.observe)
 				select {
 				case <-ctx.Done():
 					return

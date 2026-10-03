@@ -64,6 +64,7 @@ type Window struct {
 	renderCSS                     *gtk.CSSProvider
 	renderSettings                *gtk.Settings
 	preparedSnapshot              *renderer.OverlaySnapshot
+	drawObserver                  func(*renderer.OverlaySnapshot)
 	preparedOptions               renderer.Options
 	preparedWidth, preparedHeight int
 }
