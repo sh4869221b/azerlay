@@ -1,0 +1,17 @@
+{
+  "game": "Cyberpunk 2077",
+  "game_version": "2.31",
+  "mode": "borderless",
+  "monitor": "DP-2",
+  "visible": true,
+  "overlay": {"mapped": true, "input_region_applied": true},
+  "active_profile": null,
+  "event_rate": 0,
+  "layer": {"namespace": "azerlay", "x": 3758, "y": 12, "width": 710, "height": 681},
+  "after_hide": {
+    "visible": false,
+    "overlay": {"mapped": false, "input_region_applied": false},
+    "azerlay_layers": {"DP-1": [], "DP-2": []}
+  },
+  "evidence_scope": "Public excerpt of local status and compositor captures; display confirmed, physical input unconfirmed"
+}

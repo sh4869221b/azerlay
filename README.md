@@ -70,6 +70,14 @@ The [placement decision](docs/decisions/compositor-placement.md) records
 the measured Hyprland scope and a successful same-name headless return on the
 tested host. The cause of an earlier compositor crash remains unresolved.
 
+The normal overlay was confirmed above Cyberpunk 2077 on the tested Hyprland
+host in borderless mode. This completes the v1 game-display check; it does not
+qualify game performance or physical input-to-presentation latency. Direct
+Scanout, VRR, HDR, fullscreen mode comparisons, repeated benchmarks and
+Gamescope remain unverified, nonblocking post-v1 research in
+[Issue #132](https://github.com/sh4869221b/azerlay/issues/132). See the
+[game-display decision and preliminary measurements](docs/decisions/fullscreen-performance.md).
+
 ## Native installation
 
 Local packaging targets Arch/CachyOS x86-64 and Hyprland. It packages the current

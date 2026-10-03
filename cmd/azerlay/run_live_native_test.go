@@ -443,6 +443,27 @@ func exerciseLiveOverlay(ctx context.Context, mode, path, dir, profilePath, prof
 	if err := awaitLive(ctx, currentDraw); err != nil {
 		return fmt.Errorf("first draw: %w", err)
 	}
+	expectedOutput := os.Getenv("AZERLAY_TEST_LIVE_MONITOR")
+	if err := awaitLive(ctx, func() bool {
+		return gtkCondition(func() bool {
+			widget, err := liveOverlayWidget()
+			if err != nil {
+				return false
+			}
+			surface, err := layershell.Surface(widget)
+			if err != nil {
+				return false
+			}
+			monitor := widget.Widget.Display().MonitorAtSurface(surface)
+			if monitor == nil {
+				return false
+			}
+			connector := monitor.Connector()
+			return connector != "" && (expectedOutput == "" || connector == expectedOutput)
+		})
+	}); err != nil {
+		return fmt.Errorf("wait for output %q: %w", expectedOutput, err)
+	}
 	if err := liveGTK(ctx, func() error {
 		widget, err := liveOverlayWidget()
 		if err != nil {
@@ -453,6 +474,13 @@ func exerciseLiveOverlay(ctx context.Context, mode, path, dir, profilePath, prof
 			return err
 		}
 		monitor := widget.Widget.Display().MonitorAtSurface(surface)
+		if monitor == nil {
+			return errors.New("selected output unavailable before report")
+		}
+		connector := monitor.Connector()
+		if connector == "" || (expectedOutput != "" && connector != expectedOutput) {
+			return fmt.Errorf("selected output changed before report: expected %q, got %q", expectedOutput, connector)
+		}
 		geometry := monitor.Geometry()
 		fmt.Printf("output=%s geometry=%dx%d scale=%d refresh_millihz=%d GTK=%d.%d.%d backend=Wayland renderer=%s\n", monitor.Connector(), geometry.Width(), geometry.Height(), monitor.ScaleFactor(), monitor.RefreshRate(), gtk.GetMajorVersion(), gtk.GetMinorVersion(), gtk.GetMicroVersion(), os.Getenv("GSK_RENDERER"))
 		if mode != "live-latency" {
