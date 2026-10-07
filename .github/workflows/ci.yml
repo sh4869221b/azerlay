@@ -83,12 +83,27 @@ jobs:
         run: staticcheck ./...
 
       - name: Test
+        id: native_race
         run: |
+          set -euo pipefail
           useradd --create-home --user-group azerlay-test
           mkdir -p "$GOCACHE" "$GOMODCACHE"
           chown -R azerlay-test:azerlay-test "$GITHUB_WORKSPACE" "$GOCACHE" "$GOMODCACHE"
           mapfile -t native < scripts/ci-native-packages.txt
-          runuser -u azerlay-test -- env PATH="$PATH" GOCACHE="$GOCACHE" GOMODCACHE="$GOMODCACHE" scripts/test-wayland.sh go test -race -shuffle=on -count=1 "${native[@]}"
+          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/native-race-timing.json" -- \
+            runuser -u azerlay-test -- env PATH="$PATH" GOCACHE="$GOCACHE" GOMODCACHE="$GOMODCACHE" scripts/test-wayland.sh go test -race -json -shuffle=on -count=1 "${native[@]}" \
+            | tee "$RUNNER_TEMP/native-race-tests.jsonl"
+
+      - name: Upload native race diagnostics
+        if: ${{ always() && (steps.native_race.outcome == 'success' || steps.native_race.outcome == 'failure') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-race-json-attempt-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/native-race-tests.jsonl
+            ${{ runner.temp }}/native-race-timing.json
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Build
         run: go build ./cmd/azerlay
@@ -307,6 +322,7 @@ jobs:
           go test -shuffle=on -count=1 "${core[@]}"
 
       - name: Validate and race-test core without GUI setup
+        id: core_race
         shell: bash
         run: |
           set -euo pipefail
@@ -318,7 +334,20 @@ jobs:
           mapfile -t core < scripts/ci-core-packages.txt
           go env GOOS GOARCH CGO_ENABLED CC GOCACHE
           python3 scripts/ci_check_packages.py --core-only
-          go test -race -shuffle=on -count=1 "${core[@]}"
+          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/core-race-timing.json" -- \
+            go test -race -json -shuffle=on -count=1 "${core[@]}" \
+            | tee "$RUNNER_TEMP/core-race-tests.jsonl"
+
+      - name: Upload core race diagnostics
+        if: ${{ always() && (steps.core_race.outcome == 'success' || steps.core_race.outcome == 'failure') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-race-json-attempt-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/core-race-tests.jsonl
+            ${{ runner.temp }}/core-race-timing.json
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Regenerate LZMA boundary fixtures
         run: go run ./internal/profiledecode/testdata/generate

@@ -23,7 +23,7 @@ go vet ./...
 go install honnef.co/go/tools/cmd/staticcheck@2026.2.1
 staticcheck ./...
 mapfile -t native < scripts/ci-native-packages.txt
-scripts/test-wayland.sh go test -race -shuffle=on -count=1 "${native[@]}"
+scripts/test-wayland.sh go test -race -json -shuffle=on -count=1 "${native[@]}"
 go build ./cmd/azerlay
 ```
 
@@ -58,6 +58,74 @@ omissions and overlap; failure in either job still fails the workflow. Job IDs,
 package-install commands and existing cache inputs are unchanged. The fresh
 core race cache and extra CGO=0 mode have a cost that remains part of measurement.
 This partition is a measured candidate, not a 60-second or p95 claim.
+
+### Race diagnostics baseline
+
+For [Issue #138](https://github.com/sh4869221b/azerlay/issues/138), both required
+race commands now use `-json`. The existing package manifests, `-race`,
+`-shuffle=on` and `-count=1` are unchanged. The native command still runs through
+`runuser -u azerlay-test` and the unmodified two-output `test-wayland.sh` launcher;
+the timing wrapper is outside `runuser` and never runs Go tests as root. The
+separate core CGO=0 contract run, fresh core race cache, all six jobs, native
+package installs, cache inputs, fuzz budgets and fixture regeneration remain.
+This is baseline instrumentation before any test-speed changes.
+
+Each race command is wrapped by the standard-library-only
+`scripts/ci_time_command.py`, then piped to `tee` with explicit
+`set -euo pipefail`. The wrapper preserves the command's exit status and signal
+termination and forwards SIGINT/SIGTERM. Neither `tee` nor artifact upload can
+turn a failed command into a successful test step. A timing-report write error
+also fails the step, while retaining an already failing command's exit status.
+No `continue-on-error` or replacement green check is used.
+
+The corresponding upload step runs after a successful or failed race step.
+Artifacts are retained for seven days and have distinct names on full or
+failed-jobs-only reruns:
+
+| Artifact | Explicit files |
+| --- | --- |
+| `native-race-json-attempt-${{ github.run_attempt }}` | `native-race-tests.jsonl`, `native-race-timing.json` |
+| `core-race-json-attempt-${{ github.run_attempt }}` | `core-race-tests.jsonl`, `core-race-timing.json` |
+
+Only those files are uploaded, not directories, caches, compositor logs,
+profiles or fuzz inputs. Test JSON retains all events, including failures,
+skips, shuffle seeds, `run`/`pause`/`cont` timestamps and test output. These are
+the repository's synthetic tests only: the wrapper passes output through and
+does **not** redact private inputs. The synthetic-fixture policy still applies
+to all test output and artifacts. Do not add private fixture or environment
+dumps. The wrapper itself records only numeric timing/status fields, never
+arguments, environment variables, HOME or paths; its timing summary goes to
+stderr separately from test JSON on stdout.
+
+The timing JSON records monotonic command elapsed time, child user/system CPU
+seconds, `max_child_rss_kib`, the command `returncode` (negative for a signal),
+and an optional received `wrapper_signal`. CPU accounting includes resources
+propagated from descendants that the command waits for. On Linux,
+`max_child_rss_kib` is in KiB and is the largest child high-water mark, including
+propagated waited-for descendant usage. It is **not** the simultaneous peak
+memory of the process tree, and does not prove safe memory headroom for adding
+parallelism. Killed or orphaned descendants need not yield complete accounting;
+SIGKILL of the wrapper, runner loss or job cancellation can leave partial or
+missing artifacts. A failed/partial run is not a successful timing sample.
+
+Use `python3 scripts/ci_measure.py tests PATH-TO-TESTS.jsonl` for terminal elapsed
+records. Rank rows with a `test` name separately from package rows (`test: null`).
+Retain the raw JSON for overlap and pause/continue analysis. Never add parent
+and child test times or overlapping package times together. Test elapsed is
+not command elapsed: command timing includes compilation/cache work, and the
+native command also includes user/Wayland setup, the current-checkout CLI build
+inside TestMain, and compositor teardown. It is not a per-child CPU profile.
+
+Diagnostic overhead is unmeasured until hosted validation: JSON formatting and
+additional output, the Python process, `tee` file writes, and artifact upload all
+cost time. Command elapsed excludes wrapper startup/reporting and artifact
+upload; job/workflow elapsed and runner-seconds include those costs. Keep the
+uninstrumented partition control, instrumented baseline, any later speed
+candidate, and optional profiling runs in distinct measurement cohorts. Compare
+like cache/runner conditions and the exact same gate set, disclosing sample and
+failure counts. One run establishes neither p95 nor a speedup, and profiling
+runs cannot establish ordinary test performance. No test parallelism or
+profiling is introduced here.
 
 ## Fuzz budget
 
