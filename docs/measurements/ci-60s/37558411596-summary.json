@@ -1,0 +1,60 @@
+[
+  {
+    "attempts": 1,
+    "cohort": "2026-10-07-cli-initial-proof",
+    "commit": "0bd4717c9cb1b85babb358b3c07ca6fad3a0d4bd",
+    "complete_initial_gate_set": true,
+    "condition": "source-only",
+    "metrics": {
+      "created_to_required_result_seconds": {
+        "max": 165.0,
+        "n": 1,
+        "p50": 165.0,
+        "p95": 165.0
+      },
+      "event_to_required_result_seconds": {
+        "max": null,
+        "n": 0,
+        "p50": null,
+        "p95": null
+      },
+      "execution_seconds": {
+        "max": 162.0,
+        "n": 1,
+        "p50": 162.0,
+        "p95": 162.0
+      },
+      "runner_seconds": {
+        "max": 534.0,
+        "n": 1,
+        "p50": 534.0,
+        "p95": 534.0
+      }
+    },
+    "non_success_rate": 1.0,
+    "required_jobs": [
+      "fuzz",
+      "generated-files",
+      "licenses",
+      "native-build",
+      "test",
+      "vulnerability"
+    ],
+    "runs": [
+      {
+        "attempt": 1,
+        "errors": [
+          "required job native-build: completed/failure",
+          "required job vulnerability: completed/failure",
+          "required job test: completed/failure",
+          "workflow: completed/failure"
+        ],
+        "run_id": 37558411596,
+        "url": "https://github.com/sh4869221b/azerlay/actions/runs/37558411596"
+      }
+    ],
+    "small_sample_warning": true,
+    "successes": 0,
+    "warm_60s_observed": false
+  }
+]

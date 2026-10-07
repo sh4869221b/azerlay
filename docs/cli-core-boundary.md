@@ -45,10 +45,10 @@ The native `TestMain` still builds the executable from the current checkout;
 all existing native process/IPC/GTK integration files remain in place.
 Test helpers are local to each test package, not a new production testing API.
 
-The explicit manifests assign all 20 ordinary Go packages:
+The explicit manifests assign all 19 ordinary root-module Go packages:
 
 - [Core manifest](../scripts/ci-core-packages.txt): 14 packages
-- [Native manifest](../scripts/ci-native-packages.txt): 6 packages
+- [Native manifest](../scripts/ci-native-packages.txt): 5 packages
 
 `scripts/ci_check_packages.py` rejects omissions, stale entries, duplicates,
 overlap and wildcard entries. Full mode compares the exact disjoint union
@@ -128,8 +128,12 @@ CGO_ENABLED=1 go build ./cmd/azerlay
 
 Continue to check formatting repository-wide. Preserve the existing fuzz,
 fixture-generation, native-build, vulnerability and license gates. In particular,
-Go's `./...` excludes `testdata` tools; the fixture generator and consumer checks
-are still required separately.
+Go's `./...` excludes `testdata` tools and nested modules. `generated-files`
+explicitly runs the boundary-fixture generator. Existing external-package
+profileadapter integration tests remain; the standalone testdata consumer is
+not an existing automated root-CI check. `internal/layershell/probe` has its own
+`go.mod` and was already outside root-module CI. The consumer fixture and
+research probe remain separately invoked tools, not omitted root packages.
 
 Before adopting separate required jobs, compare setup-inclusive core/native
 wall time, compile work, aggregate runner-seconds and the complete workflow

@@ -14,7 +14,7 @@ explicit versions without changing the application's `go.mod` or `go.sum`.
 | `native-build` | Verify default CGo, compile the native binary in Arch, run version, and inspect shared libraries | 15 minutes |
 | `vulnerability` | Reachable Go vulnerability scan | 20 minutes |
 | `licenses` | Third-party Go dependency license CSV | 10 minutes |
-| `generated-files` | Regenerate both LZMA fixtures and reject differences | 15 minutes |
+| `generated-files` | CI-tool tests, core CGO=0 and race boundary proof, regenerate both LZMA fixtures and reject differences | 15 minutes |
 
 The `test` job rejects any output from `gofmt -l .`, then runs:
 
@@ -30,6 +30,28 @@ Ordinary tests run once, retaining the race detector, shuffled ordering and
 uncached execution, including the production GTK/CGo packages. Native child
 tests initialize GTK on their process main thread.
 Analyzer installation or execution failures fail CI; they are not suppressed.
+
+## Initial core boundary proof
+
+The [CLI/core boundary](cli-core-boundary.md) assigns every ordinary package to
+an explicit core or native manifest. Before formatting/vet, the native `test`
+job compares their exact disjoint union against `go list ./...` and checks the
+core dependency closure including tests for native/GTK imports. Its existing
+whole-repository formatting, vet, Staticcheck, race, Sway and build gates remain.
+Formatting failures print `gofmt -d .` for review from hosted logs.
+
+The existing `generated-files` job adds core-only dependency checks and tests
+with `CGO_ENABLED=0`, followed by a separate `CGO_ENABLED=1` race run. Both use
+shuffle and count=1 without installing or starting GTK/Sway. The race step uses
+a new temporary GOCACHE, including for its dependency check, so setup-go's
+Ubuntu cache does not start reusing/saving CGo outputs without the native ABI
+fingerprint. The original fixture regeneration and diff steps remain afterward.
+
+This deliberately duplicates core coverage during initial hosted validation.
+Additional tests, cold race compilation and runner-seconds are overhead to
+measure, not an achieved optimization. No job IDs, package-install commands,
+required native checks or existing cache inputs change. A successful boundary
+proof alone does not complete issue #137 or demonstrate a CI speedup.
 
 ## Fuzz budget
 
@@ -57,7 +79,7 @@ from this job by `-run='^$'`. Longer fuzz campaigns are outside PR CI.
 `ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell
 gobject-introspection`. Ubuntu distribution support is excluded from v1 and
 tracked in [Issue #98](https://github.com/sh4869221b/azerlay/issues/98).
-The Ubuntu-hosted runner and the pure `fuzz`/`generated-files` jobs do not qualify
+The Ubuntu-hosted runner and the GUI-free `fuzz`/`generated-files` jobs do not qualify
 Ubuntu as a product target. The distribution build runs:
 
 ```sh
@@ -80,7 +102,9 @@ global Git config. This preserves normal Go VCS metadata during compilation.
 
 The four Arch jobs use `.github/actions/native-go-cache`. Automatic setup-go
 caching is disabled for those jobs to avoid saving the same directories twice.
-The two pure Ubuntu jobs retain their existing setup-go caches unchanged.
+The two GUI-free Ubuntu jobs retain their existing setup-go caches unchanged;
+`generated-files` runs its new CGo/race boundary proof in a separate fresh,
+step-local `RUNNER_TEMP` GOCACHE that is deleted rather than saved.
 
 - **Application modules:** all four jobs restore
   `/tmp/azerlay-go-mod/cache/download`, keyed

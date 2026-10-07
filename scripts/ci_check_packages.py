@@ -45,6 +45,14 @@ def check(root, core_only=False):
     if overlap:
         raise ValueError("packages appear in both manifests: " + ", ".join(overlap))
 
+    # Root ./... does not enter nested modules. Reject accidental manifest
+    # entries there before invoking Go; do not weaken the exact-union check.
+    for package in core + native:
+        relative = Path(package[2:])
+        for directory in (relative, *relative.parents):
+            if directory != Path(".") and (root / directory / "go.mod").is_file():
+                raise ValueError(f"manifest package belongs to a nested module: {package}")
+
     modules = run_go(root, "list", "-m", "-f", "{{.Path}}")
     if len(modules) != 1 or not modules[0]:
         raise ValueError("expected exactly one module path")

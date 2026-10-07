@@ -50,6 +50,14 @@ class PackageBoundaryTests(unittest.TestCase):
         with patch.object(ci, "run_go", self.fake_go):
             return ci.check(self.root, core_only)
 
+    def test_nested_module_is_not_a_root_manifest_package(self):
+        nested = self.root / "internal/live"
+        nested.mkdir(parents=True)
+        (nested / "go.mod").write_text("module example.invalid/nested\n")
+        with self.assertRaisesRegex(ValueError, "nested module"):
+            self.check()
+        self.assertEqual(self.calls, [])
+
     def test_exact_partition_and_test_dependencies(self):
         self.assertEqual(self.check(), (2, 2))
         self.assertEqual(len(self.calls), 3)
