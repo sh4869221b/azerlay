@@ -15,7 +15,7 @@ class MeasurementTests(unittest.TestCase):
         self.run = dict(id=1, run_attempt=1, head_sha="abc", html_url="https://example.invalid/run/1",
                         status="completed", conclusion="success", created_at="2026-01-01T00:00:00Z",
                         updated_at="2026-01-01T00:00:59Z")
-        self.jobs = {"total_count": 6, "jobs": [dict(id=i, run_id=1, run_attempt=1, head_sha="abc",
+        self.jobs = {"total_count": len(ci.REQUIRED), "jobs": [dict(id=i, run_id=1, run_attempt=1, head_sha="abc",
                      name=name, status="completed", conclusion="success", started_at="2026-01-01T00:00:02Z",
                      completed_at="2026-01-01T00:00:58Z", steps=[]) for i, name in enumerate(ci.REQUIRED)]}
 
@@ -35,11 +35,11 @@ class MeasurementTests(unittest.TestCase):
         self.assertEqual(result["execution_seconds"], 56)
         self.assertEqual(result["created_to_required_result_seconds"], 58)
         self.assertEqual(result["created_to_updated_seconds"], 59)
-        self.assertEqual(result["runner_seconds"], 336)
+        self.assertEqual(result["runner_seconds"], 56 * len(ci.REQUIRED))
         self.assertIsNone(result["event_to_required_result_seconds"])
 
     def test_all_gate_failure_modes_are_not_success(self):
-        for index in range(6):
+        for index in range(len(ci.REQUIRED)):
             for conclusion in ("failure", "cancelled", "timed_out", "skipped", None):
                 with self.subTest(index=index, conclusion=conclusion):
                     jobs = copy.deepcopy(self.jobs)
@@ -63,7 +63,7 @@ class MeasurementTests(unittest.TestCase):
         self.assertFalse(self.sample()["quality_success"])
 
     def test_missing_page_is_error(self):
-        self.jobs["total_count"] = 7
+        self.jobs["total_count"] = len(ci.REQUIRED) + 1
         with self.assertRaises(ValueError):
             self.sample()
 
@@ -75,7 +75,7 @@ class MeasurementTests(unittest.TestCase):
                 ci.measure(self.run, [jobs], "warm", "synthetic-v1")
 
     def test_paginated_jobs(self):
-        pages = [dict(total_count=6, jobs=self.jobs["jobs"][:3]), dict(total_count=6, jobs=self.jobs["jobs"][3:])]
+        pages = [dict(total_count=len(ci.REQUIRED), jobs=self.jobs["jobs"][:3]), dict(total_count=len(ci.REQUIRED), jobs=self.jobs["jobs"][3:])]
         self.assertTrue(ci.measure(self.run, pages, "warm", "synthetic-v1")["quality_success"])
 
     def test_partial_rerun_copied_jobs_are_not_a_new_timing_sample(self):

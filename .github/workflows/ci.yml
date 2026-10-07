@@ -14,8 +14,8 @@ concurrency:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
-    container: archlinux:base
+    runs-on: ubuntu-24.04
+    container: ubuntu:26.04@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794
     defaults:
       run:
         shell: bash
@@ -23,10 +23,61 @@ jobs:
       GOCACHE: /tmp/azerlay-go-build
       GOMODCACHE: /tmp/azerlay-go-mod
     steps:
-      - name: Install native test dependencies
+      - name: Bootstrap snapshot CA with verified official package
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = 'https://snapshot.ubuntu.com/ubuntu/20261001T000000Z/pool/main/c/ca-certificates/ca-certificates_20260601~26.04.1_all.deb';
+            const expected = '6077d27c6b6f8b23590cb01ff877ed8c804a67a5442cc32b5a33da10d2bd0e90';
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`CA bootstrap download failed: ${response.status}`);
+            const data = Buffer.from(await response.arrayBuffer());
+            const actual = require('crypto').createHash('sha256').update(data).digest('hex');
+            if (data.length !== 138514 || actual !== expected) throw new Error('CA bootstrap integrity mismatch');
+            require('fs').writeFileSync('/tmp/azerlay-bootstrap-ca.deb', data);
+
+      - name: Install pinned Ubuntu test dependencies
         run: |
-          pacman -Syu --noconfirm --needed ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection sway dbus grim noto-fonts-cjk noto-fonts-emoji
-          setcap -r /usr/bin/sway
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          dpkg-deb -x /tmp/azerlay-bootstrap-ca.deb /tmp/azerlay-bootstrap-ca
+          cat /tmp/azerlay-bootstrap-ca/usr/share/ca-certificates/mozilla/*.crt > /tmp/azerlay-bootstrap-ca.pem
+          printf 'Acquire::https::CAInfo "/tmp/azerlay-bootstrap-ca.pem";\nAPT::Get::Always-Include-Phased-Updates "true";\n' > /etc/apt/apt.conf.d/00azerlay-snapshot
+          # Fixed, signed archive closure. No live apt sources or insecure flags.
+          rm -f /etc/apt/sources.list
+          rm -f /etc/apt/sources.list.d/ubuntu.sources
+          cat > /etc/apt/sources.list.d/azerlay.sources <<'SOURCES'
+          Types: deb
+          URIs: https://snapshot.ubuntu.com/ubuntu/20261001T000000Z/
+          Suites: resolute resolute-updates resolute-security
+          Components: main universe
+          Architectures: amd64
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+          SOURCES
+          apt-get update --error-on=any
+          # Verify the exact signed metadata as well as APT's signature checks.
+          while read -r suite expected; do
+            indexes=(/var/lib/apt/lists/*_dists_"$suite"_InRelease)
+            test "${#indexes[@]}" = 1
+            printf '%s  %s\n' "$expected" "${indexes[0]}" | sha256sum --check
+          done <<'INDEXES'
+          resolute 45f95ce276cdba3e41870516a130e03c58b8b7a79e9546b0efe9e526d255740c
+          resolute-updates 802e675dd9de4c7f3916434a95e7c1d8eec0e82886622d7805ab19a2c6fe0365
+          resolute-security 1d5041572116a8b23aabf79ac7439ad8af83d57ad3fb0f9aa0d4523ec10c5908
+          INDEXES
+          apt-get indextargets --format '$(URI)' > /tmp/azerlay-apt-index-uris
+          test -s /tmp/azerlay-apt-index-uris
+          if grep -v '^https://snapshot\.ubuntu\.com/ubuntu/20261001T000000Z/' /tmp/azerlay-apt-index-uris; then
+            printf 'Unexpected non-snapshot APT source\n' >&2
+            exit 1
+          fi
+          apt-get -y dist-upgrade
+          apt-get install -y --no-install-recommends ca-certificates git curl tar gzip zstd build-essential pkg-config libgtk-4-dev libgtk4-layer-shell-dev gobject-introspection libgirepository-1.0-dev python3 sway dbus grim fonts-noto-cjk fonts-noto-color-emoji libcap2-bin
+          apt-get check
+          audit=$(dpkg --audit)
+          test -z "$audit"
+          # Ubuntu may ship sway without a capability; do not mask other errors.
+          if [[ -n $(getcap /usr/bin/sway) ]]; then setcap -r /usr/bin/sway; fi
 
       - name: Check out repository
         uses: actions/checkout@v4
@@ -34,14 +85,12 @@ jobs:
           persist-credentials: false
 
       - name: Prepare native Go cache input
+        id: native_environment
         env:
           CI_CACHE_JOB: ${{ github.job }}
         run: |
           set -euo pipefail
-          {
-            printf 'job=%s\n' "$CI_CACHE_JOB"
-            LC_ALL=C pacman -Q | LC_ALL=C sort
-          } > .git/ci-native-cache-input
+          bash scripts/ci-native-fingerprint.sh > .git/ci-native-cache-input
 
       - name: Set up Go and native caches
         uses: ./.github/actions/native-go-cache
@@ -109,8 +158,18 @@ jobs:
       - name: Build
         run: go build ./cmd/azerlay
 
+      - name: Retain complete native environment fingerprint
+        if: ${{ always() && steps.native_environment.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: .git/ci-native-cache-input
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
   fuzz:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Check out repository
@@ -139,9 +198,9 @@ jobs:
           go test ./internal/profileadapter -run='^$' -fuzz='^FuzzNormalize$' -fuzztime=10s -parallel=1 -timeout=2m
 
   native-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
-    container: archlinux:base
+    container: ubuntu:26.04@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794
     defaults:
       run:
         shell: bash
@@ -149,8 +208,59 @@ jobs:
       GOCACHE: /tmp/azerlay-go-build
       GOMODCACHE: /tmp/azerlay-go-mod
     steps:
-      - name: Install Arch build dependencies
-        run: pacman -Syu --noconfirm --needed ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection
+      - name: Bootstrap snapshot CA with verified official package
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = 'https://snapshot.ubuntu.com/ubuntu/20261001T000000Z/pool/main/c/ca-certificates/ca-certificates_20260601~26.04.1_all.deb';
+            const expected = '6077d27c6b6f8b23590cb01ff877ed8c804a67a5442cc32b5a33da10d2bd0e90';
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`CA bootstrap download failed: ${response.status}`);
+            const data = Buffer.from(await response.arrayBuffer());
+            const actual = require('crypto').createHash('sha256').update(data).digest('hex');
+            if (data.length !== 138514 || actual !== expected) throw new Error('CA bootstrap integrity mismatch');
+            require('fs').writeFileSync('/tmp/azerlay-bootstrap-ca.deb', data);
+
+      - name: Install pinned Ubuntu build dependencies
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          dpkg-deb -x /tmp/azerlay-bootstrap-ca.deb /tmp/azerlay-bootstrap-ca
+          cat /tmp/azerlay-bootstrap-ca/usr/share/ca-certificates/mozilla/*.crt > /tmp/azerlay-bootstrap-ca.pem
+          printf 'Acquire::https::CAInfo "/tmp/azerlay-bootstrap-ca.pem";\nAPT::Get::Always-Include-Phased-Updates "true";\n' > /etc/apt/apt.conf.d/00azerlay-snapshot
+          # Fixed, signed archive closure. No live apt sources or insecure flags.
+          rm -f /etc/apt/sources.list
+          rm -f /etc/apt/sources.list.d/ubuntu.sources
+          cat > /etc/apt/sources.list.d/azerlay.sources <<'SOURCES'
+          Types: deb
+          URIs: https://snapshot.ubuntu.com/ubuntu/20261001T000000Z/
+          Suites: resolute resolute-updates resolute-security
+          Components: main universe
+          Architectures: amd64
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+          SOURCES
+          apt-get update --error-on=any
+          # Verify the exact signed metadata as well as APT's signature checks.
+          while read -r suite expected; do
+            indexes=(/var/lib/apt/lists/*_dists_"$suite"_InRelease)
+            test "${#indexes[@]}" = 1
+            printf '%s  %s\n' "$expected" "${indexes[0]}" | sha256sum --check
+          done <<'INDEXES'
+          resolute 45f95ce276cdba3e41870516a130e03c58b8b7a79e9546b0efe9e526d255740c
+          resolute-updates 802e675dd9de4c7f3916434a95e7c1d8eec0e82886622d7805ab19a2c6fe0365
+          resolute-security 1d5041572116a8b23aabf79ac7439ad8af83d57ad3fb0f9aa0d4523ec10c5908
+          INDEXES
+          apt-get indextargets --format '$(URI)' > /tmp/azerlay-apt-index-uris
+          test -s /tmp/azerlay-apt-index-uris
+          if grep -v '^https://snapshot\.ubuntu\.com/ubuntu/20261001T000000Z/' /tmp/azerlay-apt-index-uris; then
+            printf 'Unexpected non-snapshot APT source\n' >&2
+            exit 1
+          fi
+          apt-get -y dist-upgrade
+          apt-get install -y --no-install-recommends ca-certificates git curl tar gzip zstd build-essential pkg-config libgtk-4-dev libgtk4-layer-shell-dev gobject-introspection libgirepository-1.0-dev python3
+          apt-get check
+          audit=$(dpkg --audit)
+          test -z "$audit"
 
       - name: Check out repository
         uses: actions/checkout@v4
@@ -158,14 +268,12 @@ jobs:
           persist-credentials: false
 
       - name: Prepare native Go cache input
+        id: native_environment
         env:
           CI_CACHE_JOB: ${{ github.job }}
         run: |
           set -euo pipefail
-          {
-            printf 'job=%s\n' "$CI_CACHE_JOB"
-            LC_ALL=C pacman -Q | LC_ALL=C sort
-          } > .git/ci-native-cache-input
+          bash scripts/ci-native-fingerprint.sh > .git/ci-native-cache-input
 
       - name: Set up Go and native caches
         uses: ./.github/actions/native-go-cache
@@ -186,10 +294,20 @@ jobs:
           /tmp/azerlay version
           readelf -d /tmp/azerlay
 
+      - name: Retain complete native environment fingerprint
+        if: ${{ always() && steps.native_environment.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: .git/ci-native-cache-input
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
   vulnerability:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
-    container: archlinux:base
+    container: ubuntu:26.04@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794
     defaults:
       run:
         shell: bash
@@ -197,8 +315,59 @@ jobs:
       GOCACHE: /tmp/azerlay-go-build
       GOMODCACHE: /tmp/azerlay-go-mod
     steps:
-      - name: Install native build dependencies
-        run: pacman -Syu --noconfirm --needed ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection
+      - name: Bootstrap snapshot CA with verified official package
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = 'https://snapshot.ubuntu.com/ubuntu/20261001T000000Z/pool/main/c/ca-certificates/ca-certificates_20260601~26.04.1_all.deb';
+            const expected = '6077d27c6b6f8b23590cb01ff877ed8c804a67a5442cc32b5a33da10d2bd0e90';
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`CA bootstrap download failed: ${response.status}`);
+            const data = Buffer.from(await response.arrayBuffer());
+            const actual = require('crypto').createHash('sha256').update(data).digest('hex');
+            if (data.length !== 138514 || actual !== expected) throw new Error('CA bootstrap integrity mismatch');
+            require('fs').writeFileSync('/tmp/azerlay-bootstrap-ca.deb', data);
+
+      - name: Install pinned Ubuntu build dependencies
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          dpkg-deb -x /tmp/azerlay-bootstrap-ca.deb /tmp/azerlay-bootstrap-ca
+          cat /tmp/azerlay-bootstrap-ca/usr/share/ca-certificates/mozilla/*.crt > /tmp/azerlay-bootstrap-ca.pem
+          printf 'Acquire::https::CAInfo "/tmp/azerlay-bootstrap-ca.pem";\nAPT::Get::Always-Include-Phased-Updates "true";\n' > /etc/apt/apt.conf.d/00azerlay-snapshot
+          # Fixed, signed archive closure. No live apt sources or insecure flags.
+          rm -f /etc/apt/sources.list
+          rm -f /etc/apt/sources.list.d/ubuntu.sources
+          cat > /etc/apt/sources.list.d/azerlay.sources <<'SOURCES'
+          Types: deb
+          URIs: https://snapshot.ubuntu.com/ubuntu/20261001T000000Z/
+          Suites: resolute resolute-updates resolute-security
+          Components: main universe
+          Architectures: amd64
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+          SOURCES
+          apt-get update --error-on=any
+          # Verify the exact signed metadata as well as APT's signature checks.
+          while read -r suite expected; do
+            indexes=(/var/lib/apt/lists/*_dists_"$suite"_InRelease)
+            test "${#indexes[@]}" = 1
+            printf '%s  %s\n' "$expected" "${indexes[0]}" | sha256sum --check
+          done <<'INDEXES'
+          resolute 45f95ce276cdba3e41870516a130e03c58b8b7a79e9546b0efe9e526d255740c
+          resolute-updates 802e675dd9de4c7f3916434a95e7c1d8eec0e82886622d7805ab19a2c6fe0365
+          resolute-security 1d5041572116a8b23aabf79ac7439ad8af83d57ad3fb0f9aa0d4523ec10c5908
+          INDEXES
+          apt-get indextargets --format '$(URI)' > /tmp/azerlay-apt-index-uris
+          test -s /tmp/azerlay-apt-index-uris
+          if grep -v '^https://snapshot\.ubuntu\.com/ubuntu/20261001T000000Z/' /tmp/azerlay-apt-index-uris; then
+            printf 'Unexpected non-snapshot APT source\n' >&2
+            exit 1
+          fi
+          apt-get -y dist-upgrade
+          apt-get install -y --no-install-recommends ca-certificates git curl tar gzip zstd build-essential pkg-config libgtk-4-dev libgtk4-layer-shell-dev gobject-introspection libgirepository-1.0-dev python3
+          apt-get check
+          audit=$(dpkg --audit)
+          test -z "$audit"
 
       - name: Check out repository
         uses: actions/checkout@v4
@@ -206,14 +375,12 @@ jobs:
           persist-credentials: false
 
       - name: Prepare native Go cache input
+        id: native_environment
         env:
           CI_CACHE_JOB: ${{ github.job }}
         run: |
           set -euo pipefail
-          {
-            printf 'job=%s\n' "$CI_CACHE_JOB"
-            LC_ALL=C pacman -Q | LC_ALL=C sort
-          } > .git/ci-native-cache-input
+          bash scripts/ci-native-fingerprint.sh > .git/ci-native-cache-input
 
       - name: Set up Go and native caches
         uses: ./.github/actions/native-go-cache
@@ -233,10 +400,20 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           govulncheck ./...
 
+      - name: Retain complete native environment fingerprint
+        if: ${{ always() && steps.native_environment.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: .git/ci-native-cache-input
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
   licenses:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
-    container: archlinux:base
+    container: ubuntu:26.04@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794
     defaults:
       run:
         shell: bash
@@ -244,8 +421,59 @@ jobs:
       GOCACHE: /tmp/azerlay-go-build
       GOMODCACHE: /tmp/azerlay-go-mod
     steps:
-      - name: Install native build dependencies
-        run: pacman -Syu --noconfirm --needed ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection
+      - name: Bootstrap snapshot CA with verified official package
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = 'https://snapshot.ubuntu.com/ubuntu/20261001T000000Z/pool/main/c/ca-certificates/ca-certificates_20260601~26.04.1_all.deb';
+            const expected = '6077d27c6b6f8b23590cb01ff877ed8c804a67a5442cc32b5a33da10d2bd0e90';
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`CA bootstrap download failed: ${response.status}`);
+            const data = Buffer.from(await response.arrayBuffer());
+            const actual = require('crypto').createHash('sha256').update(data).digest('hex');
+            if (data.length !== 138514 || actual !== expected) throw new Error('CA bootstrap integrity mismatch');
+            require('fs').writeFileSync('/tmp/azerlay-bootstrap-ca.deb', data);
+
+      - name: Install pinned Ubuntu build dependencies
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          dpkg-deb -x /tmp/azerlay-bootstrap-ca.deb /tmp/azerlay-bootstrap-ca
+          cat /tmp/azerlay-bootstrap-ca/usr/share/ca-certificates/mozilla/*.crt > /tmp/azerlay-bootstrap-ca.pem
+          printf 'Acquire::https::CAInfo "/tmp/azerlay-bootstrap-ca.pem";\nAPT::Get::Always-Include-Phased-Updates "true";\n' > /etc/apt/apt.conf.d/00azerlay-snapshot
+          # Fixed, signed archive closure. No live apt sources or insecure flags.
+          rm -f /etc/apt/sources.list
+          rm -f /etc/apt/sources.list.d/ubuntu.sources
+          cat > /etc/apt/sources.list.d/azerlay.sources <<'SOURCES'
+          Types: deb
+          URIs: https://snapshot.ubuntu.com/ubuntu/20261001T000000Z/
+          Suites: resolute resolute-updates resolute-security
+          Components: main universe
+          Architectures: amd64
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+          SOURCES
+          apt-get update --error-on=any
+          # Verify the exact signed metadata as well as APT's signature checks.
+          while read -r suite expected; do
+            indexes=(/var/lib/apt/lists/*_dists_"$suite"_InRelease)
+            test "${#indexes[@]}" = 1
+            printf '%s  %s\n' "$expected" "${indexes[0]}" | sha256sum --check
+          done <<'INDEXES'
+          resolute 45f95ce276cdba3e41870516a130e03c58b8b7a79e9546b0efe9e526d255740c
+          resolute-updates 802e675dd9de4c7f3916434a95e7c1d8eec0e82886622d7805ab19a2c6fe0365
+          resolute-security 1d5041572116a8b23aabf79ac7439ad8af83d57ad3fb0f9aa0d4523ec10c5908
+          INDEXES
+          apt-get indextargets --format '$(URI)' > /tmp/azerlay-apt-index-uris
+          test -s /tmp/azerlay-apt-index-uris
+          if grep -v '^https://snapshot\.ubuntu\.com/ubuntu/20261001T000000Z/' /tmp/azerlay-apt-index-uris; then
+            printf 'Unexpected non-snapshot APT source\n' >&2
+            exit 1
+          fi
+          apt-get -y dist-upgrade
+          apt-get install -y --no-install-recommends ca-certificates git curl tar gzip zstd build-essential pkg-config libgtk-4-dev libgtk4-layer-shell-dev gobject-introspection libgirepository-1.0-dev python3
+          apt-get check
+          audit=$(dpkg --audit)
+          test -z "$audit"
 
       - name: Check out repository
         uses: actions/checkout@v4
@@ -253,14 +481,12 @@ jobs:
           persist-credentials: false
 
       - name: Prepare native Go cache input
+        id: native_environment
         env:
           CI_CACHE_JOB: ${{ github.job }}
         run: |
           set -euo pipefail
-          {
-            printf 'job=%s\n' "$CI_CACHE_JOB"
-            LC_ALL=C pacman -Q | LC_ALL=C sort
-          } > .git/ci-native-cache-input
+          bash scripts/ci-native-fingerprint.sh > .git/ci-native-cache-input
 
       - name: Set up Go and native caches
         uses: ./.github/actions/native-go-cache
@@ -288,8 +514,18 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Retain complete native environment fingerprint
+        if: ${{ always() && steps.native_environment.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: .git/ci-native-cache-input
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
   generated-files:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out repository
@@ -355,3 +591,114 @@ jobs:
 
       - name: Check generated fixtures
         run: git diff --exit-code -- internal/profiledecode/testdata/zeros-64mib.lzma internal/profiledecode/testdata/zeros-64mib-plus-one.lzma
+
+  arch-compatibility:
+    runs-on: ubuntu-24.04
+    container: archlinux:base
+    defaults:
+      run:
+        shell: bash
+    env:
+      GOCACHE: /tmp/azerlay-go-build
+      GOMODCACHE: /tmp/azerlay-go-mod
+    steps:
+      - name: Install native test dependencies
+        run: |
+          pacman -Syu --noconfirm --needed ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection sway dbus grim noto-fonts-cjk noto-fonts-emoji
+          setcap -r /usr/bin/sway
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Prepare native Go cache input
+        id: native_environment
+        env:
+          CI_CACHE_JOB: ${{ github.job }}
+        run: |
+          set -euo pipefail
+          bash scripts/ci-native-fingerprint.sh > .git/ci-native-cache-input
+
+      - name: Set up Go and native caches
+        uses: ./.github/actions/native-go-cache
+        with:
+          tool-cache: 'true'
+
+      - name: Check complete package partition and core dependencies
+        env:
+          CGO_ENABLED: '1'
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          python3 scripts/ci_check_packages.py
+
+      - name: Check formatting
+        shell: bash
+        run: |
+          files=$(gofmt -l .)
+          if [[ -n $files ]]; then
+            printf 'Files require gofmt:\n%s\n' "$files"
+            gofmt -d .
+            exit 1
+          fi
+
+      - name: Vet
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          go vet ./...
+
+      - name: Install Staticcheck
+        env:
+          GOMODCACHE: /tmp/azerlay-tool-go-mod
+        run: |
+          source .github/ci-tools.env
+          go install honnef.co/go/tools/cmd/staticcheck@"$STATICCHECK_VERSION"
+          du -sb "$GOMODCACHE/cache/download"
+
+      - name: Staticcheck
+        run: staticcheck ./...
+
+      - name: Test
+        id: native_race
+        run: |
+          set -euo pipefail
+          useradd --create-home --user-group azerlay-test
+          mkdir -p "$GOCACHE" "$GOMODCACHE"
+          chown -R azerlay-test:azerlay-test "$GITHUB_WORKSPACE" "$GOCACHE" "$GOMODCACHE"
+          mapfile -t native < scripts/ci-native-packages.txt
+          printf 'diagnostic_dir=%s\n' "$RUNNER_TEMP" >> "$GITHUB_OUTPUT"
+          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/native-race-timing.json" -- \
+            runuser -u azerlay-test -- env PATH="$PATH" GOCACHE="$GOCACHE" GOMODCACHE="$GOMODCACHE" scripts/test-wayland.sh go test -race -json -shuffle=on -count=1 "${native[@]}" \
+            | tee "$RUNNER_TEMP/native-race-tests.jsonl"
+
+      - name: Upload native race diagnostics
+        if: ${{ always() && (steps.native_race.outcome == 'success' || steps.native_race.outcome == 'failure') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: arch-native-race-json-attempt-${{ github.run_attempt }}
+          path: |
+            ${{ steps.native_race.outputs.diagnostic_dir }}/native-race-tests.jsonl
+            ${{ steps.native_race.outputs.diagnostic_dir }}/native-race-timing.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Build, run, and inspect Arch native binary
+        run: |
+          set -euo pipefail
+          test "$(go env CGO_ENABLED)" = 1
+          go version
+          pkg-config --modversion gtk4 gtk4-layer-shell-0
+          CGO_ENABLED=1 go build -o /tmp/azerlay ./cmd/azerlay
+          /tmp/azerlay version
+          readelf -d /tmp/azerlay
+
+      - name: Retain complete native environment fingerprint
+        if: ${{ always() && steps.native_environment.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: .git/ci-native-cache-input
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7

@@ -24,7 +24,11 @@ cpu_count=$(getconf _NPROCESSORS_ONLN)
   go env GOOS GOARCH GOVERSION CGO_ENABLED CC GOAMD64
   pkg-config --modversion gtk4 gtk4-layer-shell-0
 } > "$out/environment.txt"
-LC_ALL=C pacman -Q | LC_ALL=C sort > "$out/native-packages.txt"
+if command -v dpkg-query >/dev/null; then
+  LC_ALL=C dpkg-query -W -f='${binary:Package}\t${Version}\t${Architecture}\n' | LC_ALL=C sort > "$out/native-packages.txt"
+else
+  LC_ALL=C pacman -Q | LC_ALL=C sort > "$out/native-packages.txt"
+fi
 sha256sum go.mod go.sum .github/ci-tools.env > "$out/input-sha256.txt"
 if [[ -f .git/ci-native-cache-input ]]; then
   cp .git/ci-native-cache-input "$out/native-cache-input.txt"

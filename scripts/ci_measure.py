@@ -7,7 +7,7 @@ from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
 
-REQUIRED = ("test", "fuzz", "native-build", "vulnerability", "licenses", "generated-files")
+REQUIRED = ("test", "fuzz", "native-build", "vulnerability", "licenses", "generated-files", "arch-compatibility")
 P50_BUDGET_SECONDS = 180
 P95_BUDGET_SECONDS = 300
 MINIMUM_SAMPLES = 20

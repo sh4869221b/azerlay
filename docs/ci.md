@@ -11,10 +11,11 @@ explicit versions without changing the application's `go.mod` or `go.sum`.
 | --- | --- | --- |
 | `test` | Formatting, all-package vet/Staticcheck, native race tests, binary build | GitHub default (360 minutes) |
 | `fuzz` | Seven existing fuzz targets, each with a 10-second fuzz allocation | 10 minutes |
-| `native-build` | Verify default CGo, compile the native binary in Arch, run version, and inspect shared libraries | 15 minutes |
+| `native-build` | Verify default CGo, compile the native binary in pinned Ubuntu 26.04, run version, and inspect shared libraries | 15 minutes |
 | `vulnerability` | Reachable Go vulnerability scan | 20 minutes |
 | `licenses` | Third-party Go dependency license CSV | 10 minutes |
 | `generated-files` | CI-tool tests, core CGO=0 and race tests, regenerate both LZMA fixtures and reject differences | 15 minutes |
+| `arch-compatibility` | Rolling Arch whole-package vet/Staticcheck, native race/Wayland integration, native build/version/ELF checks | GitHub default (360 minutes) |
 
 The `test` job rejects any output from `gofmt -l .`, then runs:
 
@@ -27,7 +28,7 @@ scripts/test-wayland.sh go test -race -json -shuffle=on -count=1 "${native[@]}"
 go build ./cmd/azerlay
 ```
 
-Every ordinary root-module package has one race/shuffle/uncached test run:
+Every ordinary root-module package has a required race/shuffle/uncached test run:
 core packages in `generated-files`, native packages in `test`. Core packages
 also receive a separate CGO=0 contract run. Production GTK/CGo remains native. Native child
 tests initialize GTK on their process main thread.
@@ -54,8 +55,8 @@ fingerprint. The original fixture regeneration and diff steps remain afterward.
 After successful initial boundary validation, the native race command no longer
 repeats the 14 core packages. Their required race run stays in `generated-files`,
 which also retains actual fixture regeneration/diff. The manifest checker rejects
-omissions and overlap; failure in either job still fails the workflow. Job IDs,
-package-install commands and existing cache inputs are unchanged. The fresh
+omissions and overlap; failure in either job still fails the workflow. Existing job IDs and
+the core/native package manifests are unchanged. The fresh
 core race cache and extra CGO=0 mode have a cost that remains part of measurement.
 This partition is a measured candidate, not a demonstrated p50/p95 budget result.
 
@@ -148,13 +149,21 @@ from this job by `-run='^$'`. Longer fuzz campaigns are outside PR CI.
 
 ## Distribution builds and GTK coverage
 
-`test`, `native-build`, `vulnerability`, and `licenses` use
-`archlinux:base`. Before checkout and Go setup, they run `pacman -Syu` and install
-`ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell
-gobject-introspection`. Ubuntu distribution support is excluded from v1 and
+`test`, `native-build`, `vulnerability`, and `licenses` use an immutable
+Ubuntu 26.04 AMD64 base plus an official dated APT snapshot. See
+[the stable-native environment contract](ci-stable-native.md) for exact pins,
+bootstrap authentication, update and rollback policy, and validation status.
+`arch-compatibility` retains rolling `archlinux:base` and `pacman -Syu` on every
+PR and main push. It repeats the complete native race/Wayland gate and checks
+whole-package vet/Staticcheck plus the built binary's version and ELF linkage.
+It is blocking workflow work, with no schedule-only or continue-on-error path.
+
+The runner host and GUI-free `fuzz`/`generated-files` jobs use the explicit
+`ubuntu-24.04` hosted-runner label. Hosted images are maintained by GitHub, not
+immutable. The core race cache remains fresh and outside setup-go's cache.
+Ubuntu as a CI substrate does not expand v1 product support; that remains
 tracked in [Issue #98](https://github.com/sh4869221b/azerlay/issues/98).
-The Ubuntu-hosted runner and the GUI-free `fuzz`/`generated-files` jobs do not qualify
-Ubuntu as a product target. The distribution build runs:
+The distribution build runs:
 
 ```sh
 git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -174,7 +183,7 @@ global Git config. This preserves normal Go VCS metadata during compilation.
 
 ### Module and native build caches
 
-The four Arch jobs use `.github/actions/native-go-cache`. Automatic setup-go
+The four fixed Ubuntu native jobs and rolling Arch compatibility job use `.github/actions/native-go-cache`. Automatic setup-go
 caching is disabled for those jobs to avoid saving the same directories twice.
 The two GUI-free Ubuntu jobs retain their existing setup-go caches unchanged;
 `generated-files` runs its new CGo/race boundary proof in a separate fresh,
@@ -198,7 +207,8 @@ step-local `RUNNER_TEMP` GOCACHE that is deleted rather than saved.
   downloads. Each tool installs normally on a cache miss; no priming build or
   cross-job dependency is introduced.
 - **Build results:** each job restores and saves only `/tmp/azerlay-go-build`.
-  Its key includes the job ID and complete sorted installed Arch package list,
+  Its key includes the job ID, distro, image/install recipe, compiler/linker/pkg-config
+  metadata and complete sorted installed package list,
   plus OS, architecture, resolved Go toolchain, application dependency files,
   and CI-tool versions. No restore prefix crosses the native compatibility
   boundary. Native updates still produce a cold build cache.
@@ -252,7 +262,7 @@ only download archives and reconstructs sources locally. The issue's
 0–10-second estimate
 is a hypothesis, not a measured result or a compile-time saving.
 
-The test job also installs Sway and D-Bus, removes Sway's file capability inside
+Both native integration jobs install Sway and D-Bus, remove any Sway file capability inside
 the container, and runs tests as a dedicated non-root user with writable Go
 caches. `scripts/test-wayland.sh` starts a private two-output headless Sway with
 the pixman renderer, waits for its socket, and provides an absolute test display
@@ -274,6 +284,16 @@ isolated build cache rather than the two equivalent caches it replaced. Old
 combined cache entries expire under GitHub's normal retention policy.
 
 ### Required-check migration
+
+The stable-native migration keeps all six existing job IDs and adds the real
+`arch-compatibility` job. Require that additional check wherever repository
+protection/rulesets enforce CI; this PR does not change those settings. Until
+that administrative policy is configured, “required” here describes the
+workflow acceptance contract, not a claim about GitHub branch protection.
+The measurement tool's default gate set now includes all seven jobs; it must
+not report the six-job subset as the total PR latency. Historical six-job
+measurements require an explicit `--required` list and remain a separate cohort.
+
 
 Before merging this job rename, repository administrators should inspect branch
 protection and rulesets. If either `container-build` or `cgo-smoke` is required,
