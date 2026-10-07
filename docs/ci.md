@@ -57,7 +57,7 @@ which also retains actual fixture regeneration/diff. The manifest checker reject
 omissions and overlap; failure in either job still fails the workflow. Job IDs,
 package-install commands and existing cache inputs are unchanged. The fresh
 core race cache and extra CGO=0 mode have a cost that remains part of measurement.
-This partition is a measured candidate, not a 60-second or p95 claim.
+This partition is a measured candidate, not a demonstrated p50/p95 budget result.
 
 ### Race diagnostics baseline
 
@@ -358,7 +358,7 @@ Only the existing compressed files are written; ordinary tests read them
 without regeneration and no decompressed files are stored. Any byte change
 fails the diff check and needs an explanation, not an automatic fixture update.
 
-## CI-wide 60-second measurement contract
+## CI-wide measurement contract
 
 The initial [Issue #135 measurement contract](measurements/ci-60s/README.md)
 defines distinct execution/queue/event clocks, a six-gate correspondence,
@@ -369,3 +369,30 @@ historical run has 186 seconds of required execution and 189 seconds from run
 creation to last API update. This clock correction is not a speedup, and one
 sample does not establish a p95. All native checks and safety budgets above
 remain mandatory.
+
+### Current performance goal
+
+The owner revised #134/#135 on 2026-10-07: ordinary warm/source-only full-required
+execution targets p50 <=180 seconds and p95 <=300 seconds. Keep queue/event time
+and cold/dependency/native refresh separate. The original 60-second target is
+historical. Current 159-second ordinary and 196-second diagnostic observations
+are single samples, not established p50/p95. Use representative natural runs
+first; no automatic large benchmark campaign or mandatory broad native rewrite.
+
+### Bounded #138 candidate validation
+
+The test-only candidate stores real compositor screenshot crops using lossless
+PNG without compression. Pixel/bounds round trips, deterministic equal-image
+bytes, per-channel differences and source immutability are checked. Only the
+two independently owned CLI input-fixture groups become parallel; all 68 routes
+and sequential per-store children remain. No decoder caps, native samples,
+sleeps, deadlines, frames or production code change. Larger temporary PNG files
+are a tradeoff to measure.
+
+One diagnostic validation run repeats the CLI input groups, live-overlay modes
+and live-latency test three times, and the pure capture-encoding helper 20 times.
+These are focused stress repetitions inside one workflow, not 20 workflow samples
+or a p95 campaign. Ordinary required commands retain count=1. Stress and JSON
+artifact overhead must stay separate from ordinary-budget conclusions; failures
+remain blocking. Large-decoder parallelism and larger architectural experiments
+are deferred under the revised goal.

@@ -1,4 +1,4 @@
-# CI 60-second measurement contract (Issue #135, initial stage)
+# CI measurement contract: ordinary p50 3 minutes, p95 5 minutes
 
 This is measurement infrastructure, not a CI speedup or a completed acceptance
 claim. The six existing workflow gates and cache keys remain; a Python tooling
@@ -21,19 +21,32 @@ branch protection. Python 3.10+ is needed only for offline analysis.
 - Queue, per-job creation/start, and results-notification delivery are separate
   measurements when those timestamps are available. Unknown stays unknown.
 
-Use nearest-rank percentiles: sorted sample at `ceil(p*n)`, one-indexed. Fix the
-cohort, variant, repetition plan and selection window **before** running. Plan
-20 measured runs each for identical-commit warm and source-only conditions.
-Plan the same for cold, Go dependency refresh, native/image refresh and tool
-refresh only after estimating their runner cost and receiving authorization for
-that experiment. A plan does not authorize dozens of CI runs. Keep priming runs
-separate and record every failed, cancelled, timed-out and outlier attempt.
-Reruns are new attempts, not replacements for failed observations. Failed-jobs-only
-reruns need separate recovery records: GitHub copies prior successful jobs with
-new IDs and attempt numbers but old execution timestamps. The analyzer rejects
-that mixed timing history using `run_started_at`, so prior runner time is not
-counted twice or presented as an independent successful sample. Preserve the
-failed attempt and the retry's raw data/quality outcome together.
+## Current goal (owner update, 2026-10-07)
+
+For ordinary warm/source-only runs, required workflow execution aims for **p50
+<=180 seconds and p95 <=300 seconds**. Queue/event-to-result remains separate.
+Cold, Go dependency changes and native/image/tool refresh have separate cohorts
+and regression/failure reporting; these bounds are not guarantees for them.
+The original 60-second goal and this directory name are historical. No broad
+native replacement, speculative cache pipeline or extra fuzz sharding is mandatory
+solely to reach that old number. All existing quality gates remain required.
+
+Use the predeclared nearest-rank p50/p95 method: sorted sample at `ceil(p*n)`,
+one-indexed. First use comparable existing and ordinary-development observations.
+Fix representative conditions, the selection window and anticipated cost before
+requesting extra runs. At least 20 comparable observations is the minimum for
+an empirical p95 budget flag, not a statistical confidence guarantee. Small
+samples support preliminary range/p50 discussion only. Do not automatically
+launch 20 runs per condition, especially cold/refresh. A bulk campaign requires
+an explicit necessity/cost decision. Keep priming and instrumented runs distinct.
+Retain every failed, cancelled, timed-out and outlier attempt.
+
+Reruns do not replace failed observations. Failed-jobs-only retries need separate
+recovery records: GitHub copies prior successful jobs with new IDs and attempt
+numbers but old execution timestamps. The analyzer rejects that mixed timing
+history using `run_started_at`, so prior runner time is not counted twice or
+presented as an independent successful sample. Preserve the failed attempt and
+the retry's raw data/quality outcome together.
 
 Each compared variant needs a fixed revision and documented environment cohort.
 Alternate baseline/candidate runs where practical; do not pool different
@@ -44,13 +57,15 @@ label from short duration. A cohort ID identifies the reviewed fingerprint and
 protocol; the analyzer does not prove that its human-supplied label is true.
 
 The analyzer reports descriptive percentiles even with one sample and marks
-`small_sample_warning`. Its `warm_60s_observed` flag requires at least 20 complete
-successful samples in one warm/source-only cohort, the exact initial six-gate
-set and p95 <=60 seconds. Future gate splits need a reviewed manifest update
-before this initial implementation can issue that flag. This is
-an observation, not a statistical confidence guarantee or an overall Issue #134
-completion. Missing/skipped/failed required jobs block it. All other conditions
-must report their gap to 60 seconds, even if warm passes.
+`small_sample_warning`. `ordinary_budget_observed` requires at least 20 complete,
+successful comparable samples, the complete six-job execution set, an ordinary
+warm/source-only condition, p50 <=180 seconds and p95 <=300 seconds. Missing,
+skipped, failed or cancelled checks block the flag. `budget_applicable` is false
+for cold/refresh/historical cohorts; report those outcomes separately. The flag
+is an empirical observation, not statistical confidence or automatic issue closure.
+Any future gate split requires a reviewed complete execution-manifest update.
+Saved summary files can be regenerated under this current policy without changing
+raw run evidence or pretending historical one-sample outcomes established p95.
 
 ## Reproduction
 

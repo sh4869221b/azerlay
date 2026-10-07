@@ -6,17 +6,17 @@
       "p50_seconds": 180,
       "p95_seconds": 300
     },
-    "budget_applicable": true,
-    "cohort": "2026-10-07-post-refresh-control",
-    "commit": "57f8f5ba94639610a2fde0aa3a7c41c24f6ff22c",
+    "budget_applicable": false,
+    "cohort": "2026-10-07-before-test-only-candidate",
+    "commit": "ff969e371a4db0cceb057339d4714c5032fd5e99",
     "complete_initial_gate_set": true,
-    "condition": "source-only",
+    "condition": "diagnostic",
     "metrics": {
       "created_to_required_result_seconds": {
-        "max": 219.0,
+        "max": 198.0,
         "n": 1,
-        "p50": 219.0,
-        "p95": 219.0
+        "p50": 198.0,
+        "p95": 198.0
       },
       "event_to_required_result_seconds": {
         "max": null,
@@ -25,16 +25,16 @@
         "p95": null
       },
       "execution_seconds": {
-        "max": 217.0,
+        "max": 196.0,
         "n": 1,
-        "p50": 217.0,
-        "p95": 217.0
+        "p50": 196.0,
+        "p95": 196.0
       },
       "runner_seconds": {
-        "max": 577.0,
+        "max": 655.0,
         "n": 1,
-        "p50": 577.0,
-        "p95": 577.0
+        "p50": 655.0,
+        "p95": 655.0
       }
     },
     "non_success_rate": 0.0,
@@ -51,8 +51,8 @@
       {
         "attempt": 1,
         "errors": [],
-        "run_id": 37557666676,
-        "url": "https://github.com/sh4869221b/azerlay/actions/runs/37557666676"
+        "run_id": 37562258365,
+        "url": "https://github.com/sh4869221b/azerlay/actions/runs/37562258365"
       }
     ],
     "small_sample_warning": true,

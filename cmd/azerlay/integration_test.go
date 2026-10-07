@@ -213,6 +213,9 @@ func TestCLIInputForms(t *testing.T) {
 		{"single", cliSingle, cliSingleResult}, {"duplicate_bundle", cliBundle, cliBundleResult},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
+			// Each fixture owns its HOME/XDG store. Keep its inner routes
+			// sequential because imports intentionally share that store.
+			t.Parallel()
 			env := cliEnvironment(t.TempDir())
 			// Choose padding by data, not timing. Require different alphabets and
 			// an actual '=' so all four base64 forms are discriminatory.

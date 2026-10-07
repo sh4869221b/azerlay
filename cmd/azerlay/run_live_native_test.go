@@ -407,14 +407,14 @@ func liveCapture(path string) ([]byte, error) {
 	x, y := (full.Bounds().Dx()-w)/2, (full.Bounds().Dy()-h)/2
 	crop := image.NewNRGBA(image.Rect(0, 0, w, h))
 	draw.Draw(crop, crop.Bounds(), full, image.Pt(x, y), draw.Src)
-	var result bytes.Buffer
-	if err := png.Encode(&result, crop); err != nil {
+	result, err := encodeLiveCapture(crop)
+	if err != nil {
 		return nil, err
 	}
-	if err := os.WriteFile(path, result.Bytes(), 0600); err != nil {
+	if err := os.WriteFile(path, result, 0600); err != nil {
 		return nil, err
 	}
-	return result.Bytes(), nil
+	return result, nil
 }
 
 func exerciseLiveOverlay(ctx context.Context, mode, path, dir, profilePath, profileJSON string, settings func(int, string) string, controller *control.Controller, coordinator *live.Coordinator, raw *nativePipeInput, window *overlay.Window, drawn *atomic.Pointer[renderer.OverlaySnapshot], requests *atomic.Uint64, requestTimes *[]time.Time) error {

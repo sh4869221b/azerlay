@@ -1,6 +1,12 @@
 [
   {
     "attempts": 1,
+    "budget": {
+      "minimum_samples": 20,
+      "p50_seconds": 180,
+      "p95_seconds": 300
+    },
+    "budget_applicable": false,
     "cohort": "main-09db7b3d-observation",
     "commit": "09db7b3d0525de5cbe1f00ba111de10d271ba4c8",
     "complete_initial_gate_set": true,
@@ -32,6 +38,7 @@
       }
     },
     "non_success_rate": 0.0,
+    "ordinary_budget_observed": false,
     "required_jobs": [
       "fuzz",
       "generated-files",
@@ -49,7 +56,6 @@
       }
     ],
     "small_sample_warning": true,
-    "successes": 1,
-    "warm_60s_observed": false
+    "successes": 1
   }
 ]

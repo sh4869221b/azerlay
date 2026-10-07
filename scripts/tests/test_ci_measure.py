@@ -88,7 +88,7 @@ class MeasurementTests(unittest.TestCase):
     def test_single_sample_never_passes_target(self):
         result = ci.summarize([self.sample()])[0]
         self.assertTrue(result["small_sample_warning"])
-        self.assertFalse(result["warm_60s_observed"])
+        self.assertFalse(result["ordinary_budget_observed"])
 
     def test_failure_stays_in_denominator(self):
         rows = []
@@ -96,12 +96,12 @@ class MeasurementTests(unittest.TestCase):
             row = self.sample()
             row["run_id"] = i
             rows.append(row)
-        self.assertTrue(ci.summarize(rows)[0]["warm_60s_observed"])
+        self.assertTrue(ci.summarize(rows)[0]["ordinary_budget_observed"])
         rows[0].update(quality_success=False, errors=["cancelled"], execution_seconds=None)
         result = ci.summarize(rows)[0]
         self.assertEqual(result["attempts"], 20)
         self.assertEqual(result["non_success_rate"], .05)
-        self.assertFalse(result["warm_60s_observed"])
+        self.assertFalse(result["ordinary_budget_observed"])
 
     def test_duplicate_attempt_and_mixed_cohorts(self):
         row = self.sample()
@@ -123,7 +123,7 @@ class MeasurementTests(unittest.TestCase):
     def test_reduced_gate_set_cannot_claim_project_target(self):
         sample = ci.measure(self.run, [self.jobs], "warm", "synthetic-v1", ["generated-files"])
         rows = [dict(sample, run_id=i) for i in range(20)]
-        self.assertFalse(ci.summarize(rows)[0]["warm_60s_observed"])
+        self.assertFalse(ci.summarize(rows)[0]["ordinary_budget_observed"])
 
     def test_gate_order_does_not_split_cohort(self):
         first = self.sample()
@@ -156,11 +156,25 @@ class MeasurementTests(unittest.TestCase):
         self.assertEqual(result["event_to_required_result_seconds"], 58)
 
     def test_target_boundary(self):
-        rows = [dict(self.sample(), run_id=i, execution_seconds=60) for i in range(20)]
-        self.assertTrue(ci.summarize(rows)[0]["warm_60s_observed"])
+        rows = [dict(self.sample(), run_id=i, execution_seconds=180) for i in range(20)]
+        self.assertTrue(ci.summarize(rows)[0]["ordinary_budget_observed"])
         for row in rows:
-            row["execution_seconds"] = 60.1
-        self.assertFalse(ci.summarize(rows)[0]["warm_60s_observed"])
+            row["execution_seconds"] = 180.1
+        self.assertFalse(ci.summarize(rows)[0]["ordinary_budget_observed"])
+        for row in rows:
+            row["execution_seconds"] = 180
+        rows[-1]["execution_seconds"] = rows[-2]["execution_seconds"] = 300
+        self.assertTrue(ci.summarize(rows)[0]["ordinary_budget_observed"])
+        rows[-1]["execution_seconds"] = rows[-2]["execution_seconds"] = 300.1
+        self.assertFalse(ci.summarize(rows)[0]["ordinary_budget_observed"])
+
+    def test_ordinary_budget_does_not_apply_to_cold_or_refresh(self):
+        for condition in ("cold", "go-refresh", "native-refresh", "tool-refresh", "historical", "diagnostic"):
+            with self.subTest(condition=condition):
+                rows = [dict(self.sample(), run_id=i, condition=condition) for i in range(20)]
+                result = ci.summarize(rows)[0]
+                self.assertFalse(result["budget_applicable"])
+                self.assertFalse(result["ordinary_budget_observed"])
 
     def test_invalid_time(self):
         with self.assertRaises(ValueError):

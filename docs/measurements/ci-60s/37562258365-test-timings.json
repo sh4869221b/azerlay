@@ -1,0 +1,337 @@
+{
+  "run_id": 37562258365,
+  "head": "ff969e371a4db0cceb057339d4714c5032fd5e99",
+  "instrumented": true,
+  "native": {
+    "job_id": 112601958846,
+    "metrics": [
+      {
+        "child_system_seconds": 14.864925,
+        "child_user_seconds": 67.138594,
+        "elapsed_seconds": 73.73880639000001,
+        "max_child_rss_kib": 616860,
+        "returncode": 0,
+        "schema_version": 1,
+        "wrapper_signal": null
+      }
+    ],
+    "slow_tests": [
+      {
+        "package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+        "test": "TestRunLiveOverlayNative",
+        "elapsed": 34.22
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/overlay",
+        "test": "TestNativeRendererScaled",
+        "elapsed": 15.04
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+        "test": "TestRunLiveOverlayNative/local",
+        "elapsed": 13.57
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+        "test": "TestRunLiveOverlayNative/imported",
+        "elapsed": 12.07
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+        "test": "TestRunLiveOverlayNative/missing",
+        "elapsed": 8.58
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+        "test": "TestRunLiveOverlayLatency",
+        "elapsed": 8.22
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+        "test": "TestCLIInputForms",
+        "elapsed": 3.99
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/overlay",
+        "test": "TestNativeWindow",
+        "elapsed": 3.44
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+        "test": "TestCLIReportSnapshots",
+        "elapsed": 2.98
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+        "test": "TestRunLocalLifecycle",
+        "elapsed": 2.66
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+        "test": "TestCLINoPersistence",
+        "elapsed": 2.61
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/renderer",
+        "test": "TestRenderSamples",
+        "elapsed": 2.16
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+        "test": "TestCLIInputForms/single",
+        "elapsed": 2.01
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+        "test": "TestCLIInputForms/duplicate_bundle",
+        "elapsed": 1.94
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+        "test": "TestRunConfigPlacement",
+        "elapsed": 1.74
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+        "test": "TestRunNativeVisibility",
+        "elapsed": 1.65
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/overlay",
+        "test": "TestNativeRenderer",
+        "elapsed": 1.47
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/overlay",
+        "test": "TestNativeWindow/lifecycle",
+        "elapsed": 1.21
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/overlay",
+        "test": "TestNativeWindow/region-failure",
+        "elapsed": 1.17
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/overlay",
+        "test": "TestNativeWindow/invalid-display",
+        "elapsed": 1.07
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+        "test": "TestCLIStorageFailureNoAdoption",
+        "elapsed": 0.86
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+        "test": "TestCLIDevicesUsage",
+        "elapsed": 0.81
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+        "test": "TestCLIControlLive",
+        "elapsed": 0.8
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+        "test": "TestCLIPrivateData",
+        "elapsed": 0.79
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+        "test": "TestCLIDuplicateStorage",
+        "elapsed": 0.78
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+        "test": "TestCLICacheRecoveryNoWrite",
+        "elapsed": 0.75
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+        "test": "TestRunLocalWithoutImportedHome",
+        "elapsed": 0.73
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+        "test": "TestRunShutdown",
+        "elapsed": 0.57
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+        "test": "TestCLIControlFailures",
+        "elapsed": 0.54
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/renderer",
+        "test": "TestRenderSamples/status-profile-missing",
+        "elapsed": 0.48
+      }
+    ]
+  },
+  "core": {
+    "job_id": 112601958723,
+    "metrics": [
+      {
+        "child_system_seconds": 19.781826,
+        "child_user_seconds": 160.272876,
+        "elapsed_seconds": 106.45885048000002,
+        "max_child_rss_kib": 1441772,
+        "returncode": 0,
+        "schema_version": 1,
+        "wrapper_signal": null
+      }
+    ],
+    "slow_tests": [
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profilesource",
+        "test": "TestImportedCommitFailure",
+        "elapsed": 20.02
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profilesource",
+        "test": "TestImportedCommitFailure/index_cap",
+        "elapsed": 19.66
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profiledecode",
+        "test": "TestDecodeLZMA_WhenLimitExceeded_RejectsBeforeAdoption",
+        "elapsed": 18.45
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profiledecode",
+        "test": "TestDecodeLZMA_WhenLimitExceeded_RejectsBeforeAdoption/unknown_output_64_MiB_plus_one",
+        "elapsed": 18.38
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profiledecode",
+        "test": "TestDecodeLZMA_WhenComplete_AcceptsExactOutputLimit",
+        "elapsed": 16.97
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profiledecode",
+        "test": "TestDecodeRejectsMalformedAndOverLimitInput/LZMA_unknown_output_over_limit",
+        "elapsed": 16.96
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profilesource",
+        "test": "TestLocalStateRejectsInvalidEnvelope",
+        "elapsed": 8.24
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profilesource",
+        "test": "TestLocalStateRejectsInvalidEnvelope/decoded_limit",
+        "elapsed": 7.55
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profiledecode",
+        "test": "TestSourceLimit_WhenFileIsExactLimit_AcceptsIt",
+        "elapsed": 7.34
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profiledecode",
+        "test": "TestSourceLimit_WhenReaderIsExactLimit_AcceptsIt",
+        "elapsed": 6.42
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profilesource",
+        "test": "TestStorageCodecRejectsInvalid",
+        "elapsed": 4.76
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profiledecode",
+        "test": "TestSourceLimit_WhenTextIsExactLimit_AcceptsIt",
+        "elapsed": 4.25
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profileadapter",
+        "test": "TestNormalizeMacro",
+        "elapsed": 4.2
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profilesource",
+        "test": "TestLocalWatchRealWriteRenameRepair",
+        "elapsed": 3.58
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profilesource",
+        "test": "TestStorageBounds",
+        "elapsed": 3.44
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profilesource",
+        "test": "TestPrepareExactOriginal",
+        "elapsed": 3.23
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profilesource",
+        "test": "TestStorageBounds/index_read_exact_and_overflow",
+        "elapsed": 2.63
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/control",
+        "test": "TestLocalControllerWatchAndRestart",
+        "elapsed": 2.26
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profilesource",
+        "test": "TestStorageBounds/index_read_exact_and_overflow/0",
+        "elapsed": 2.2
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profilesource",
+        "test": "TestPrepareFailure",
+        "elapsed": 2.16
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profilesource",
+        "test": "TestImportedConcurrentWriters",
+        "elapsed": 2.12
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profilesource",
+        "test": "TestPrepareExactOriginal/source_cap/reader",
+        "elapsed": 2.11
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profilesource",
+        "test": "TestImportedConcurrentWriters/serialized_catalog",
+        "elapsed": 2.07
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profileadapter",
+        "test": "TestNormalizeMacro/exact_grammar_boundary",
+        "elapsed": 1.95
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profilesource",
+        "test": "TestImportedLoadCorruption",
+        "elapsed": 1.52
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profiledecode",
+        "test": "TestDecodeRejectsMalformedAndOverLimitInput",
+        "elapsed": 1.48
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profiledecode",
+        "test": "TestDecodeBase64_WhenLimitBoundary_AcceptsExactLimit",
+        "elapsed": 1.26
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/control",
+        "test": "TestProfileSnapshotLocalWatchAndRestore",
+        "elapsed": 1.22
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/control",
+        "test": "TestAutoLocalMissingAndAmbiguousRoots",
+        "elapsed": 1.04
+      },
+      {
+        "package": "github.com/sh4869221b/azerlay/internal/profiledecode",
+        "test": "TestDecodeBase64_WhenLimitBoundary_RejectsLimitPlusOne",
+        "elapsed": 1.02
+      }
+    ]
+  }
+}

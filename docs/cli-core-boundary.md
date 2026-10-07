@@ -78,7 +78,7 @@ required race run; core also has the additional CGO=0 contract run. The exact
 manifest union rejects missing/duplicate packages, and failure in either job
 fails the workflow. Package-install commands, cache inputs and native process
 coverage are unchanged. The fresh core race cache remains measurable overhead;
-this does not establish a 60-second or p95 performance result.
+this does not establish the revised p50 180-second / p95 300-second performance result.
 
 These Bash commands also describe the individual verification units:
 
@@ -131,7 +131,7 @@ research probe remain separately invoked tools, not omitted root packages.
 
 For this partition, compare setup-inclusive core/native
 wall time, compile work, aggregate runner-seconds and the complete workflow
-critical path using [the measurement contract](ci.md#ci-wide-60-second-measurement-contract).
+critical path using [the measurement contract](ci.md#ci-wide-measurement-contract).
 Removing the unconditional CLI `TestMain` from in-process tests establishes a
 usable targeted verification unit; it does not demonstrate a whole-workflow
 speedup. Native compilation and the checkout-built executable still have to run.

@@ -108,6 +108,26 @@ jobs:
       - name: Build
         run: go build ./cmd/azerlay
 
+      # Bounded candidate validation, not twenty workflow runs or a timing sample.
+      - name: Stress native capture and isolated CLI fixtures
+        id: cli_stress
+        run: |
+          set -euo pipefail
+          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/cli-stress-timing.json" -- \
+            runuser -u azerlay-test -- env PATH="$PATH" GOCACHE="$GOCACHE" GOMODCACHE="$GOMODCACHE" scripts/test-wayland.sh go test -race -json -shuffle=on -count=3 -run '^Test(CLIInputForms|RunLiveOverlayNative|RunLiveOverlayLatency)$' ./cmd/azerlay \
+            | tee "$RUNNER_TEMP/cli-stress-tests.jsonl"
+
+      - name: Upload CLI stress diagnostics
+        if: ${{ always() && (steps.cli_stress.outcome == 'success' || steps.cli_stress.outcome == 'failure') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-stress-json-attempt-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/cli-stress-tests.jsonl
+            ${{ runner.temp }}/cli-stress-timing.json
+          if-no-files-found: error
+          retention-days: 7
+
   fuzz:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -337,6 +357,9 @@ jobs:
           python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/core-race-timing.json" -- \
             go test -race -json -shuffle=on -count=1 "${core[@]}" \
             | tee "$RUNNER_TEMP/core-race-tests.jsonl"
+          # Pure test-only PNG helper, no TestMain or GTK substitute. Retain the
+          # separate real native capture suite above; disclose this stress count.
+          go test -race -shuffle=on -count=20 cmd/azerlay/run_live_capture_test.go
 
       - name: Upload core race diagnostics
         if: ${{ always() && (steps.core_race.outcome == 'success' || steps.core_race.outcome == 'failure') }}

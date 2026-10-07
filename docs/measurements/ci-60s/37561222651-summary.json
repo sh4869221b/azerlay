@@ -1,6 +1,12 @@
 [
   {
     "attempts": 1,
+    "budget": {
+      "minimum_samples": 20,
+      "p50_seconds": 180,
+      "p95_seconds": 300
+    },
+    "budget_applicable": true,
     "cohort": "2026-10-07-core-native-partition",
     "commit": "cd6b04e852f08fb4da505b296b2751540d036cab",
     "complete_initial_gate_set": true,
@@ -32,6 +38,7 @@
       }
     },
     "non_success_rate": 0.0,
+    "ordinary_budget_observed": false,
     "required_jobs": [
       "fuzz",
       "generated-files",
@@ -49,7 +56,6 @@
       }
     ],
     "small_sample_warning": true,
-    "successes": 1,
-    "warm_60s_observed": false
+    "successes": 1
   }
 ]

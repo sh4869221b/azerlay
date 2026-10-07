@@ -8,7 +8,11 @@ from datetime import datetime
 from pathlib import Path
 
 REQUIRED = ("test", "fuzz", "native-build", "vulnerability", "licenses", "generated-files")
-CONDITIONS = ("cold", "warm", "source-only", "go-refresh", "native-refresh", "tool-refresh", "historical")
+P50_BUDGET_SECONDS = 180
+P95_BUDGET_SECONDS = 300
+MINIMUM_SAMPLES = 20
+
+CONDITIONS = ("cold", "warm", "source-only", "go-refresh", "native-refresh", "tool-refresh", "historical", "diagnostic")
 
 
 def timestamp(value):
@@ -147,13 +151,15 @@ def summarize(samples):
         metrics = {name: quantiles([r[name] for r in rows if r[name] is not None])
                    for name in ("execution_seconds", "runner_seconds", "created_to_required_result_seconds", "event_to_required_result_seconds")}
         # Incomplete/failed/cancelled runs remain in the denominator and block a pass.
-        enough = len(rows) >= 20 and len(good) == len(rows) and metrics["execution_seconds"]["n"] == len(rows)
+        enough = len(rows) >= MINIMUM_SAMPLES and len(good) == len(rows) and metrics["execution_seconds"]["n"] == len(rows)
         output.append({"commit": commit, "condition": condition, "cohort": cohort,
                        "required_jobs": required, "attempts": len(rows), "successes": len(good),
                        "non_success_rate": (len(rows) - len(good)) / len(rows),
-                       "small_sample_warning": len(rows) < 20, "metrics": metrics,
+                       "small_sample_warning": len(rows) < MINIMUM_SAMPLES, "metrics": metrics,
                        "complete_initial_gate_set": set(required) == set(REQUIRED),
-                       "warm_60s_observed": enough and set(required) == set(REQUIRED) and condition in ("warm", "source-only") and metrics["execution_seconds"]["p95"] <= 60,
+                       "budget_applicable": condition in ("warm", "source-only"),
+                       "budget": {"p50_seconds": P50_BUDGET_SECONDS, "p95_seconds": P95_BUDGET_SECONDS, "minimum_samples": MINIMUM_SAMPLES},
+                       "ordinary_budget_observed": enough and set(required) == set(REQUIRED) and condition in ("warm", "source-only") and metrics["execution_seconds"]["p50"] <= P50_BUDGET_SECONDS and metrics["execution_seconds"]["p95"] <= P95_BUDGET_SECONDS,
                        "runs": [{"run_id": r["run_id"], "attempt": r["attempt"], "url": r["url"], "errors": r["errors"]} for r in rows]})
     return output
 

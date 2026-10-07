@@ -1,6 +1,12 @@
 [
   {
     "attempts": 1,
+    "budget": {
+      "minimum_samples": 20,
+      "p50_seconds": 180,
+      "p95_seconds": 300
+    },
+    "budget_applicable": true,
     "cohort": "2026-10-07-cli-initial-proof",
     "commit": "0bd4717c9cb1b85babb358b3c07ca6fad3a0d4bd",
     "complete_initial_gate_set": true,
@@ -32,6 +38,7 @@
       }
     },
     "non_success_rate": 1.0,
+    "ordinary_budget_observed": false,
     "required_jobs": [
       "fuzz",
       "generated-files",
@@ -54,7 +61,6 @@
       }
     ],
     "small_sample_warning": true,
-    "successes": 0,
-    "warm_60s_observed": false
+    "successes": 0
   }
 ]
