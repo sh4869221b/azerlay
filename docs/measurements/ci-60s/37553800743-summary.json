@@ -1,0 +1,55 @@
+[
+  {
+    "attempts": 1,
+    "cohort": "2026-10-07-native-refresh",
+    "commit": "4faedfba7b67f650907b48efefeb0fe54df190fe",
+    "complete_initial_gate_set": true,
+    "condition": "native-refresh",
+    "metrics": {
+      "created_to_required_result_seconds": {
+        "max": 1784.0,
+        "n": 1,
+        "p50": 1784.0,
+        "p95": 1784.0
+      },
+      "event_to_required_result_seconds": {
+        "max": null,
+        "n": 0,
+        "p50": null,
+        "p95": null
+      },
+      "execution_seconds": {
+        "max": 1782.0,
+        "n": 1,
+        "p50": 1782.0,
+        "p95": 1782.0
+      },
+      "runner_seconds": {
+        "max": 3405.0,
+        "n": 1,
+        "p50": 3405.0,
+        "p95": 3405.0
+      }
+    },
+    "non_success_rate": 0.0,
+    "required_jobs": [
+      "fuzz",
+      "generated-files",
+      "licenses",
+      "native-build",
+      "test",
+      "vulnerability"
+    ],
+    "runs": [
+      {
+        "attempt": 1,
+        "errors": [],
+        "run_id": 37553800743,
+        "url": "https://github.com/sh4869221b/azerlay/actions/runs/37553800743"
+      }
+    ],
+    "small_sample_warning": true,
+    "successes": 1,
+    "warm_60s_observed": false
+  }
+]

@@ -167,3 +167,13 @@ without an appropriate toolchain/native environment. Real GitHub Actions runs,
 publication and repeated cold/warm experiments require their own authorized
 execution route. Hosted validation is tracked separately in the pull request; no merge or
 protection change is part of this patch.
+
+## Hosted validation after initial staging
+
+The first authorized [PR #140 validation](37553800743-notes.md) passed all six
+gates at exact head `4faedfba7b67f650907b48efefeb0fe54df190fe`. It required
+1,782 seconds with changed native fingerprints and cold native build caches;
+application/tool module caches hit. This is retained as a native-refresh
+observation and cache-priming run, not a warm A/B result or a speedup claim.
+The 22 Python tests also passed on Actions. Local runtime limitations above
+remain distinct from this successful hosted validation.
