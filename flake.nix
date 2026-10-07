@@ -30,6 +30,9 @@
           # ci-nix-run excludes inherited host tools and GUI configuration.
           AZERLAY_NIX_PATH = lib.makeBinPath (tools ++ [ pkgs.stdenv.cc ]);
           AZERLAY_NIX_FONT_DIRS = lib.concatMapStringsSep ":" (p: "${p}/share/fonts") fonts;
+          # Color emoji uses bitmap strikes and needs fontconfig's standard
+          # scaling rule; font directories alone produce oversized Pango lines.
+          AZERLAY_NIX_FONT_RULES = lib.optionalString withGUI "${pkgs.fontconfig.out}/share/fontconfig/conf.avail/10-scale-bitmap-fonts.conf";
           AZERLAY_NIX_DATA_DIRS = "${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}:${pkgs.shared-mime-info}/share:${pkgs.gtk4}/share/gsettings-schemas/${pkgs.gtk4.name}:${pkgs.gtk4}/share";
           # Explicit runtime paths avoid the host /etc D-Bus session config and
           # at-spi2-core's wrapper, which otherwise prepends /usr/bin to PATH.

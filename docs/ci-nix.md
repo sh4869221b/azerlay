@@ -64,6 +64,15 @@ It preserves stdenv CC/CXX and NIX compiler/linker flags. The runner and all
 headless tests remain non-root. Existing `scripts/test-wayland.sh` retains the
 same two outputs, pixman compositor and Cairo GTK renderer.
 
+Font discovery stays limited to the pinned CJK and color-emoji directories.
+The test role also includes the pinned fontconfig `10-scale-bitmap-fonts.conf`
+rule. Color emoji uses bitmap strikes even though fontconfig marks it scalable;
+without this standard rule, a requested 14px mixed Unicode line can inherit the
+emoji strike's native height and overflow the renderer. No host font config is
+included. A host-library Pango regression reproduces the original 129px height
+and verifies the corrected 22px height; the actual Nix renderer gate remains the
+authoritative check for the pinned environment.
+
 ### Accessibility and session isolation
 
 GTK's Nix package does not itself supply the AT-SPI bus service. The test shell
@@ -164,3 +173,4 @@ still require the hosted CI comparison. A blocked profile is not a timing result
 - [AT-SPI 2.60.6 bus launcher](https://github.com/GNOME/at-spi2-core/blob/2.60.6/bus/at-spi-bus-launcher.c)
 - [D-Bus session launcher options](https://dbus.freedesktop.org/doc/dbus-run-session.1.html)
 - [Nix 2.35 derivation JSON format](https://nix.dev/manual/nix/2.35/protocols/json/derivation/)
+- [Pinned fontconfig bitmap-scaling rule](https://github.com/fontconfig/fontconfig/blob/2.18.3/conf.d/10-scale-bitmap-fonts.conf)

@@ -5,6 +5,7 @@ set -euo pipefail
 : "${AZERLAY_NIX_CI:?Run this command inside the pinned Nix CI shell}"
 : "${AZERLAY_NIX_PATH:?}"
 : "${AZERLAY_NIX_FONT_DIRS?}"
+: "${AZERLAY_NIX_FONT_RULES?}"
 : "${CI_NIX_ROLE:?Select test or build}"
 if [[ "$CI_NIX_ROLE" != test && "$CI_NIX_ROLE" != build ]]; then exit 2; fi
 test "$AZERLAY_NIX_CI_ROLE" = "$CI_NIX_ROLE"
@@ -49,6 +50,10 @@ import xml.etree.ElementTree as ET
 root = ET.Element('fontconfig')
 for path in filter(None, os.environ['AZERLAY_NIX_FONT_DIRS'].split(':')):
     ET.SubElement(root, 'dir').text = path
+for path in filter(None, os.environ['AZERLAY_NIX_FONT_RULES'].split(':')):
+    if not Path(path).is_file():
+        raise ValueError('Missing pinned fontconfig scaling rule')
+    ET.SubElement(root, 'include', ignore_missing='no').text = path
 ET.SubElement(root, 'cachedir').text = os.environ['XDG_CACHE_HOME'] + '/fontconfig'
 ET.ElementTree(root).write(os.environ['FONTCONFIG_FILE'], encoding='utf-8', xml_declaration=True)
 PY
