@@ -1,10 +1,10 @@
-"""Dependency-free guard for the migration's explicit workflow contract."""
+"""Historical guards for the archived Ubuntu comparison candidate."""
 import re
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW = (ROOT / ".github/workflows/ci.yml").read_text()
+WORKFLOW = (ROOT / "docs/measurements/ci-136-comparison/workflows/ci-ubuntu.yml").read_text()
 JOBS = dict(re.findall(r"^  ([a-z][a-z-]*):\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", WORKFLOW.split("jobs:\n", 1)[1], re.M | re.S))
 
 

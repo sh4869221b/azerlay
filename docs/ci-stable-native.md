@@ -1,5 +1,9 @@
 # Stable native CI environment (migration candidate)
 
+> Historical Ubuntu comparison candidate, retained as evidence. Normal CI now
+> uses Nix; this seven-gate design is not the current trigger policy. See
+> [the adoption policy](ci-adoption.md).
+
 ## Scope and status
 
 This is Issue #136's Ubuntu 26.04 candidate, based on main `63e1c4da`.
@@ -110,11 +114,14 @@ then one same-head warm validation; no bulk benchmark campaign is implied.
 Retain image initialization/pull and snapshot install durations from Actions
 job steps, complete native fingerprints, exact native/core test diagnostics,
 all seven job results, cache hit/miss and transfer bytes. Measure from the
-first required job start through the last required job completion. The default
-`scripts/ci_measure.py` gate set includes `arch-compatibility`, including its
+first required job start through the last required job completion. The historical experiment
+gate set included `arch-compatibility`, including its
 setup and cleanup, and keeps queue-inclusive latency separate. A six-job
 Ubuntu/core diagnostic subset is not the full workflow target. Historical
-six-job cohorts remain explicitly separate via `--required`.
+six-job cohorts remain explicitly separate via `--required`. The current
+normal default is six Nix/core/fuzz gates; replay this archived seven-gate
+profile only with `--required test fuzz native-build vulnerability licenses generated-files arch-compatibility`
+or the frozen historical `ci_compare_profiles.py` contract.
 
 Adoption remains contingent on correctness, dependable bootstrap and practical
 setup/transfer/maintenance overhead. If this phase increases costs without

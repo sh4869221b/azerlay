@@ -18,7 +18,7 @@ class ProfileComparisonTests(unittest.TestCase):
                            status="completed", conclusion="success", created_at="2026-01-01T00:00:00Z",
                            updated_at="2026-01-01T00:04:00Z", html_url="https://example.invalid/1")
         self.nix = dict(self.ubuntu, id=2, path=".github/workflows/ci-nix.yml", html_url="https://example.invalid/2")
-        self.a = self.jobs(1, comparison.ci.REQUIRED, "2026-01-01T00:03:00Z")
+        self.a = self.jobs(1, comparison.COMPARISON_REQUIRED, "2026-01-01T00:03:00Z")
         self.b = self.jobs(2, comparison.NIX_NATIVE, "2026-01-01T00:04:00Z")
 
     def jobs(self, run, names, end):

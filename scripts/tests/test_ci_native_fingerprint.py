@@ -23,7 +23,7 @@ class NativeFingerprintTests(unittest.TestCase):
                 path = binaries / command
                 path.write_text("#!/bin/sh\n" + body + "\n")
                 path.chmod(0o700)
-            env = dict(os.environ, PATH=str(binaries) + ":/usr/bin:/bin", CI_CACHE_JOB=job)
+            env = dict(os.environ, PATH=str(binaries) + ":/usr/bin:/bin", CI_CACHE_JOB=job, CI_NATIVE_WORKFLOW=".github/workflows/arch-ci.yml")
             return subprocess.run(["bash", str(SCRIPT)], cwd=ROOT, env=env, capture_output=True, text=True)
 
     def test_inventory_is_complete_sorted_and_changes_boundary(self):
@@ -32,7 +32,7 @@ class NativeFingerprintTests(unittest.TestCase):
         self.assertIn("a-compiler\t1\tamd64\nz-runtime\t1\tamd64", first.stdout)
         self.assertNotEqual(first.stdout, changed.stdout)
         self.assertIn("snapshot=fixed", first.stdout)
-        self.assertIn(".github/workflows/ci.yml", first.stdout)
+        self.assertIn(".github/workflows/arch-ci.yml", first.stdout)
 
     def test_jobs_never_share_native_builds(self):
         self.assertNotEqual(self.capture().stdout, self.capture(job="arch-compatibility").stdout)

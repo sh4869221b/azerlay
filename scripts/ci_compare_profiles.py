@@ -9,6 +9,8 @@ import ci_measure as ci
 
 UBUNTU_NATIVE = ("test", "native-build", "vulnerability", "licenses")
 SHARED = ("fuzz", "generated-files", "arch-compatibility")
+# Frozen seven-gate experiment contract; normal CI later adopted six Nix gates.
+COMPARISON_REQUIRED = ("test", "fuzz", "native-build", "vulnerability", "licenses", "generated-files", "arch-compatibility")
 NIX_NATIVE = tuple("nix-" + name for name in UBUNTU_NATIVE)
 
 
@@ -93,12 +95,12 @@ def verify_jobs_and_checkout(run, pages, expected, logs):
 
 def compare(ubuntu, ubuntu_pages, nix, nix_pages, ubuntu_condition, nix_condition, ubuntu_logs, nix_logs):
     check_pair(ubuntu, nix)
-    checkouts = verify_jobs_and_checkout(ubuntu, ubuntu_pages, ci.REQUIRED, ubuntu_logs)
+    checkouts = verify_jobs_and_checkout(ubuntu, ubuntu_pages, COMPARISON_REQUIRED, ubuntu_logs)
     checkouts |= verify_jobs_and_checkout(nix, nix_pages, NIX_NATIVE, nix_logs)
     if len(checkouts) != 1:
         raise ValueError("actual checked-out commits differ between jobs/workflows")
     tested_commit = next(iter(checkouts))
-    a = ci.measure(ubuntu, ubuntu_pages, ubuntu_condition, "ubuntu-nix-paired", required=ci.REQUIRED)
+    a = ci.measure(ubuntu, ubuntu_pages, ubuntu_condition, "ubuntu-nix-paired", required=COMPARISON_REQUIRED)
     b = ci.measure(nix, nix_pages, nix_condition, "ubuntu-nix-paired", required=NIX_NATIVE)
     rows = []
     for run, result in ((ubuntu, a), (nix, b)):
@@ -108,9 +110,9 @@ def compare(ubuntu, ubuntu_pages, nix, nix_pages, ubuntu_condition, nix_conditio
     if any("ubuntu-24.04" not in row.get("labels", []) for row in rows):
         raise ValueError("comparison requires the same ubuntu-24.04 hosted runner class for every gate")
     runs = (ubuntu, nix)
-    ubuntu_profile = profile(rows, ci.REQUIRED, ubuntu_condition, runs)
+    ubuntu_profile = profile(rows, COMPARISON_REQUIRED, ubuntu_condition, runs)
     nix_profile = profile(rows, NIX_NATIVE + SHARED, nix_condition, runs)
-    total = profile(rows, ci.REQUIRED + NIX_NATIVE, "paired-experiment", runs)
+    total = profile(rows, COMPARISON_REQUIRED + NIX_NATIVE, "paired-experiment", runs)
     # Preserve workflow-level failures (including unexpected bootstrap jobs)
     # separately; a passing native subset never makes the experiment green.
     total["workflow_errors"] = a["errors"] + b["errors"]

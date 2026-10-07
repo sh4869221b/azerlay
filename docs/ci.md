@@ -4,18 +4,20 @@
 It has read-only repository permissions and cancels superseded runs for the
 same pull request. All Go jobs use Go 1.27.1. CI-only tools are installed with
 explicit versions without changing the application's `go.mod` or `go.sum`.
+The owner selected pinned Nix for normal CI on 2026-10-07. Latest Arch runs
+independently each day and through manual pre-release verification; see the
+[adopted trigger and release-verification policy](ci-adoption.md).
 
 ## Quality gates
 
 | Job | Checks | Job timeout |
 | --- | --- | --- |
-| `test` | Formatting, all-package vet/Staticcheck, native race tests, binary build | GitHub default (360 minutes) |
+| `test` | Formatting, all-package vet/Staticcheck, native race tests, binary build | 60 minutes |
 | `fuzz` | Seven existing fuzz targets, each with a 10-second fuzz allocation | 10 minutes |
-| `native-build` | Verify default CGo, compile the native binary in pinned Ubuntu 26.04, run version, and inspect shared libraries | 15 minutes |
-| `vulnerability` | Reachable Go vulnerability scan | 20 minutes |
-| `licenses` | Third-party Go dependency license CSV | 10 minutes |
+| `native-build` | Verify default CGo, compile the native binary in pinned Nix, run version, and inspect shared libraries | 30 minutes |
+| `vulnerability` | Reachable Go vulnerability scan | 30 minutes |
+| `licenses` | Third-party Go dependency license CSV | 20 minutes |
 | `generated-files` | CI-tool tests, core CGO=0 and race tests, regenerate both LZMA fixtures and reject differences | 15 minutes |
-| `arch-compatibility` | Rolling Arch whole-package vet/Staticcheck, native race/Wayland integration, native build/version/ELF checks | GitHub default (360 minutes) |
 
 The `test` job rejects any output from `gofmt -l .`, then runs:
 
@@ -64,9 +66,9 @@ This partition is a measured candidate, not a demonstrated p50/p95 budget result
 
 For [Issue #138](https://github.com/sh4869221b/azerlay/issues/138), both required
 race commands now use `-json`. The existing package manifests, `-race`,
-`-shuffle=on` and `-count=1` are unchanged. The native command still runs through
-`runuser -u azerlay-test` and the unmodified two-output `test-wayland.sh` launcher;
-the timing wrapper is outside `runuser` and never runs Go tests as root. The
+`-shuffle=on` and `-count=1` are unchanged. The native command runs as the ordinary non-root hosted user inside the pinned
+Nix environment and the unmodified two-output `test-wayland.sh` launcher.
+Rolling Arch uses `runuser -u azerlay-test`; neither path runs Go tests as root. The
 separate core CGO=0 contract run, fresh core race cache, all six jobs, native
 package installs, cache inputs, fuzz budgets and fixture regeneration remain.
 This is baseline instrumentation before any test-speed changes.
@@ -85,7 +87,7 @@ failed-jobs-only reruns:
 
 | Artifact | Explicit files |
 | --- | --- |
-| `native-race-json-attempt-${{ github.run_attempt }}` | `native-race-tests.jsonl`, `native-race-timing.json` |
+| `nix-native-race-json-attempt-${{ github.run_attempt }}` | `nix-native-race-tests.jsonl`, `nix-native-race-timing.json` |
 | `core-race-json-attempt-${{ github.run_attempt }}` | `core-race-tests.jsonl`, `core-race-timing.json` |
 
 Only those files are uploaded, not directories, caches, compositor logs,
@@ -149,20 +151,17 @@ from this job by `-run='^$'`. Longer fuzz campaigns are outside PR CI.
 
 ## Distribution builds and GTK coverage
 
-`test`, `native-build`, `vulnerability`, and `licenses` use an immutable
-Ubuntu 26.04 AMD64 base plus an official dated APT snapshot. See
-[the stable-native environment contract](ci-stable-native.md) for exact pins,
-bootstrap authentication, update and rollback policy, and validation status.
-`arch-compatibility` retains rolling `archlinux:base` and `pacman -Syu` on every
-PR and main push. It repeats the complete native race/Wayland gate and checks
-whole-package vet/Staticcheck plus the built binary's version and ELF linkage.
-It is blocking workflow work, with no schedule-only or continue-on-error path.
+`test`, `native-build`, `vulnerability`, and `licenses` use the pinned
+[Nix native environment](ci-nix.md), including the locked Go 1.27.1 and native
+closure. The four roles retain current-checkout build/scan/test commands.
+The separate [Arch full validation](../.github/workflows/arch-ci.yml) runs all
+six quality gates against rolling `archlinux:base` / `pacman -Syu`, once daily
+and through the pre-release verification entrypoint. It has no soft-failure path.
 
-The runner host and GUI-free `fuzz`/`generated-files` jobs use the explicit
-`ubuntu-24.04` hosted-runner label. Hosted images are maintained by GitHub, not
-immutable. The core race cache remains fresh and outside setup-go's cache.
-Ubuntu as a CI substrate does not expand v1 product support; that remains
-tracked in [Issue #98](https://github.com/sh4869221b/azerlay/issues/98).
+All hosts and GUI-free `fuzz`/`generated-files` jobs use standard `ubuntu-24.04`.
+Hosted images are maintained by GitHub, not immutable. The fresh core race cache
+remains outside setup-go's cache. Nix as a CI substrate does not qualify a new
+product distribution target; Ubuntu support remains tracked in Issue #98.
 The distribution build runs:
 
 ```sh
@@ -183,11 +182,10 @@ global Git config. This preserves normal Go VCS metadata during compilation.
 
 ### Module and native build caches
 
-The four fixed Ubuntu native jobs and rolling Arch compatibility job use `.github/actions/native-go-cache`. Automatic setup-go
-caching is disabled for those jobs to avoid saving the same directories twice.
-The two GUI-free Ubuntu jobs retain their existing setup-go caches unchanged;
-`generated-files` runs its new CGo/race boundary proof in a separate fresh,
-step-local `RUNNER_TEMP` GOCACHE that is deleted rather than saved.
+Normal native jobs use `.github/actions/nix-go-cache`; no second Go SDK is
+installed by setup-go. Arch native jobs use `.github/actions/native-go-cache`
+with setup-go's implicit caching disabled. The two GUI-free jobs retain their
+setup-go caches; core CGo/race still uses a fresh step-local GOCACHE.
 
 - **Application modules:** all four jobs restore
   `/tmp/azerlay-go-mod/cache/download`, keyed
@@ -207,8 +205,8 @@ step-local `RUNNER_TEMP` GOCACHE that is deleted rather than saved.
   downloads. Each tool installs normally on a cache miss; no priming build or
   cross-job dependency is introduced.
 - **Build results:** each job restores and saves only `/tmp/azerlay-go-build`.
-  Its key includes the job ID, distro, image/install recipe, compiler/linker/pkg-config
-  metadata and complete sorted installed package list,
+  Its key includes the job ID, complete locked Nix closure or full installed Arch
+  inventory, actual workflow/install recipe, compiler/linker/pkg-config metadata,
   plus OS, architecture, resolved Go toolchain, application dependency files,
   and CI-tool versions. No restore prefix crosses the native compatibility
   boundary. Native updates still produce a cold build cache.
@@ -229,7 +227,8 @@ Cache hits never skip formatting, vet, analyzers, tests, compilation, or binary
 execution. No credentials, HOME directory, binaries, or user profiles are included
 in the module snapshots. GitHub's normal branch/PR cache scope remains in force;
 there is no privileged workflow, ref override, or PR-to-main cache promotion.
-The test job's existing ownership transition covers both normalized cache roots.
+Arch test jobs transfer both normalized cache roots to their non-root test user;
+Nix jobs already run as the non-root hosted user.
 
 Changing to separate caches initially invalidates the old combined snapshots.
 This migration cost is distinct from steady-state results. It does not implement
@@ -262,9 +261,9 @@ only download archives and reconstructs sources locally. The issue's
 0–10-second estimate
 is a hypothesis, not a measured result or a compile-time saving.
 
-Both native integration jobs install Sway and D-Bus, remove any Sway file capability inside
-the container, and runs tests as a dedicated non-root user with writable Go
-caches. `scripts/test-wayland.sh` starts a private two-output headless Sway with
+Both native environments include Sway and D-Bus with writable Go caches.
+Arch removes Sway capabilities and changes to a dedicated non-root test user;
+Nix uses its capability-free pinned compositor as the non-root hosted user. `scripts/test-wayland.sh` starts a private two-output headless Sway with
 the pixman renderer, waits for its socket, and provides an absolute test display
 path. CLI fixtures retain separate runtime/config/data directories. The launcher
 stops its compositor and removes its private runtime directory on exit. This
@@ -285,14 +284,19 @@ combined cache entries expire under GitHub's normal retention policy.
 
 ### Required-check migration
 
-The stable-native migration keeps all six existing job IDs and adds the real
-`arch-compatibility` job. Require that additional check wherever repository
-protection/rulesets enforce CI; this PR does not change those settings. Until
-that administrative policy is configured, “required” here describes the
-workflow acceptance contract, not a claim about GitHub branch protection.
-The measurement tool's default gate set now includes all seven jobs; it must
-not report the six-job subset as the total PR latency. Historical six-job
-measurements require an explicit `--required` list and remain a separate cohort.
+The adopted normal workflow keeps the six familiar job/check names: `test`,
+`fuzz`, `native-build`, `vulnerability`, `licenses`, `generated-files`. The
+experiment's additional `arch-compatibility` PR job is replaced by independently
+visible full Arch daily/pre-release workflows, by explicit owner decision.
+Repository rules/settings are not edited here. Administrators must inspect any
+rules that explicitly required the experiment-only check before merging; do not
+leave an obsolete required name blocking every PR or claim protection changed.
+
+The measurement tool defaults to the six current normal gates. The retained
+historical comparison script explicitly validates its original seven-plus-four
+contract; historical profiles are not silently reinterpreted as normal CI.
+Daily and pre-release validation are separate cohorts, including their aggregate
+and readiness jobs where applicable. Their compute cost is reported separately.
 
 
 Before merging this job rename, repository administrators should inspect branch
@@ -325,13 +329,14 @@ The license job runs:
 
 ```sh
 go install github.com/google/go-licenses/v2@v2.0.1
-go-licenses report ./... --include_tests --ignore=github.com/sh4869221b/azerlay > "$RUNNER_TEMP/dependency-licenses.csv"
+go-licenses report ./... --include_tests --ignore=github.com/sh4869221b/azerlay > "$RUNNER_TEMP/nix-dependency-licenses.csv"
 ```
 
 After successful report generation, `actions/upload-artifact@v4` publishes
-`dependency-licenses` for seven days and fails if the file is absent. The
-report includes test dependencies and excludes only the project's undecided
-license, not its third-party dependencies. Stderr remains visible. Upstream
+`nix-dependency-licenses` for seven days in normal CI (the separate Arch
+workflow uses an `arch-` artifact name) and fails if the file is absent. The
+report includes test dependencies and excludes only the project's own
+MIT-licensed module, not its third-party dependencies. Stderr remains visible. Upstream
 may report unknown licenses or license/URL discovery warnings while exiting
 successfully; these warnings are not converted into failures by custom rules.
 Every actual nonzero tool result fails the job.
@@ -419,25 +424,18 @@ artifact overhead must stay separate from ordinary-budget conclusions; failures
 remain blocking. Large-decoder parallelism and larger architectural experiments
 are deferred under the revised goal.
 
-## Paired Ubuntu/Nix experiment
+## Completed Ubuntu/Nix comparison and adoption
 
-PR #141 also carries the experimental [Nix native profile](ci-nix.md). Its four
-native jobs run on the same PR checkout as the four Ubuntu native jobs. Core,
-fuzz and rolling Arch compatibility remain in `CI` and count in both complete
-seven-gate profiles; count them only once in the actual 11-job experiment cost.
-`scripts/ci_compare_profiles.py` rejects differing source/base/repository or
-actual checkout commits, incomplete jobs, and failed-jobs-only reruns.
+The [retained comparison evidence](measurements/ci-136-comparison/README.md)
+records all eleven jobs, actual checkout provenance, cold corrections and the
+single final native-warm pair. Its two seven-gate profiles include shared Arch;
+those historical measurements do not become six-gate normal-CI observations.
+The owner subsequently selected normal Nix CI with daily/pre-release full Arch.
+The comparison workflows are archived under docs, not active parallel workflows.
 
-The bounded first evaluation is one cold/refresh pair and one fresh warm pair.
-If an empty commit triggers the latter, record both head commits and their
-identical Git trees. This leaves package/workflow/cache inputs unchanged while
-running every gate again. Each Nix job still installs Nix and downloads its
-closure on a fresh hosted runner; “warm” describes Go cache evidence, not a
-persisted Nix store. Correctness failures require a separately identified
-corrective run, never a speed claim. Neither this small sample nor its fastest
-run establishes the p50/p95 target, and adoption awaits the owner's decision.
-
-Every comparison job logs runner image, kernel, CPU model/count and total memory.
-Historical private-repository observations are retained as history rather than
-pooled with these public-repository pairs: allocation, hardware and cache state
-may differ even when the hosted runner label has the same spelling.
+The exact adopted head must pass all six normal gates before merge. Workflow
+and cache-recipe changes invalidate compiled caches conservatively; a cold
+validation does not establish warm p50/p95. Scheduled workflows begin only after
+this configuration reaches the default branch. There is no release publisher;
+manual pre-release verification and its enforcement boundary are documented in
+[the adoption policy](ci-adoption.md).

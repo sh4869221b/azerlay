@@ -15,4 +15,4 @@ pkg-config --version
 pkg-config --modversion gtk4 gtk4-layer-shell-0 glib-2.0 pango
 pkg-config --cflags --libs gtk4 gtk4-layer-shell-0
 fc-list --format '%{file}\n' | LC_ALL=C sort -u
-sha256sum flake.nix flake.lock scripts/ci_nix_prepare.py scripts/ci-nix-install.sh scripts/ci-nix-run.sh scripts/ci-nix-session.py scripts/ci-nix-fingerprint.sh scripts/test-wayland.sh .github/workflows/ci-nix.yml
+sha256sum flake.nix flake.lock scripts/ci_nix_prepare.py scripts/ci-nix-install.sh scripts/ci-nix-run.sh scripts/ci-nix-session.py scripts/ci-nix-fingerprint.sh scripts/test-wayland.sh .github/workflows/ci.yml

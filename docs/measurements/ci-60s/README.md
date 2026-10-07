@@ -6,14 +6,15 @@ self-test is added to `generated-files` without removing any existing check. The
 measurement scripts never authenticate, start CI, mutate caches, or modify
 branch protection. Python 3.10+ is needed only for offline analysis.
 
-## Stable-native migration
+## Current and historical gate contracts
 
-The initial six-gate mapping and historical observations below are preserved.
-The current Ubuntu 26.04 candidate adds a seventh blocking `arch-compatibility`
-job on every PR and main push; the default measurement manifest includes it.
-See [the migration contract](../../ci-stable-native.md). Full-workflow timing
-must include Arch setup, validation and cleanup. Historical six-job replay uses
-an explicit original job list and cannot establish the current seven-job budget.
+Normal CI now uses six Nix/core/fuzz gates after the owner selected daily and
+pre-release full Arch verification. `ci_measure.py` defaults to those six gates.
+The earlier Ubuntu/Nix experiment used seven Ubuntu/shared gates plus four Nix
+native gates; its `ci_compare_profiles.py` contract remains explicitly frozen.
+See [comparison evidence](../ci-136-comparison/README.md) and
+[the adopted policy](../../ci-adoption.md). Never pool these different gate sets,
+conditions or trigger schedules into one latency cohort.
 
 ## Clocks and acceptance
 

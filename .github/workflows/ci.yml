@@ -12,75 +12,20 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
+# Normal PR/main gates use pinned Nix. Latest Arch runs independently each day
+# and through the explicit pre-release verification entrypoint.
 jobs:
   test:
     runs-on: ubuntu-24.04
-    container: ubuntu:26.04@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794
+    timeout-minutes: 60
     defaults:
       run:
         shell: bash
     env:
+      CI_NIX_ROLE: test
       GOCACHE: /tmp/azerlay-go-build
       GOMODCACHE: /tmp/azerlay-go-mod
     steps:
-      - name: Bootstrap snapshot CA with verified official package
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const url = 'https://snapshot.ubuntu.com/ubuntu/20261001T000000Z/pool/main/c/ca-certificates/ca-certificates_20260601~26.04.1_all.deb';
-            const expected = '6077d27c6b6f8b23590cb01ff877ed8c804a67a5442cc32b5a33da10d2bd0e90';
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`CA bootstrap download failed: ${response.status}`);
-            const data = Buffer.from(await response.arrayBuffer());
-            const actual = require('crypto').createHash('sha256').update(data).digest('hex');
-            if (data.length !== 138514 || actual !== expected) throw new Error('CA bootstrap integrity mismatch');
-            require('fs').writeFileSync('/tmp/azerlay-bootstrap-ca.deb', data);
-
-      - name: Install pinned Ubuntu test dependencies
-        run: |
-          set -euo pipefail
-          export DEBIAN_FRONTEND=noninteractive
-          dpkg-deb -x /tmp/azerlay-bootstrap-ca.deb /tmp/azerlay-bootstrap-ca
-          cat /tmp/azerlay-bootstrap-ca/usr/share/ca-certificates/mozilla/*.crt > /tmp/azerlay-bootstrap-ca.pem
-          printf 'Acquire::https::CAInfo "/tmp/azerlay-bootstrap-ca.pem";\nAPT::Get::Always-Include-Phased-Updates "true";\n' > /etc/apt/apt.conf.d/00azerlay-snapshot
-          # Fixed, signed archive closure. No live apt sources or insecure flags.
-          rm -f /etc/apt/sources.list
-          rm -f /etc/apt/sources.list.d/ubuntu.sources
-          cat > /etc/apt/sources.list.d/azerlay.sources <<'SOURCES'
-          Types: deb
-          URIs: https://snapshot.ubuntu.com/ubuntu/20261001T000000Z/
-          Suites: resolute resolute-updates resolute-security
-          Components: main universe
-          Architectures: amd64
-          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-          SOURCES
-          apt-get update --error-on=any
-          # Verify the exact signed metadata as well as APT's signature checks.
-          while read -r suite expected; do
-            indexes=(/var/lib/apt/lists/*_dists_"$suite"_InRelease)
-            test "${#indexes[@]}" = 1
-            printf '%s  %s\n' "$expected" "${indexes[0]}" | sha256sum --check
-          done <<'INDEXES'
-          resolute 45f95ce276cdba3e41870516a130e03c58b8b7a79e9546b0efe9e526d255740c
-          resolute-updates 802e675dd9de4c7f3916434a95e7c1d8eec0e82886622d7805ab19a2c6fe0365
-          resolute-security 1d5041572116a8b23aabf79ac7439ad8af83d57ad3fb0f9aa0d4523ec10c5908
-          INDEXES
-          apt-get indextargets --format '$(URI)' > /tmp/azerlay-apt-index-uris
-          test -s /tmp/azerlay-apt-index-uris
-          if grep -v '^https://snapshot\.ubuntu\.com/ubuntu/20261001T000000Z/' /tmp/azerlay-apt-index-uris; then
-            printf 'Unexpected non-snapshot APT source\n' >&2
-            exit 1
-          fi
-          apt-get -y dist-upgrade
-          apt-get install -y --no-install-recommends ca-certificates git curl tar gzip zstd build-essential pkg-config libgtk-4-dev libgtk4-layer-shell-dev gobject-introspection libgirepository-1.0-dev python3 sway dbus grim fonts-noto-cjk fonts-noto-color-emoji libcap2-bin at-spi2-core
-          apt-get check
-          audit=$(dpkg --audit)
-          test -z "$audit"
-          # GTK must have its real accessibility bus, as in the Arch dependency closure.
-          test -f /usr/share/dbus-1/services/org.a11y.Bus.service
-          # Ubuntu may ship sway without a capability; do not mask other errors.
-          if [[ -n $(getcap /usr/bin/sway) ]]; then setcap -r /usr/bin/sway; fi
-
       - name: Check out repository
         uses: actions/checkout@v4
         with:
@@ -95,89 +40,122 @@ jobs:
           awk -F: '/model name/{sub(/^ +/, "", $2); print "cpu_model=" $2; exit}' /proc/cpuinfo
           grep '^MemTotal:' /proc/meminfo
 
-      - name: Prepare native Go cache input
-        id: native_environment
+      - name: Initialize isolated Nix job paths
+        run: |
+          set -euo pipefail
+          printf 'CI_NIX_STATE=%s/azerlay-nix-state\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          printf 'CI_NIX_OUTPUT=%s/azerlay-nix-output\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+
+      - name: Install verified official Nix runtime
+        run: |
+          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/nix-install-time.json" -- \
+            bash scripts/ci-nix-install.sh
+
+      - name: Prepare locked binary-substituted native environment
+        run: |
+          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/nix-prepare-time.json" -- \
+            python3 scripts/ci_nix_prepare.py --role "$CI_NIX_ROLE" --output "$CI_NIX_OUTPUT"
+
+      - name: Prepare complete Nix Go cache fingerprint
         env:
           CI_CACHE_JOB: ${{ github.job }}
         run: |
           set -euo pipefail
-          bash scripts/ci-native-fingerprint.sh > .git/ci-native-cache-input
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command \
+            bash scripts/ci-nix-run.sh bash scripts/ci-nix-fingerprint.sh > .git/ci-native-cache-input
 
-      - name: Set up Go and native caches
-        uses: ./.github/actions/native-go-cache
+      - name: Restore isolated Nix Go caches
+        uses: ./.github/actions/nix-go-cache
         with:
           tool-cache: 'true'
 
-      - name: Check complete package partition and core dependencies
-        env:
-          CGO_ENABLED: '1'
+      - name: Check complete package partition and formatting
         run: |
-          set -euo pipefail
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          python3 scripts/ci_check_packages.py
-
-      - name: Check formatting
-        shell: bash
-        run: |
-          files=$(gofmt -l .)
-          if [[ -n $files ]]; then
-            printf 'Files require gofmt:\n%s\n' "$files"
-            gofmt -d .
-            exit 1
-          fi
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh bash -c '
+            set -euo pipefail
+            python3 scripts/ci_check_packages.py
+            files=$(gofmt -l .)
+            if [[ -n $files ]]; then
+              printf "Files require gofmt:\n%s\n" "$files"
+              gofmt -d .
+              exit 1
+            fi
+          '
 
       - name: Vet
         run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          go vet ./...
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh bash -c '
+            set -euo pipefail
+            go vet ./...
+          '
 
       - name: Install Staticcheck
         env:
           GOMODCACHE: /tmp/azerlay-tool-go-mod
         run: |
-          source .github/ci-tools.env
-          go install honnef.co/go/tools/cmd/staticcheck@"$STATICCHECK_VERSION"
-          du -sb "$GOMODCACHE/cache/download"
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh bash -c '
+            set -euo pipefail
+            source .github/ci-tools.env
+            go install honnef.co/go/tools/cmd/staticcheck@"$STATICCHECK_VERSION"
+            du -sb "$GOMODCACHE/cache/download"
+          '
 
       - name: Staticcheck
-        run: staticcheck ./...
+        run: |
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh bash -c '
+            set -euo pipefail
+            staticcheck ./...
+          '
 
-      - name: Test
+      - name: Test native race and Wayland integration
         id: native_race
         run: |
           set -euo pipefail
-          useradd --create-home --user-group azerlay-test
-          mkdir -p "$GOCACHE" "$GOMODCACHE"
-          chown -R azerlay-test:azerlay-test "$GITHUB_WORKSPACE" "$GOCACHE" "$GOMODCACHE"
           mapfile -t native < scripts/ci-native-packages.txt
-          printf 'diagnostic_dir=%s\n' "$RUNNER_TEMP" >> "$GITHUB_OUTPUT"
-          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/native-race-timing.json" -- \
-            runuser -u azerlay-test -- env PATH="$PATH" GOCACHE="$GOCACHE" GOMODCACHE="$GOMODCACHE" scripts/test-wayland.sh go test -race -json -shuffle=on -count=1 "${native[@]}" \
-            | tee "$RUNNER_TEMP/native-race-tests.jsonl"
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh \
+            python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/nix-native-race-timing.json" -- \
+            scripts/test-wayland.sh go test -race -json -shuffle=on -count=1 "${native[@]}" \
+            | tee "$RUNNER_TEMP/nix-native-race-tests.jsonl"
 
-      - name: Upload native race diagnostics
+      - name: Retain Nix native race diagnostics
         if: ${{ always() && (steps.native_race.outcome == 'success' || steps.native_race.outcome == 'failure') }}
         uses: actions/upload-artifact@v4
         with:
-          name: native-race-json-attempt-${{ github.run_attempt }}
+          name: nix-native-race-json-attempt-${{ github.run_attempt }}
           path: |
-            ${{ steps.native_race.outputs.diagnostic_dir }}/native-race-tests.jsonl
-            ${{ steps.native_race.outputs.diagnostic_dir }}/native-race-timing.json
+            ${{ runner.temp }}/nix-native-race-tests.jsonl
+            ${{ runner.temp }}/nix-native-race-timing.json
           if-no-files-found: error
           retention-days: 7
 
       - name: Build
-        run: go build ./cmd/azerlay
+        run: |
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh bash -c '
+            set -euo pipefail
+            go build ./cmd/azerlay
+          '
 
-      - name: Retain complete native environment fingerprint
-        if: ${{ always() && steps.native_environment.outcome == 'success' }}
+      - name: Retain Nix setup and closure evidence
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: native-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
-          path: .git/ci-native-cache-input
+          name: nix-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: |
+            .git/ci-native-cache-input
+            ${{ runner.temp }}/nix-install-time.json
+            ${{ runner.temp }}/nix-prepare-time.json
+            ${{ runner.temp }}/azerlay-nix-output/nix-version.txt
+            ${{ runner.temp }}/azerlay-nix-output/versions.json
+            ${{ runner.temp }}/azerlay-nix-output/dependency-installables.json
+            ${{ runner.temp }}/azerlay-nix-output/devshell-derivation.json
+            ${{ runner.temp }}/azerlay-nix-output/devshell-result.json
+            ${{ runner.temp }}/azerlay-nix-output/closure.json
+            ${{ runner.temp }}/azerlay-nix-output/closure-paths.txt
+            ${{ runner.temp }}/azerlay-nix-output/lock-sha256.txt
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
+
 
   fuzz:
     runs-on: ubuntu-24.04
@@ -217,71 +195,18 @@ jobs:
           go test ./internal/profileraw -run='^$' -fuzz='^FuzzParse$' -fuzztime=10s -parallel=1 -timeout=2m
           go test ./internal/profileadapter -run='^$' -fuzz='^FuzzNormalize$' -fuzztime=10s -parallel=1 -timeout=2m
 
+
   native-build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    container: ubuntu:26.04@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794
+    timeout-minutes: 30
     defaults:
       run:
         shell: bash
     env:
+      CI_NIX_ROLE: build
       GOCACHE: /tmp/azerlay-go-build
       GOMODCACHE: /tmp/azerlay-go-mod
     steps:
-      - name: Bootstrap snapshot CA with verified official package
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const url = 'https://snapshot.ubuntu.com/ubuntu/20261001T000000Z/pool/main/c/ca-certificates/ca-certificates_20260601~26.04.1_all.deb';
-            const expected = '6077d27c6b6f8b23590cb01ff877ed8c804a67a5442cc32b5a33da10d2bd0e90';
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`CA bootstrap download failed: ${response.status}`);
-            const data = Buffer.from(await response.arrayBuffer());
-            const actual = require('crypto').createHash('sha256').update(data).digest('hex');
-            if (data.length !== 138514 || actual !== expected) throw new Error('CA bootstrap integrity mismatch');
-            require('fs').writeFileSync('/tmp/azerlay-bootstrap-ca.deb', data);
-
-      - name: Install pinned Ubuntu build dependencies
-        run: |
-          set -euo pipefail
-          export DEBIAN_FRONTEND=noninteractive
-          dpkg-deb -x /tmp/azerlay-bootstrap-ca.deb /tmp/azerlay-bootstrap-ca
-          cat /tmp/azerlay-bootstrap-ca/usr/share/ca-certificates/mozilla/*.crt > /tmp/azerlay-bootstrap-ca.pem
-          printf 'Acquire::https::CAInfo "/tmp/azerlay-bootstrap-ca.pem";\nAPT::Get::Always-Include-Phased-Updates "true";\n' > /etc/apt/apt.conf.d/00azerlay-snapshot
-          # Fixed, signed archive closure. No live apt sources or insecure flags.
-          rm -f /etc/apt/sources.list
-          rm -f /etc/apt/sources.list.d/ubuntu.sources
-          cat > /etc/apt/sources.list.d/azerlay.sources <<'SOURCES'
-          Types: deb
-          URIs: https://snapshot.ubuntu.com/ubuntu/20261001T000000Z/
-          Suites: resolute resolute-updates resolute-security
-          Components: main universe
-          Architectures: amd64
-          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-          SOURCES
-          apt-get update --error-on=any
-          # Verify the exact signed metadata as well as APT's signature checks.
-          while read -r suite expected; do
-            indexes=(/var/lib/apt/lists/*_dists_"$suite"_InRelease)
-            test "${#indexes[@]}" = 1
-            printf '%s  %s\n' "$expected" "${indexes[0]}" | sha256sum --check
-          done <<'INDEXES'
-          resolute 45f95ce276cdba3e41870516a130e03c58b8b7a79e9546b0efe9e526d255740c
-          resolute-updates 802e675dd9de4c7f3916434a95e7c1d8eec0e82886622d7805ab19a2c6fe0365
-          resolute-security 1d5041572116a8b23aabf79ac7439ad8af83d57ad3fb0f9aa0d4523ec10c5908
-          INDEXES
-          apt-get indextargets --format '$(URI)' > /tmp/azerlay-apt-index-uris
-          test -s /tmp/azerlay-apt-index-uris
-          if grep -v '^https://snapshot\.ubuntu\.com/ubuntu/20261001T000000Z/' /tmp/azerlay-apt-index-uris; then
-            printf 'Unexpected non-snapshot APT source\n' >&2
-            exit 1
-          fi
-          apt-get -y dist-upgrade
-          apt-get install -y --no-install-recommends ca-certificates git curl tar gzip zstd build-essential pkg-config libgtk-4-dev libgtk4-layer-shell-dev gobject-introspection libgirepository-1.0-dev python3
-          apt-get check
-          audit=$(dpkg --audit)
-          test -z "$audit"
-
       - name: Check out repository
         uses: actions/checkout@v4
         with:
@@ -296,108 +221,82 @@ jobs:
           awk -F: '/model name/{sub(/^ +/, "", $2); print "cpu_model=" $2; exit}' /proc/cpuinfo
           grep '^MemTotal:' /proc/meminfo
 
-      - name: Prepare native Go cache input
-        id: native_environment
+      - name: Initialize isolated Nix job paths
+        run: |
+          set -euo pipefail
+          printf 'CI_NIX_STATE=%s/azerlay-nix-state\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          printf 'CI_NIX_OUTPUT=%s/azerlay-nix-output\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+
+      - name: Install verified official Nix runtime
+        run: |
+          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/nix-install-time.json" -- \
+            bash scripts/ci-nix-install.sh
+
+      - name: Prepare locked binary-substituted native environment
+        run: |
+          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/nix-prepare-time.json" -- \
+            python3 scripts/ci_nix_prepare.py --role "$CI_NIX_ROLE" --output "$CI_NIX_OUTPUT"
+
+      - name: Prepare complete Nix Go cache fingerprint
         env:
           CI_CACHE_JOB: ${{ github.job }}
         run: |
           set -euo pipefail
-          bash scripts/ci-native-fingerprint.sh > .git/ci-native-cache-input
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command \
+            bash scripts/ci-nix-run.sh bash scripts/ci-nix-fingerprint.sh > .git/ci-native-cache-input
 
-      - name: Set up Go and native caches
-        uses: ./.github/actions/native-go-cache
+      - name: Restore isolated Nix Go caches
+        uses: ./.github/actions/nix-go-cache
         with:
+          tool-cache: 'false'
           module-writer: 'true'
 
-      - name: Build, run, and inspect native binary
+      - name: Build, run, and inspect Nix native binary
         run: |
-          set -euo pipefail
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          go version
-          go env GOOS GOARCH CGO_ENABLED CC
-          # The former default-CGo build and explicit-CGo smoke must agree.
-          # Fail on drift rather than silently dropping a distinct build condition.
-          test "$(go env CGO_ENABLED)" = 1
-          pkg-config --modversion gtk4 gtk4-layer-shell-0
-          CGO_ENABLED=1 go build -o /tmp/azerlay ./cmd/azerlay
-          /tmp/azerlay version
-          readelf -d /tmp/azerlay
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh bash -c '
+            set -euo pipefail
+            go version
+            go env GOOS GOARCH CGO_ENABLED CC
+            test "$(go env CGO_ENABLED)" = 1
+            pkg-config --modversion gtk4 gtk4-layer-shell-0
+            CGO_ENABLED=1 go build -o /tmp/azerlay ./cmd/azerlay
+            /tmp/azerlay version
+            readelf -d /tmp/azerlay
+          '
 
-      - name: Retain complete native environment fingerprint
-        if: ${{ always() && steps.native_environment.outcome == 'success' }}
+      - name: Retain Nix setup and closure evidence
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: native-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
-          path: .git/ci-native-cache-input
+          name: nix-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: |
+            .git/ci-native-cache-input
+            ${{ runner.temp }}/nix-install-time.json
+            ${{ runner.temp }}/nix-prepare-time.json
+            ${{ runner.temp }}/azerlay-nix-output/nix-version.txt
+            ${{ runner.temp }}/azerlay-nix-output/versions.json
+            ${{ runner.temp }}/azerlay-nix-output/dependency-installables.json
+            ${{ runner.temp }}/azerlay-nix-output/devshell-derivation.json
+            ${{ runner.temp }}/azerlay-nix-output/devshell-result.json
+            ${{ runner.temp }}/azerlay-nix-output/closure.json
+            ${{ runner.temp }}/azerlay-nix-output/closure-paths.txt
+            ${{ runner.temp }}/azerlay-nix-output/lock-sha256.txt
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
 
+
   vulnerability:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    container: ubuntu:26.04@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794
+    timeout-minutes: 30
     defaults:
       run:
         shell: bash
     env:
+      CI_NIX_ROLE: build
       GOCACHE: /tmp/azerlay-go-build
       GOMODCACHE: /tmp/azerlay-go-mod
     steps:
-      - name: Bootstrap snapshot CA with verified official package
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const url = 'https://snapshot.ubuntu.com/ubuntu/20261001T000000Z/pool/main/c/ca-certificates/ca-certificates_20260601~26.04.1_all.deb';
-            const expected = '6077d27c6b6f8b23590cb01ff877ed8c804a67a5442cc32b5a33da10d2bd0e90';
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`CA bootstrap download failed: ${response.status}`);
-            const data = Buffer.from(await response.arrayBuffer());
-            const actual = require('crypto').createHash('sha256').update(data).digest('hex');
-            if (data.length !== 138514 || actual !== expected) throw new Error('CA bootstrap integrity mismatch');
-            require('fs').writeFileSync('/tmp/azerlay-bootstrap-ca.deb', data);
-
-      - name: Install pinned Ubuntu build dependencies
-        run: |
-          set -euo pipefail
-          export DEBIAN_FRONTEND=noninteractive
-          dpkg-deb -x /tmp/azerlay-bootstrap-ca.deb /tmp/azerlay-bootstrap-ca
-          cat /tmp/azerlay-bootstrap-ca/usr/share/ca-certificates/mozilla/*.crt > /tmp/azerlay-bootstrap-ca.pem
-          printf 'Acquire::https::CAInfo "/tmp/azerlay-bootstrap-ca.pem";\nAPT::Get::Always-Include-Phased-Updates "true";\n' > /etc/apt/apt.conf.d/00azerlay-snapshot
-          # Fixed, signed archive closure. No live apt sources or insecure flags.
-          rm -f /etc/apt/sources.list
-          rm -f /etc/apt/sources.list.d/ubuntu.sources
-          cat > /etc/apt/sources.list.d/azerlay.sources <<'SOURCES'
-          Types: deb
-          URIs: https://snapshot.ubuntu.com/ubuntu/20261001T000000Z/
-          Suites: resolute resolute-updates resolute-security
-          Components: main universe
-          Architectures: amd64
-          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-          SOURCES
-          apt-get update --error-on=any
-          # Verify the exact signed metadata as well as APT's signature checks.
-          while read -r suite expected; do
-            indexes=(/var/lib/apt/lists/*_dists_"$suite"_InRelease)
-            test "${#indexes[@]}" = 1
-            printf '%s  %s\n' "$expected" "${indexes[0]}" | sha256sum --check
-          done <<'INDEXES'
-          resolute 45f95ce276cdba3e41870516a130e03c58b8b7a79e9546b0efe9e526d255740c
-          resolute-updates 802e675dd9de4c7f3916434a95e7c1d8eec0e82886622d7805ab19a2c6fe0365
-          resolute-security 1d5041572116a8b23aabf79ac7439ad8af83d57ad3fb0f9aa0d4523ec10c5908
-          INDEXES
-          apt-get indextargets --format '$(URI)' > /tmp/azerlay-apt-index-uris
-          test -s /tmp/azerlay-apt-index-uris
-          if grep -v '^https://snapshot\.ubuntu\.com/ubuntu/20261001T000000Z/' /tmp/azerlay-apt-index-uris; then
-            printf 'Unexpected non-snapshot APT source\n' >&2
-            exit 1
-          fi
-          apt-get -y dist-upgrade
-          apt-get install -y --no-install-recommends ca-certificates git curl tar gzip zstd build-essential pkg-config libgtk-4-dev libgtk4-layer-shell-dev gobject-introspection libgirepository-1.0-dev python3
-          apt-get check
-          audit=$(dpkg --audit)
-          test -z "$audit"
-
       - name: Check out repository
         uses: actions/checkout@v4
         with:
@@ -412,16 +311,32 @@ jobs:
           awk -F: '/model name/{sub(/^ +/, "", $2); print "cpu_model=" $2; exit}' /proc/cpuinfo
           grep '^MemTotal:' /proc/meminfo
 
-      - name: Prepare native Go cache input
-        id: native_environment
+      - name: Initialize isolated Nix job paths
+        run: |
+          set -euo pipefail
+          printf 'CI_NIX_STATE=%s/azerlay-nix-state\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          printf 'CI_NIX_OUTPUT=%s/azerlay-nix-output\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+
+      - name: Install verified official Nix runtime
+        run: |
+          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/nix-install-time.json" -- \
+            bash scripts/ci-nix-install.sh
+
+      - name: Prepare locked binary-substituted native environment
+        run: |
+          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/nix-prepare-time.json" -- \
+            python3 scripts/ci_nix_prepare.py --role "$CI_NIX_ROLE" --output "$CI_NIX_OUTPUT"
+
+      - name: Prepare complete Nix Go cache fingerprint
         env:
           CI_CACHE_JOB: ${{ github.job }}
         run: |
           set -euo pipefail
-          bash scripts/ci-native-fingerprint.sh > .git/ci-native-cache-input
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command \
+            bash scripts/ci-nix-run.sh bash scripts/ci-nix-fingerprint.sh > .git/ci-native-cache-input
 
-      - name: Set up Go and native caches
-        uses: ./.github/actions/native-go-cache
+      - name: Restore isolated Nix Go caches
+        uses: ./.github/actions/nix-go-cache
         with:
           tool-cache: 'true'
 
@@ -429,90 +344,53 @@ jobs:
         env:
           GOMODCACHE: /tmp/azerlay-tool-go-mod
         run: |
-          source .github/ci-tools.env
-          go install golang.org/x/vuln/cmd/govulncheck@"$GOVULNCHECK_VERSION"
-          du -sb "$GOMODCACHE/cache/download"
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh bash -c '
+            set -euo pipefail
+            source .github/ci-tools.env
+            go install golang.org/x/vuln/cmd/govulncheck@"$GOVULNCHECK_VERSION"
+            du -sb "$GOMODCACHE/cache/download"
+          '
 
       - name: Check reachable vulnerabilities
         run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          govulncheck ./...
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh bash -c '
+            set -euo pipefail
+            govulncheck ./...
+          '
 
-      - name: Retain complete native environment fingerprint
-        if: ${{ always() && steps.native_environment.outcome == 'success' }}
+      - name: Retain Nix setup and closure evidence
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: native-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
-          path: .git/ci-native-cache-input
+          name: nix-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: |
+            .git/ci-native-cache-input
+            ${{ runner.temp }}/nix-install-time.json
+            ${{ runner.temp }}/nix-prepare-time.json
+            ${{ runner.temp }}/azerlay-nix-output/nix-version.txt
+            ${{ runner.temp }}/azerlay-nix-output/versions.json
+            ${{ runner.temp }}/azerlay-nix-output/dependency-installables.json
+            ${{ runner.temp }}/azerlay-nix-output/devshell-derivation.json
+            ${{ runner.temp }}/azerlay-nix-output/devshell-result.json
+            ${{ runner.temp }}/azerlay-nix-output/closure.json
+            ${{ runner.temp }}/azerlay-nix-output/closure-paths.txt
+            ${{ runner.temp }}/azerlay-nix-output/lock-sha256.txt
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
 
+
   licenses:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    container: ubuntu:26.04@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794
+    timeout-minutes: 20
     defaults:
       run:
         shell: bash
     env:
+      CI_NIX_ROLE: build
       GOCACHE: /tmp/azerlay-go-build
       GOMODCACHE: /tmp/azerlay-go-mod
     steps:
-      - name: Bootstrap snapshot CA with verified official package
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const url = 'https://snapshot.ubuntu.com/ubuntu/20261001T000000Z/pool/main/c/ca-certificates/ca-certificates_20260601~26.04.1_all.deb';
-            const expected = '6077d27c6b6f8b23590cb01ff877ed8c804a67a5442cc32b5a33da10d2bd0e90';
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`CA bootstrap download failed: ${response.status}`);
-            const data = Buffer.from(await response.arrayBuffer());
-            const actual = require('crypto').createHash('sha256').update(data).digest('hex');
-            if (data.length !== 138514 || actual !== expected) throw new Error('CA bootstrap integrity mismatch');
-            require('fs').writeFileSync('/tmp/azerlay-bootstrap-ca.deb', data);
-
-      - name: Install pinned Ubuntu build dependencies
-        run: |
-          set -euo pipefail
-          export DEBIAN_FRONTEND=noninteractive
-          dpkg-deb -x /tmp/azerlay-bootstrap-ca.deb /tmp/azerlay-bootstrap-ca
-          cat /tmp/azerlay-bootstrap-ca/usr/share/ca-certificates/mozilla/*.crt > /tmp/azerlay-bootstrap-ca.pem
-          printf 'Acquire::https::CAInfo "/tmp/azerlay-bootstrap-ca.pem";\nAPT::Get::Always-Include-Phased-Updates "true";\n' > /etc/apt/apt.conf.d/00azerlay-snapshot
-          # Fixed, signed archive closure. No live apt sources or insecure flags.
-          rm -f /etc/apt/sources.list
-          rm -f /etc/apt/sources.list.d/ubuntu.sources
-          cat > /etc/apt/sources.list.d/azerlay.sources <<'SOURCES'
-          Types: deb
-          URIs: https://snapshot.ubuntu.com/ubuntu/20261001T000000Z/
-          Suites: resolute resolute-updates resolute-security
-          Components: main universe
-          Architectures: amd64
-          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-          SOURCES
-          apt-get update --error-on=any
-          # Verify the exact signed metadata as well as APT's signature checks.
-          while read -r suite expected; do
-            indexes=(/var/lib/apt/lists/*_dists_"$suite"_InRelease)
-            test "${#indexes[@]}" = 1
-            printf '%s  %s\n' "$expected" "${indexes[0]}" | sha256sum --check
-          done <<'INDEXES'
-          resolute 45f95ce276cdba3e41870516a130e03c58b8b7a79e9546b0efe9e526d255740c
-          resolute-updates 802e675dd9de4c7f3916434a95e7c1d8eec0e82886622d7805ab19a2c6fe0365
-          resolute-security 1d5041572116a8b23aabf79ac7439ad8af83d57ad3fb0f9aa0d4523ec10c5908
-          INDEXES
-          apt-get indextargets --format '$(URI)' > /tmp/azerlay-apt-index-uris
-          test -s /tmp/azerlay-apt-index-uris
-          if grep -v '^https://snapshot\.ubuntu\.com/ubuntu/20261001T000000Z/' /tmp/azerlay-apt-index-uris; then
-            printf 'Unexpected non-snapshot APT source\n' >&2
-            exit 1
-          fi
-          apt-get -y dist-upgrade
-          apt-get install -y --no-install-recommends ca-certificates git curl tar gzip zstd build-essential pkg-config libgtk-4-dev libgtk4-layer-shell-dev gobject-introspection libgirepository-1.0-dev python3
-          apt-get check
-          audit=$(dpkg --audit)
-          test -z "$audit"
-
       - name: Check out repository
         uses: actions/checkout@v4
         with:
@@ -527,16 +405,32 @@ jobs:
           awk -F: '/model name/{sub(/^ +/, "", $2); print "cpu_model=" $2; exit}' /proc/cpuinfo
           grep '^MemTotal:' /proc/meminfo
 
-      - name: Prepare native Go cache input
-        id: native_environment
+      - name: Initialize isolated Nix job paths
+        run: |
+          set -euo pipefail
+          printf 'CI_NIX_STATE=%s/azerlay-nix-state\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          printf 'CI_NIX_OUTPUT=%s/azerlay-nix-output\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+
+      - name: Install verified official Nix runtime
+        run: |
+          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/nix-install-time.json" -- \
+            bash scripts/ci-nix-install.sh
+
+      - name: Prepare locked binary-substituted native environment
+        run: |
+          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/nix-prepare-time.json" -- \
+            python3 scripts/ci_nix_prepare.py --role "$CI_NIX_ROLE" --output "$CI_NIX_OUTPUT"
+
+      - name: Prepare complete Nix Go cache fingerprint
         env:
           CI_CACHE_JOB: ${{ github.job }}
         run: |
           set -euo pipefail
-          bash scripts/ci-native-fingerprint.sh > .git/ci-native-cache-input
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command \
+            bash scripts/ci-nix-run.sh bash scripts/ci-nix-fingerprint.sh > .git/ci-native-cache-input
 
-      - name: Set up Go and native caches
-        uses: ./.github/actions/native-go-cache
+      - name: Restore isolated Nix Go caches
+        uses: ./.github/actions/nix-go-cache
         with:
           tool-cache: 'true'
 
@@ -544,29 +438,45 @@ jobs:
         env:
           GOMODCACHE: /tmp/azerlay-tool-go-mod
         run: |
-          source .github/ci-tools.env
-          go install github.com/google/go-licenses/v2@"$GO_LICENSES_VERSION"
-          du -sb "$GOMODCACHE/cache/download"
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh bash -c '
+            set -euo pipefail
+            source .github/ci-tools.env
+            go install github.com/google/go-licenses/v2@"$GO_LICENSES_VERSION"
+            du -sb "$GOMODCACHE/cache/download"
+          '
 
       - name: Report dependency licenses
         run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          go-licenses report ./... --include_tests --ignore=github.com/sh4869221b/azerlay > "$RUNNER_TEMP/dependency-licenses.csv"
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh bash -c '
+            set -euo pipefail
+            go-licenses report ./... --include_tests --ignore=github.com/sh4869221b/azerlay > "$RUNNER_TEMP/nix-dependency-licenses.csv"
+          '
 
-      - name: Upload dependency license report
+      - name: Retain Nix dependency license report
         uses: actions/upload-artifact@v4
         with:
-          name: dependency-licenses
-          path: ${{ runner.temp }}/dependency-licenses.csv
+          name: nix-dependency-licenses
+          path: ${{ runner.temp }}/nix-dependency-licenses.csv
           if-no-files-found: error
           retention-days: 7
 
-      - name: Retain complete native environment fingerprint
-        if: ${{ always() && steps.native_environment.outcome == 'success' }}
+      - name: Retain Nix setup and closure evidence
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: native-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
-          path: .git/ci-native-cache-input
+          name: nix-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: |
+            .git/ci-native-cache-input
+            ${{ runner.temp }}/nix-install-time.json
+            ${{ runner.temp }}/nix-prepare-time.json
+            ${{ runner.temp }}/azerlay-nix-output/nix-version.txt
+            ${{ runner.temp }}/azerlay-nix-output/versions.json
+            ${{ runner.temp }}/azerlay-nix-output/dependency-installables.json
+            ${{ runner.temp }}/azerlay-nix-output/devshell-derivation.json
+            ${{ runner.temp }}/azerlay-nix-output/devshell-result.json
+            ${{ runner.temp }}/azerlay-nix-output/closure.json
+            ${{ runner.temp }}/azerlay-nix-output/closure-paths.txt
+            ${{ runner.temp }}/azerlay-nix-output/lock-sha256.txt
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
@@ -647,123 +557,3 @@ jobs:
 
       - name: Check generated fixtures
         run: git diff --exit-code -- internal/profiledecode/testdata/zeros-64mib.lzma internal/profiledecode/testdata/zeros-64mib-plus-one.lzma
-
-  arch-compatibility:
-    runs-on: ubuntu-24.04
-    container: archlinux:base
-    defaults:
-      run:
-        shell: bash
-    env:
-      GOCACHE: /tmp/azerlay-go-build
-      GOMODCACHE: /tmp/azerlay-go-mod
-    steps:
-      - name: Install native test dependencies
-        run: |
-          pacman -Syu --noconfirm --needed ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection sway dbus grim noto-fonts-cjk noto-fonts-emoji
-          setcap -r /usr/bin/sway
-
-      - name: Check out repository
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Record runner comparison metadata
-        run: |
-          set -euo pipefail
-          printf 'logical_cpu_count=%s\n' "$(getconf _NPROCESSORS_ONLN)"
-          printf 'runner_image=%s\nrunner_image_version=%s\n' "${ImageOS:-unknown}" "${ImageVersion:-unknown}"
-          uname -srmo
-          awk -F: '/model name/{sub(/^ +/, "", $2); print "cpu_model=" $2; exit}' /proc/cpuinfo
-          grep '^MemTotal:' /proc/meminfo
-
-      - name: Prepare native Go cache input
-        id: native_environment
-        env:
-          CI_CACHE_JOB: ${{ github.job }}
-        run: |
-          set -euo pipefail
-          bash scripts/ci-native-fingerprint.sh > .git/ci-native-cache-input
-
-      - name: Set up Go and native caches
-        uses: ./.github/actions/native-go-cache
-        with:
-          tool-cache: 'true'
-
-      - name: Check complete package partition and core dependencies
-        env:
-          CGO_ENABLED: '1'
-        run: |
-          set -euo pipefail
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          python3 scripts/ci_check_packages.py
-
-      - name: Check formatting
-        shell: bash
-        run: |
-          files=$(gofmt -l .)
-          if [[ -n $files ]]; then
-            printf 'Files require gofmt:\n%s\n' "$files"
-            gofmt -d .
-            exit 1
-          fi
-
-      - name: Vet
-        run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          go vet ./...
-
-      - name: Install Staticcheck
-        env:
-          GOMODCACHE: /tmp/azerlay-tool-go-mod
-        run: |
-          source .github/ci-tools.env
-          go install honnef.co/go/tools/cmd/staticcheck@"$STATICCHECK_VERSION"
-          du -sb "$GOMODCACHE/cache/download"
-
-      - name: Staticcheck
-        run: staticcheck ./...
-
-      - name: Test
-        id: native_race
-        run: |
-          set -euo pipefail
-          useradd --create-home --user-group azerlay-test
-          mkdir -p "$GOCACHE" "$GOMODCACHE"
-          chown -R azerlay-test:azerlay-test "$GITHUB_WORKSPACE" "$GOCACHE" "$GOMODCACHE"
-          mapfile -t native < scripts/ci-native-packages.txt
-          printf 'diagnostic_dir=%s\n' "$RUNNER_TEMP" >> "$GITHUB_OUTPUT"
-          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/native-race-timing.json" -- \
-            runuser -u azerlay-test -- env PATH="$PATH" GOCACHE="$GOCACHE" GOMODCACHE="$GOMODCACHE" scripts/test-wayland.sh go test -race -json -shuffle=on -count=1 "${native[@]}" \
-            | tee "$RUNNER_TEMP/native-race-tests.jsonl"
-
-      - name: Upload native race diagnostics
-        if: ${{ always() && (steps.native_race.outcome == 'success' || steps.native_race.outcome == 'failure') }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: arch-native-race-json-attempt-${{ github.run_attempt }}
-          path: |
-            ${{ steps.native_race.outputs.diagnostic_dir }}/native-race-tests.jsonl
-            ${{ steps.native_race.outputs.diagnostic_dir }}/native-race-timing.json
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Build, run, and inspect Arch native binary
-        run: |
-          set -euo pipefail
-          test "$(go env CGO_ENABLED)" = 1
-          go version
-          pkg-config --modversion gtk4 gtk4-layer-shell-0
-          CGO_ENABLED=1 go build -o /tmp/azerlay ./cmd/azerlay
-          /tmp/azerlay version
-          readelf -d /tmp/azerlay
-
-      - name: Retain complete native environment fingerprint
-        if: ${{ always() && steps.native_environment.outcome == 'success' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: native-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
-          path: .git/ci-native-cache-input
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 7

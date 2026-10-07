@@ -2,6 +2,12 @@
 # Complete native compatibility boundary; never use a partial package allowlist.
 set -euo pipefail
 : "${CI_CACHE_JOB:?CI_CACHE_JOB is required}"
+: "${CI_NATIVE_WORKFLOW:?CI_NATIVE_WORKFLOW must identify the actual native workflow}"
+case "$CI_NATIVE_WORKFLOW" in
+  .github/workflows/arch-ci.yml) ;;
+  *) printf 'Unexpected native workflow recipe\n' >&2; exit 2;;
+esac
+test -f "$CI_NATIVE_WORKFLOW"
 printf 'fingerprint_schema=2\njob=%s\n' "$CI_CACHE_JOB"
 cat /etc/os-release
 uname -m
@@ -22,4 +28,4 @@ ld --version
 pkg-config --version
 pkg-config --modversion gtk4 gtk4-layer-shell-0 glib-2.0 pango
 pkg-config --cflags --libs gtk4 gtk4-layer-shell-0
-sha256sum .github/workflows/ci.yml scripts/ci-native-fingerprint.sh scripts/test-wayland.sh
+sha256sum "$CI_NATIVE_WORKFLOW" scripts/ci-native-fingerprint.sh scripts/test-wayland.sh

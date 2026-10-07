@@ -1,10 +1,11 @@
-# Experimental Nix native CI
+# Pinned Nix native CI
 
-This candidate is for comparison with the pinned Ubuntu userspace in PR #141.
-It does not select a winner, replace required gates, or claim reproducible bytes.
-The application source and native test commands must remain identical between
-profiles. Nix tests its own userspace, so Arch-native compatibility remains a
-separate shared gate.
+The owner selected this environment for normal PR/main CI on 2026-10-07 after
+[the bounded comparison](measurements/ci-136-comparison/README.md). Four native
+roles retain the existing check names in `.github/workflows/ci.yml`; core and
+fuzz remain required there. Full latest-Arch checks run daily and before version
+publication through a manual verification entrypoint. See [policy](ci-adoption.md).
+This does not claim reproducible binary bytes or new product platform support.
 
 ## Fixed inputs and source verification
 
@@ -124,7 +125,7 @@ and the relevant scripts/workflow. Do not restore across Nix/Ubuntu/Arch or ABI
 boundaries. No broad restore prefix should bypass those boundaries. Module
 archives may share only when the existing path/compression/key contract matches.
 
-## Measurement and acceptance
+## Historical comparison and acceptance
 
 Keep the original Ubuntu quality gates and cache contract, adding only the
 missing `at-spi2-core` runtime package and runner comparison metadata. Both candidates require
@@ -148,8 +149,8 @@ child CPU figure the total installer/build-daemon CPU cost.
 
 Observe the existing warm median <=180s / p95 <=300s goals, but two observations
 cannot establish those distribution statistics. Do not extrapolate an adoption
-verdict or omit cold/download/post-cache costs. Let the user choose the retained
-profile after reviewing measured results and remaining version differences.
+verdict or omit cold/download/post-cache costs. The owner chose Nix after reviewing those results. Retain the version and host
+qualifications; adoption does not prove a p50/p95 target.
 
 ## Validation limits
 

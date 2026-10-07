@@ -1,6 +1,9 @@
 name: Pinned Nix Go caches
 description: Reuse Go downloads and closure-isolated compiled results without installing a second Go SDK.
 inputs:
+  module-writer:
+    description: Native-build may publish the verified application module snapshot.
+    default: 'false'
   tool-cache:
     description: Restore this Nix role's pinned analyzer download graph.
     default: 'false'
@@ -20,6 +23,7 @@ runs:
         '
 
     - name: Restore shared Go modules
+      id: modules
       uses: actions/cache/restore@v4
       with:
         path: /tmp/azerlay-go-mod/cache/download
@@ -37,8 +41,14 @@ runs:
       shell: bash
       run: nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh bash scripts/ci-go-modules.sh
 
-    # Existing Ubuntu native-build stays the sole writer of the shared app
-    # download snapshot. Nix consumers always verify and reconstruct it normally.
+    - name: Save shared Go modules
+      if: inputs.module-writer == 'true' && steps.modules.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: /tmp/azerlay-go-mod/cache/download
+        key: ${{ steps.modules.outputs.cache-primary-key }}
+
+    # Tool archives are isolated by job and pinned analyzer versions.
     - name: Restore pinned Nix tool modules
       if: inputs.tool-cache == 'true'
       uses: actions/cache@v4
