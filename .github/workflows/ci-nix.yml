@@ -147,6 +147,7 @@ jobs:
             ${{ runner.temp }}/azerlay-nix-output/nix-version.txt
             ${{ runner.temp }}/azerlay-nix-output/versions.json
             ${{ runner.temp }}/azerlay-nix-output/dependency-installables.json
+            ${{ runner.temp }}/azerlay-nix-output/devshell-derivation.json
             ${{ runner.temp }}/azerlay-nix-output/devshell-result.json
             ${{ runner.temp }}/azerlay-nix-output/closure.json
             ${{ runner.temp }}/azerlay-nix-output/closure-paths.txt
@@ -234,6 +235,7 @@ jobs:
             ${{ runner.temp }}/azerlay-nix-output/nix-version.txt
             ${{ runner.temp }}/azerlay-nix-output/versions.json
             ${{ runner.temp }}/azerlay-nix-output/dependency-installables.json
+            ${{ runner.temp }}/azerlay-nix-output/devshell-derivation.json
             ${{ runner.temp }}/azerlay-nix-output/devshell-result.json
             ${{ runner.temp }}/azerlay-nix-output/closure.json
             ${{ runner.temp }}/azerlay-nix-output/closure-paths.txt
@@ -326,6 +328,7 @@ jobs:
             ${{ runner.temp }}/azerlay-nix-output/nix-version.txt
             ${{ runner.temp }}/azerlay-nix-output/versions.json
             ${{ runner.temp }}/azerlay-nix-output/dependency-installables.json
+            ${{ runner.temp }}/azerlay-nix-output/devshell-derivation.json
             ${{ runner.temp }}/azerlay-nix-output/devshell-result.json
             ${{ runner.temp }}/azerlay-nix-output/closure.json
             ${{ runner.temp }}/azerlay-nix-output/closure-paths.txt
@@ -426,6 +429,7 @@ jobs:
             ${{ runner.temp }}/azerlay-nix-output/nix-version.txt
             ${{ runner.temp }}/azerlay-nix-output/versions.json
             ${{ runner.temp }}/azerlay-nix-output/dependency-installables.json
+            ${{ runner.temp }}/azerlay-nix-output/devshell-derivation.json
             ${{ runner.temp }}/azerlay-nix-output/devshell-result.json
             ${{ runner.temp }}/azerlay-nix-output/closure.json
             ${{ runner.temp }}/azerlay-nix-output/closure-paths.txt

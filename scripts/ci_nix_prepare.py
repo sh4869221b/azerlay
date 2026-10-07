@@ -60,6 +60,13 @@ def validate_lock(lock):
 
 
 def dependency_installables(graph):
+    # Nix 2.35 wraps the derivation map. The command manual's example still
+    # shows the legacy map, so follow the pinned implementation/schema here.
+    # https://github.com/NixOS/nix/blob/2.35.2/src/nix/derivation-show.cc
+    if isinstance(graph, dict) and ("version" in graph or "derivations" in graph):
+        if set(graph) != {"version", "derivations"} or graph["version"] != 4:
+            raise ValueError("Unsupported derivation-show JSON envelope")
+        graph = graph["derivations"]
     if not isinstance(graph, dict) or len(graph) != 1:
         raise ValueError("Expected exactly one devShell derivation")
     drv = next(iter(graph.values()))

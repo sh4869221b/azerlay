@@ -22,6 +22,19 @@ def lock_fixture():
             **source, 'narHash': nix.NAR_HASH, 'lastModified': 1}}}}
 
 
+def derivation_show_fixture():
+    # Actual outer/inner shape emitted by Nix 2.35.2 derivation-show.cc and
+    # libstore/derivations.cc; package hashes are synthetic privacy-safe values.
+    return {'version': 4, 'derivations': {'1' * 32 + '-azerlay-ci-test.drv': {
+        'name': 'azerlay-ci-test', 'version': 4,
+        'outputs': {'out': {'path': '2' * 32 + '-azerlay-ci-test'}},
+        'system': 'x86_64-linux', 'builder': '/nix/store/' + '3' * 32 + '-bash/bin/bash',
+        'args': ['-e', '/nix/store/' + '4' * 32 + '-source-stdenv.sh'],
+        'env': {'name': 'azerlay-ci-test'},
+        'inputs': {'srcs': [], 'drvs': {'0' * 32 + '-gtk4.drv': ['out', 'dev']}},
+    }}}
+
+
 class NixPreparationTests(unittest.TestCase):
     def test_expected_lock_shape(self):
         self.assertTrue(nix.validate_lock(lock_fixture()).startswith('sha256-'))
@@ -63,6 +76,29 @@ class NixPreparationTests(unittest.TestCase):
             with self.subTest(graph=graph), self.assertRaises(ValueError):
                 nix.dependency_installables(graph)
 
+    def test_pinned_nix_235_versioned_envelope(self):
+        self.assertEqual(nix.dependency_installables(derivation_show_fixture()),
+                         ['/nix/store/' + '0' * 32 + '-gtk4.drv^dev,out'])
+
+    def test_unknown_or_malformed_envelope_is_rejected(self):
+        invalid = [
+            {'version': 5, 'derivations': derivation_show_fixture()['derivations']},
+            {'version': 4}, {'derivations': {}},
+            {'version': 4, 'derivations': None},
+            {'version': 4, 'derivations': []},
+            {'version': 4, 'derivations': {}},
+            {**derivation_show_fixture(), 'extra': {}},
+        ]
+        for graph in invalid:
+            with self.subTest(graph=graph), self.assertRaises(ValueError):
+                nix.dependency_installables(graph)
+
+    def test_envelope_still_requires_exactly_one_derivation(self):
+        graph = derivation_show_fixture()
+        graph['derivations']['5' * 32 + '-extra.drv'] = copy.deepcopy(next(iter(graph['derivations'].values())))
+        with self.assertRaisesRegex(ValueError, 'exactly one'):
+            nix.dependency_installables(graph)
+
     def test_flake_pins_toolchain_and_does_not_change_trust(self):
         root = Path(__file__).parents[2]
         flake = (root / 'flake.nix').read_text()
@@ -103,8 +139,7 @@ class NixPreparationTests(unittest.TestCase):
             elif command[1] == 'eval':
                 stdout = json.dumps(versions if versions is not None else nix.EXPECTED_VERSIONS)
             elif command[1:3] == ['derivation', 'show']:
-                stdout = json.dumps({'shell': {'version': 4, 'inputs': {'drvs': {
-                    '0' * 32 + '-gtk4.drv': ['out', 'dev']}}}})
+                stdout = json.dumps(derivation_show_fixture())
             elif '--max-jobs' in command:
                 if fail_substitution:
                     raise subprocess.CalledProcessError(1, command)
