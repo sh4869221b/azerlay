@@ -1,0 +1,80 @@
+{
+  "metrics": {
+    "native": [
+      {
+        "child_system_seconds": 12.855534,
+        "child_user_seconds": 41.334131,
+        "elapsed_seconds": 55.577283566999995,
+        "max_child_rss_kib": 619248,
+        "returncode": 0,
+        "schema_version": 1,
+        "wrapper_signal": null
+      }
+    ],
+    "core": [
+      {
+        "child_system_seconds": 20.375957,
+        "child_user_seconds": 149.837582,
+        "elapsed_seconds": 101.566416163,
+        "max_child_rss_kib": 1053128,
+        "returncode": 0,
+        "schema_version": 1,
+        "wrapper_signal": null
+      }
+    ]
+  },
+  "selected_events": [
+    {
+      "Time": "2026-10-07T03:27:07.198901993Z",
+      "Action": "run",
+      "Package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+      "Test": "TestCLIInputForms"
+    },
+    {
+      "Time": "2026-10-07T03:27:07.201196302Z",
+      "Action": "run",
+      "Package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+      "Test": "TestRunLiveOverlayLatency"
+    },
+    {
+      "Time": "2026-10-07T03:27:15.108415031Z",
+      "Action": "pass",
+      "Package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+      "Test": "TestRunLiveOverlayLatency",
+      "Elapsed": 7.91
+    },
+    {
+      "Time": "2026-10-07T03:27:17.048298534Z",
+      "Action": "run",
+      "Package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+      "Test": "TestEncodeLiveCapture"
+    },
+    {
+      "Time": "2026-10-07T03:27:17.099434141Z",
+      "Action": "pass",
+      "Package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+      "Test": "TestEncodeLiveCapture",
+      "Elapsed": 0.05
+    },
+    {
+      "Time": "2026-10-07T03:27:24.435784344Z",
+      "Action": "run",
+      "Package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+      "Test": "TestRunLiveOverlayNative"
+    },
+    {
+      "Time": "2026-10-07T03:27:44.443482499Z",
+      "Action": "pass",
+      "Package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+      "Test": "TestRunLiveOverlayNative",
+      "Elapsed": 20.01
+    },
+    {
+      "Time": "2026-10-07T03:27:53.785391274Z",
+      "Action": "pass",
+      "Package": "github.com/sh4869221b/azerlay/cmd/azerlay",
+      "Test": "TestCLIInputForms",
+      "Elapsed": 0.05
+    }
+  ]
+}

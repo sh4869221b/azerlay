@@ -7,77 +7,27 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	"github.com/diamondburned/gotk4/pkg/glib/v2"
+	"github.com/sh4869221b/azerlay/internal/cli"
 	"github.com/sh4869221b/azerlay/internal/config"
 	"github.com/sh4869221b/azerlay/internal/control"
 	"github.com/sh4869221b/azerlay/internal/live"
 	"github.com/sh4869221b/azerlay/internal/overlay"
 	"github.com/sh4869221b/azerlay/internal/profilesource"
-	"github.com/urfave/cli/v3"
 )
 
-const runHelp = `Usage: azerlay run [--config PATH] [--foreground]
-
-Run in foreground until quit, SIGINT or SIGTERM. Requires a Wayland session.
-Configuration must exist; a saved profile is optional. Show selected profile assignments and last-observed raw input.
-
-Options:
-  --config PATH  Read this configuration instead of the default XDG path
-  --foreground   Stay in foreground (the default)
-  --help         Print this help without starting the application`
-
-func normalizeRunArgs(args []string) (normalized []string, valid bool) {
-	seen := make(map[string]bool)
-	for i := 0; i < len(args); i++ {
-		name, value, equals := strings.Cut(args[i], "=")
-		if seen[name] {
-			return nil, false
-		}
-		seen[name] = true
-		switch name {
-		case "--help", "--foreground":
-			if equals {
-				return nil, false
-			}
-			normalized = append(normalized, name)
-		case "--config":
-			if !equals {
-				if i+1 == len(args) {
-					return nil, false
-				}
-				i++
-				value = args[i]
-			}
-			if value == "" {
-				return nil, false
-			}
-			normalized = append(normalized, name, value)
-		default:
-			return nil, false
-		}
-	}
-	return normalized, true
-}
-
-func runApplication(cmd *cli.Command, stdout, stderr io.Writer) int {
-	if cmd.IsSet("help") {
-		if _, err := fmt.Fprintln(stdout, runHelp); err != nil {
-			return 1
-		}
-		return 0
-	}
+func runApplication(configPath string, stdout, stderr io.Writer) int {
 	if os.Getenv("WAYLAND_DISPLAY") == "" {
-		return writeRunFailure(&reportError{"ERR_RUNTIME_WAYLAND", "runtime", "Wayland display is unavailable.", "Run in a Wayland session with WAYLAND_DISPLAY set."}, stdout, stderr)
+		return cli.WriteRunFailure(&cli.ReportError{Code: "ERR_RUNTIME_WAYLAND", Stage: "runtime", Summary: "Wayland display is unavailable.", Remediation: "Run in a Wayland session with WAYLAND_DISPLAY set."}, stdout, stderr)
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	pipeSignals := make(chan os.Signal, 1)
 	signal.Notify(pipeSignals, syscall.SIGPIPE)
 	defer signal.Stop(pipeSignals)
-	return runForeground(ctx, cmd.String("config"), stdout, stderr)
+	return runForeground(ctx, configPath, stdout, stderr)
 }
 
 func runForeground(ctx context.Context, configPath string, stdout, stderr io.Writer) (status int) {
@@ -86,7 +36,7 @@ func runForeground(ctx context.Context, configPath string, stdout, stderr io.Wri
 		return runStartupFailure(ctx, err, stdout, stderr)
 	}
 	if existing != nil {
-		return writeControlReport(controlReport{SchemaVersion: 1, Command: "run", OK: true, Result: *existing}, false, stdout, stderr)
+		return cli.WriteRunResult(*existing, stdout, stderr)
 	}
 	defer func() {
 		if err := owner.Close(); err != nil {
@@ -190,7 +140,7 @@ func runForeground(ctx context.Context, configPath string, stdout, stderr io.Wri
 	if err != nil {
 		return runStartupFailure(ctx, err, stdout, stderr)
 	}
-	if status := writeControlReport(controlReport{SchemaVersion: 1, Command: "run", OK: true, Result: response.Result}, false, stdout, stderr); status != 0 {
+	if status := cli.WriteRunResult(response.Result, stdout, stderr); status != 0 {
 		return status
 	}
 	if current, ok := response.Result.(control.Status); ok && current.ActiveProfile == nil {
@@ -219,20 +169,16 @@ func runStartupFailure(ctx context.Context, err error, stdout, stderr io.Writer)
 
 func writeRunError(err error, stdout, stderr io.Writer) int {
 	if errors.Is(err, overlay.ErrDisplayUnavailable) {
-		return writeRunFailure(&reportError{"ERR_RUNTIME_WAYLAND", "runtime", "Wayland display is unavailable.", "Run in a Wayland session with WAYLAND_DISPLAY set."}, stdout, stderr)
+		return cli.WriteRunFailure(&cli.ReportError{Code: "ERR_RUNTIME_WAYLAND", Stage: "runtime", Summary: "Wayland display is unavailable.", Remediation: "Run in a Wayland session with WAYLAND_DISPLAY set."}, stdout, stderr)
 	}
 	if errors.Is(err, overlay.ErrLayerUnavailable) {
-		return writeRunFailure(&reportError{"ERR_LAYER_SHELL_UNAVAILABLE", "runtime", "Layer Shell is unavailable.", "Use a compositor with Layer Shell support."}, stdout, stderr)
+		return cli.WriteRunFailure(&cli.ReportError{Code: "ERR_LAYER_SHELL_UNAVAILABLE", Stage: "runtime", Summary: "Layer Shell is unavailable.", Remediation: "Use a compositor with Layer Shell support."}, stdout, stderr)
 	}
 	var configError *config.Error
 	if errors.As(err, &configError) {
-		return writeRunFailure(&reportError{configError.Code, configError.Stage, configError.Reason, "Check the configuration file and use run --help."}, stdout, stderr)
+		return cli.WriteRunFailure(&cli.ReportError{Code: configError.Code, Stage: configError.Stage, Summary: configError.Reason, Remediation: "Check the configuration file and use run --help."}, stdout, stderr)
 	}
 	failure := control.NewError(control.ERR_CONTROL_UNAVAILABLE)
 	errors.As(err, &failure)
-	return writeRunFailure(&reportError{failure.Code, failure.Stage, failure.Summary, failure.Remediation}, stdout, stderr)
-}
-
-func writeRunFailure(failure *reportError, stdout, stderr io.Writer) int {
-	return writeControlReport(controlReport{SchemaVersion: 1, Command: "run", Error: failure}, false, stdout, stderr)
+	return cli.WriteRunFailure(&cli.ReportError{Code: failure.Code, Stage: failure.Stage, Summary: failure.Summary, Remediation: failure.Remediation}, stdout, stderr)
 }

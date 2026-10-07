@@ -48,12 +48,21 @@ jobs:
         with:
           tool-cache: 'true'
 
+      - name: Check complete package partition and core dependencies
+        env:
+          CGO_ENABLED: '1'
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          python3 scripts/ci_check_packages.py
+
       - name: Check formatting
         shell: bash
         run: |
           files=$(gofmt -l .)
           if [[ -n $files ]]; then
             printf 'Files require gofmt:\n%s\n' "$files"
+            gofmt -d .
             exit 1
           fi
 
@@ -74,11 +83,28 @@ jobs:
         run: staticcheck ./...
 
       - name: Test
+        id: native_race
         run: |
+          set -euo pipefail
           useradd --create-home --user-group azerlay-test
           mkdir -p "$GOCACHE" "$GOMODCACHE"
           chown -R azerlay-test:azerlay-test "$GITHUB_WORKSPACE" "$GOCACHE" "$GOMODCACHE"
-          runuser -u azerlay-test -- env PATH="$PATH" GOCACHE="$GOCACHE" GOMODCACHE="$GOMODCACHE" scripts/test-wayland.sh go test -race -shuffle=on -count=1 ./...
+          mapfile -t native < scripts/ci-native-packages.txt
+          printf 'diagnostic_dir=%s\n' "$RUNNER_TEMP" >> "$GITHUB_OUTPUT"
+          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/native-race-timing.json" -- \
+            runuser -u azerlay-test -- env PATH="$PATH" GOCACHE="$GOCACHE" GOMODCACHE="$GOMODCACHE" scripts/test-wayland.sh go test -race -json -shuffle=on -count=1 "${native[@]}" \
+            | tee "$RUNNER_TEMP/native-race-tests.jsonl"
+
+      - name: Upload native race diagnostics
+        if: ${{ always() && (steps.native_race.outcome == 'success' || steps.native_race.outcome == 'failure') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-race-json-attempt-${{ github.run_attempt }}
+          path: |
+            ${{ steps.native_race.outputs.diagnostic_dir }}/native-race-tests.jsonl
+            ${{ steps.native_race.outputs.diagnostic_dir }}/native-race-timing.json
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Build
         run: go build ./cmd/azerlay
@@ -271,6 +297,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Test CI measurement tools
+        run: python3 -m unittest discover -s scripts/tests -v
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -279,6 +308,47 @@ jobs:
           cache-dependency-path: |
             go.mod
             go.sum
+
+      # The exact manifest union is checked by test. Core race tests run here;
+      # production GTK/Wayland and process tests remain in the native test job.
+      - name: Validate and test core without CGo
+        env:
+          CGO_ENABLED: '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t core < scripts/ci-core-packages.txt
+          go env GOOS GOARCH CGO_ENABLED CC GOCACHE
+          python3 scripts/ci_check_packages.py --core-only
+          go test -shuffle=on -count=1 "${core[@]}"
+
+      - name: Validate and race-test core without GUI setup
+        id: core_race
+        shell: bash
+        run: |
+          set -euo pipefail
+          # setup-go's Ubuntu cache has no complete native ABI fingerprint.
+          # Keep core CGo/race cold, step-local and outside that cache.
+          race_cache=$(mktemp -d "$RUNNER_TEMP/azerlay-core-race.XXXXXX")
+          trap 'rm -rf "$race_cache"' EXIT
+          export GOCACHE="$race_cache" CGO_ENABLED=1
+          mapfile -t core < scripts/ci-core-packages.txt
+          go env GOOS GOARCH CGO_ENABLED CC GOCACHE
+          python3 scripts/ci_check_packages.py --core-only
+          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/core-race-timing.json" -- \
+            go test -race -json -shuffle=on -count=1 "${core[@]}" \
+            | tee "$RUNNER_TEMP/core-race-tests.jsonl"
+
+      - name: Upload core race diagnostics
+        if: ${{ always() && (steps.core_race.outcome == 'success' || steps.core_race.outcome == 'failure') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-race-json-attempt-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/core-race-tests.jsonl
+            ${{ runner.temp }}/core-race-timing.json
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Regenerate LZMA boundary fixtures
         run: go run ./internal/profiledecode/testdata/generate

@@ -9,12 +9,12 @@ explicit versions without changing the application's `go.mod` or `go.sum`.
 
 | Job | Checks | Job timeout |
 | --- | --- | --- |
-| `test` | Formatting, vet, Staticcheck, race tests, binary build | GitHub default (360 minutes) |
+| `test` | Formatting, all-package vet/Staticcheck, native race tests, binary build | GitHub default (360 minutes) |
 | `fuzz` | Seven existing fuzz targets, each with a 10-second fuzz allocation | 10 minutes |
 | `native-build` | Verify default CGo, compile the native binary in Arch, run version, and inspect shared libraries | 15 minutes |
 | `vulnerability` | Reachable Go vulnerability scan | 20 minutes |
 | `licenses` | Third-party Go dependency license CSV | 10 minutes |
-| `generated-files` | Regenerate both LZMA fixtures and reject differences | 15 minutes |
+| `generated-files` | CI-tool tests, core CGO=0 and race tests, regenerate both LZMA fixtures and reject differences | 15 minutes |
 
 The `test` job rejects any output from `gofmt -l .`, then runs:
 
@@ -22,14 +22,110 @@ The `test` job rejects any output from `gofmt -l .`, then runs:
 go vet ./...
 go install honnef.co/go/tools/cmd/staticcheck@2026.2.1
 staticcheck ./...
-scripts/test-wayland.sh go test -race -shuffle=on -count=1 ./...
+mapfile -t native < scripts/ci-native-packages.txt
+scripts/test-wayland.sh go test -race -json -shuffle=on -count=1 "${native[@]}"
 go build ./cmd/azerlay
 ```
 
-Ordinary tests run once, retaining the race detector, shuffled ordering and
-uncached execution, including the production GTK/CGo packages. Native child
+Every ordinary root-module package has one race/shuffle/uncached test run:
+core packages in `generated-files`, native packages in `test`. Core packages
+also receive a separate CGO=0 contract run. Production GTK/CGo remains native. Native child
 tests initialize GTK on their process main thread.
 Analyzer installation or execution failures fail CI; they are not suppressed.
+
+## Core/native test partition
+
+The [CLI/core boundary](cli-core-boundary.md) assigns every ordinary package to
+an explicit core or native manifest. Before formatting/vet, the native `test`
+job compares their exact disjoint union against `go list ./...` and checks the
+core dependency closure including tests for native/GTK imports. Its existing
+whole-repository formatting, vet and Staticcheck remain. Its race command uses
+the five-package native manifest with the same non-root, two-output Sway launcher
+and current-checkout CLI build; the binary build also remains.
+Formatting failures print `gofmt -d .` for review from hosted logs.
+
+The existing `generated-files` job adds core-only dependency checks and tests
+with `CGO_ENABLED=0`, followed by a separate `CGO_ENABLED=1` race run. Both use
+shuffle and count=1 without installing or starting GTK/Sway. The race step uses
+a new temporary GOCACHE, including for its dependency check, so setup-go's
+Ubuntu cache does not start reusing/saving CGo outputs without the native ABI
+fingerprint. The original fixture regeneration and diff steps remain afterward.
+
+After successful initial boundary validation, the native race command no longer
+repeats the 14 core packages. Their required race run stays in `generated-files`,
+which also retains actual fixture regeneration/diff. The manifest checker rejects
+omissions and overlap; failure in either job still fails the workflow. Job IDs,
+package-install commands and existing cache inputs are unchanged. The fresh
+core race cache and extra CGO=0 mode have a cost that remains part of measurement.
+This partition is a measured candidate, not a demonstrated p50/p95 budget result.
+
+### Race diagnostics baseline
+
+For [Issue #138](https://github.com/sh4869221b/azerlay/issues/138), both required
+race commands now use `-json`. The existing package manifests, `-race`,
+`-shuffle=on` and `-count=1` are unchanged. The native command still runs through
+`runuser -u azerlay-test` and the unmodified two-output `test-wayland.sh` launcher;
+the timing wrapper is outside `runuser` and never runs Go tests as root. The
+separate core CGO=0 contract run, fresh core race cache, all six jobs, native
+package installs, cache inputs, fuzz budgets and fixture regeneration remain.
+This is baseline instrumentation before any test-speed changes.
+
+Each race command is wrapped by the standard-library-only
+`scripts/ci_time_command.py`, then piped to `tee` with explicit
+`set -euo pipefail`. The wrapper preserves the command's exit status and signal
+termination and forwards SIGINT/SIGTERM. Neither `tee` nor artifact upload can
+turn a failed command into a successful test step. A timing-report write error
+also fails the step, while retaining an already failing command's exit status.
+No `continue-on-error` or replacement green check is used.
+
+The corresponding upload step runs after a successful or failed race step.
+Artifacts are retained for seven days and have distinct names on full or
+failed-jobs-only reruns:
+
+| Artifact | Explicit files |
+| --- | --- |
+| `native-race-json-attempt-${{ github.run_attempt }}` | `native-race-tests.jsonl`, `native-race-timing.json` |
+| `core-race-json-attempt-${{ github.run_attempt }}` | `core-race-tests.jsonl`, `core-race-timing.json` |
+
+Only those files are uploaded, not directories, caches, compositor logs,
+profiles or fuzz inputs. Test JSON retains all events, including failures,
+skips, shuffle seeds, `run`/`pause`/`cont` timestamps and test output. These are
+the repository's synthetic tests only: the wrapper passes output through and
+does **not** redact private inputs. The synthetic-fixture policy still applies
+to all test output and artifacts. Do not add private fixture or environment
+dumps. The wrapper itself records only numeric timing/status fields, never
+arguments, environment variables, HOME or paths; its timing summary goes to
+stderr separately from test JSON on stdout.
+
+The timing JSON records monotonic command elapsed time, child user/system CPU
+seconds, `max_child_rss_kib`, the command `returncode` (negative for a signal),
+and an optional received `wrapper_signal`. CPU accounting includes resources
+propagated from descendants that the command waits for. On Linux,
+`max_child_rss_kib` is in KiB and is the largest child high-water mark, including
+propagated waited-for descendant usage. It is **not** the simultaneous peak
+memory of the process tree, and does not prove safe memory headroom for adding
+parallelism. Killed or orphaned descendants need not yield complete accounting;
+SIGKILL of the wrapper, runner loss or job cancellation can leave partial or
+missing artifacts. A failed/partial run is not a successful timing sample.
+
+Use `python3 scripts/ci_measure.py tests PATH-TO-TESTS.jsonl` for terminal elapsed
+records. Rank rows with a `test` name separately from package rows (`test: null`).
+Retain the raw JSON for overlap and pause/continue analysis. Never add parent
+and child test times or overlapping package times together. Test elapsed is
+not command elapsed: command timing includes compilation/cache work, and the
+native command also includes user/Wayland setup, the current-checkout CLI build
+inside TestMain, and compositor teardown. It is not a per-child CPU profile.
+
+Diagnostic overhead is unmeasured until hosted validation: JSON formatting and
+additional output, the Python process, `tee` file writes, and artifact upload all
+cost time. Command elapsed excludes wrapper startup/reporting and artifact
+upload; job/workflow elapsed and runner-seconds include those costs. Keep the
+uninstrumented partition control, instrumented baseline, any later speed
+candidate, and optional profiling runs in distinct measurement cohorts. Compare
+like cache/runner conditions and the exact same gate set, disclosing sample and
+failure counts. One run establishes neither p95 nor a speedup, and profiling
+runs cannot establish ordinary test performance. No test parallelism or
+profiling is introduced here.
 
 ## Fuzz budget
 
@@ -57,7 +153,7 @@ from this job by `-run='^$'`. Longer fuzz campaigns are outside PR CI.
 `ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell
 gobject-introspection`. Ubuntu distribution support is excluded from v1 and
 tracked in [Issue #98](https://github.com/sh4869221b/azerlay/issues/98).
-The Ubuntu-hosted runner and the pure `fuzz`/`generated-files` jobs do not qualify
+The Ubuntu-hosted runner and the GUI-free `fuzz`/`generated-files` jobs do not qualify
 Ubuntu as a product target. The distribution build runs:
 
 ```sh
@@ -80,7 +176,9 @@ global Git config. This preserves normal Go VCS metadata during compilation.
 
 The four Arch jobs use `.github/actions/native-go-cache`. Automatic setup-go
 caching is disabled for those jobs to avoid saving the same directories twice.
-The two pure Ubuntu jobs retain their existing setup-go caches unchanged.
+The two GUI-free Ubuntu jobs retain their existing setup-go caches unchanged;
+`generated-files` runs its new CGo/race boundary proof in a separate fresh,
+step-local `RUNNER_TEMP` GOCACHE that is deleted rather than saved.
 
 - **Application modules:** all four jobs restore
   `/tmp/azerlay-go-mod/cache/download`, keyed
@@ -259,3 +357,42 @@ git diff --exit-code -- internal/profiledecode/testdata/zeros-64mib.lzma interna
 Only the existing compressed files are written; ordinary tests read them
 without regeneration and no decompressed files are stored. Any byte change
 fails the diff check and needs an explanation, not an automatic fixture update.
+
+## CI-wide measurement contract
+
+The initial [Issue #135 measurement contract](measurements/ci-60s/README.md)
+defines distinct execution/queue/event clocks, a six-gate correspondence,
+nearest-rank p50/p95 and condition-specific cohorts. The offline
+`scripts/ci_measure.py` replays saved API responses and retains failed/cancelled
+attempts; it neither starts runs nor changes the required gates. The included
+historical run has 186 seconds of required execution and 189 seconds from run
+creation to last API update. This clock correction is not a speedup, and one
+sample does not establish a p95. All native checks and safety budgets above
+remain mandatory.
+
+### Current performance goal
+
+The owner revised #134/#135 on 2026-10-07: ordinary warm/source-only full-required
+execution targets p50 <=180 seconds and p95 <=300 seconds. Keep queue/event time
+and cold/dependency/native refresh separate. The original 60-second target is
+historical. Current 159-second ordinary and 196-second diagnostic observations
+are single samples, not established p50/p95. Use representative natural runs
+first; no automatic large benchmark campaign or mandatory broad native rewrite.
+
+### Bounded #138 candidate validation
+
+The test-only candidate stores real compositor screenshot crops using lossless
+PNG without compression. Pixel/bounds round trips, deterministic equal-image
+bytes, per-channel differences and source immutability are checked. Only the
+two independently owned CLI input-fixture groups become parallel; all 68 routes
+and sequential per-store children remain. No decoder caps, native samples,
+sleeps, deadlines, frames or production code change. Larger temporary PNG files
+are a tradeoff to measure.
+
+One diagnostic validation run repeats the CLI input groups, live-overlay modes
+and live-latency test three times, and the pure capture-encoding helper 20 times.
+These are focused stress repetitions inside one workflow, not 20 workflow samples
+or a p95 campaign. Ordinary required commands retain count=1. Stress and JSON
+artifact overhead must stay separate from ordinary-budget conclusions; failures
+remain blocking. Large-decoder parallelism and larger architectural experiments
+are deferred under the revised goal.

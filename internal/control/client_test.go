@@ -96,8 +96,14 @@ func TestControlTimeoutClient(t *testing.T) {
 			}
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
+			// Give cancellation and response validation time to run under load.
+			// Only the deadline case tests expiration of a short exchange timeout.
+			timeout := connectionTimeout
+			if kind == "deadline" {
+				timeout = 80 * time.Millisecond
+			}
 			result := make(chan error, 1)
-			go func() { _, err := call(ctx, runtime, MethodShow, Params{}, 80*time.Millisecond); result <- err }()
+			go func() { _, err := call(ctx, runtime, MethodShow, Params{}, timeout); result <- err }()
 			if err := listener.SetDeadline(time.Now().Add(3 * time.Second)); err != nil {
 				t.Fatal(err)
 			}

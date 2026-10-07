@@ -1,0 +1,11 @@
+{
+  "id": 37565507636,
+  "run_attempt": 1,
+  "head_sha": "549e1c51b49cb937f8449105e0c09948e832ec9f",
+  "html_url": "https://github.com/sh4869221b/azerlay/actions/runs/37565507636",
+  "status": "completed",
+  "conclusion": "failure",
+  "created_at": "2026-10-07T03:10:25Z",
+  "updated_at": "2026-10-07T03:14:38Z",
+  "run_started_at": "2026-10-07T03:10:25Z"
+}
