@@ -259,3 +259,15 @@ git diff --exit-code -- internal/profiledecode/testdata/zeros-64mib.lzma interna
 Only the existing compressed files are written; ordinary tests read them
 without regeneration and no decompressed files are stored. Any byte change
 fails the diff check and needs an explanation, not an automatic fixture update.
+
+## CI-wide 60-second measurement contract
+
+The initial [Issue #135 measurement contract](measurements/ci-60s/README.md)
+defines distinct execution/queue/event clocks, a six-gate correspondence,
+nearest-rank p50/p95 and condition-specific cohorts. The offline
+`scripts/ci_measure.py` replays saved API responses and retains failed/cancelled
+attempts; it neither starts runs nor changes the required gates. The included
+historical run has 186 seconds of required execution and 189 seconds from run
+creation to last API update. This clock correction is not a speedup, and one
+sample does not establish a p95. All native checks and safety budgets above
+remain mandatory.

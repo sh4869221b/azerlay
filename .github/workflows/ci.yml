@@ -271,6 +271,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Test CI measurement tools
+        run: python3 -m unittest discover -s scripts/tests -v
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:

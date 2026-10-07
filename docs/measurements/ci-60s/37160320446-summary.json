@@ -1,0 +1,55 @@
+[
+  {
+    "attempts": 1,
+    "cohort": "main-09db7b3d-observation",
+    "commit": "09db7b3d0525de5cbe1f00ba111de10d271ba4c8",
+    "complete_initial_gate_set": true,
+    "condition": "historical",
+    "metrics": {
+      "created_to_required_result_seconds": {
+        "max": 188.0,
+        "n": 1,
+        "p50": 188.0,
+        "p95": 188.0
+      },
+      "event_to_required_result_seconds": {
+        "max": null,
+        "n": 0,
+        "p50": null,
+        "p95": null
+      },
+      "execution_seconds": {
+        "max": 186.0,
+        "n": 1,
+        "p50": 186.0,
+        "p95": 186.0
+      },
+      "runner_seconds": {
+        "max": 539.0,
+        "n": 1,
+        "p50": 539.0,
+        "p95": 539.0
+      }
+    },
+    "non_success_rate": 0.0,
+    "required_jobs": [
+      "fuzz",
+      "generated-files",
+      "licenses",
+      "native-build",
+      "test",
+      "vulnerability"
+    ],
+    "runs": [
+      {
+        "attempt": 1,
+        "errors": [],
+        "run_id": 37160320446,
+        "url": "https://github.com/sh4869221b/azerlay/actions/runs/37160320446"
+      }
+    ],
+    "small_sample_warning": true,
+    "successes": 1,
+    "warm_60s_observed": false
+  }
+]
