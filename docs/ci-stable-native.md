@@ -44,7 +44,7 @@ candidate. A single cold and warm validation do not establish p50/p95.
   transitive packages are captured before any compiled-cache restore.
 - Build roles install the compiler, linker, pkg-config, introspection headers,
   GTK and layer-shell headers/runtime. Integration additionally includes Sway,
-  D-Bus, grim, Noto CJK and color emoji fonts. The same existing non-root,
+  D-Bus, the real AT-SPI accessibility bus, grim, Noto CJK and color emoji fonts. The same existing non-root,
   two-headless-output/pixman Wayland launcher and GTK main-thread tests run.
 - Go is exactly 1.27.1, and analyzer versions remain in `.github/ci-tools.env`.
   Vulnerability data remains live. GitHub runner kernel, action tags and external
@@ -127,3 +127,24 @@ successful speedup merely because the environment is pinned.
 - [Ubuntu Snapshot Service](https://snapshot.ubuntu.com/)
 - [Ubuntu GTK package](https://packages.ubuntu.com/resolute/libgtk-4-dev)
 - [Ubuntu layer-shell package](https://packages.ubuntu.com/resolute/libgtk4-layer-shell-dev)
+
+## Initial hosted failure and correction
+
+[First run 37572885744](https://github.com/sh4869221b/azerlay/actions/runs/37572885744)
+at `8c141c29` completed six of seven gates successfully. Signed snapshot setup,
+production GTK/CGo binary build/version/ELF inspection, scanners, core/fuzz and
+rolling Arch integration passed. Ubuntu native tests failed because the minimal
+no-recommends dependency set lacked the `org.a11y.Bus` service. GTK warnings
+correctly failed the existing strict stderr/output assertions.
+
+The correction explicitly installs `at-spi2-core` in the Ubuntu integration
+role and checks its real D-Bus service file. Arch already receives it through
+GTK dependencies. No assertions, warnings, accessibility behavior or native
+checks are disabled. Nix's test role must expose the same real service.
+This changes the native fingerprint, so corrective validation is a refresh run.
+
+The failed run measured 1,705 seconds for all seven jobs and 5,295 runner-seconds;
+Arch's cold native compilation was the last gate. The Ubuntu race wrapper took
+695.15 seconds and returned 1. Package installation took 138–166 seconds in the
+four Ubuntu jobs; the license role alone fetched 238 MB of packages in 96 seconds.
+These are retained failure/setup observations, not a speedup or warm-budget claim.

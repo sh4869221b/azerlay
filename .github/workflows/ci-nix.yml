@@ -1,0 +1,435 @@
+name: CI-Nix
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+# Experimental four native roles. CI's fuzz/core/Arch gates are shared, not
+# deleted or duplicated. Compare the complete 7+4 evidence with the offline tool.
+jobs:
+  nix-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    env:
+      CI_NIX_ROLE: test
+      GOCACHE: /tmp/azerlay-go-build
+      GOMODCACHE: /tmp/azerlay-go-mod
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Record runner comparison metadata
+        run: |
+          set -euo pipefail
+          printf 'logical_cpu_count=%s\n' "$(getconf _NPROCESSORS_ONLN)"
+          printf 'runner_image=%s\nrunner_image_version=%s\n' "${ImageOS:-unknown}" "${ImageVersion:-unknown}"
+          uname -srmo
+          awk -F: '/model name/{sub(/^ +/, "", $2); print "cpu_model=" $2; exit}' /proc/cpuinfo
+          grep '^MemTotal:' /proc/meminfo
+
+      - name: Initialize isolated Nix job paths
+        run: |
+          set -euo pipefail
+          printf 'CI_NIX_STATE=%s/azerlay-nix-state\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          printf 'CI_NIX_OUTPUT=%s/azerlay-nix-output\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+
+      - name: Install verified official Nix runtime
+        run: |
+          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/nix-install-time.json" -- \
+            bash scripts/ci-nix-install.sh
+
+      - name: Prepare locked binary-substituted native environment
+        run: |
+          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/nix-prepare-time.json" -- \
+            python3 scripts/ci_nix_prepare.py --role "$CI_NIX_ROLE" --output "$CI_NIX_OUTPUT"
+
+      - name: Prepare complete Nix Go cache fingerprint
+        env:
+          CI_CACHE_JOB: ${{ github.job }}
+        run: |
+          set -euo pipefail
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command \
+            bash scripts/ci-nix-run.sh bash scripts/ci-nix-fingerprint.sh > .git/ci-native-cache-input
+
+      - name: Restore isolated Nix Go caches
+        uses: ./.github/actions/nix-go-cache
+        with:
+          tool-cache: 'true'
+
+      - name: Check complete package partition and formatting
+        run: |
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh bash -c '
+            set -euo pipefail
+            python3 scripts/ci_check_packages.py
+            files=$(gofmt -l .)
+            if [[ -n $files ]]; then
+              printf "Files require gofmt:\n%s\n" "$files"
+              gofmt -d .
+              exit 1
+            fi
+          '
+
+      - name: Vet
+        run: |
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh bash -c '
+            set -euo pipefail
+            go vet ./...
+          '
+
+      - name: Install Staticcheck
+        env:
+          GOMODCACHE: /tmp/azerlay-tool-go-mod
+        run: |
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh bash -c '
+            set -euo pipefail
+            source .github/ci-tools.env
+            go install honnef.co/go/tools/cmd/staticcheck@"$STATICCHECK_VERSION"
+            du -sb "$GOMODCACHE/cache/download"
+          '
+
+      - name: Staticcheck
+        run: |
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh bash -c '
+            set -euo pipefail
+            staticcheck ./...
+          '
+
+      - name: Test native race and Wayland integration
+        id: native_race
+        run: |
+          set -euo pipefail
+          mapfile -t native < scripts/ci-native-packages.txt
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh \
+            python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/nix-native-race-timing.json" -- \
+            scripts/test-wayland.sh go test -race -json -shuffle=on -count=1 "${native[@]}" \
+            | tee "$RUNNER_TEMP/nix-native-race-tests.jsonl"
+
+      - name: Retain Nix native race diagnostics
+        if: ${{ always() && (steps.native_race.outcome == 'success' || steps.native_race.outcome == 'failure') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nix-native-race-json-attempt-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/nix-native-race-tests.jsonl
+            ${{ runner.temp }}/nix-native-race-timing.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Build
+        run: |
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh bash -c '
+            set -euo pipefail
+            go build ./cmd/azerlay
+          '
+
+      - name: Retain Nix setup and closure evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nix-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: |
+            .git/ci-native-cache-input
+            ${{ runner.temp }}/nix-install-time.json
+            ${{ runner.temp }}/nix-prepare-time.json
+            ${{ runner.temp }}/azerlay-nix-output/nix-version.txt
+            ${{ runner.temp }}/azerlay-nix-output/versions.json
+            ${{ runner.temp }}/azerlay-nix-output/dependency-installables.json
+            ${{ runner.temp }}/azerlay-nix-output/devshell-result.json
+            ${{ runner.temp }}/azerlay-nix-output/closure.json
+            ${{ runner.temp }}/azerlay-nix-output/closure-paths.txt
+            ${{ runner.temp }}/azerlay-nix-output/lock-sha256.txt
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  nix-native-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    env:
+      CI_NIX_ROLE: build
+      GOCACHE: /tmp/azerlay-go-build
+      GOMODCACHE: /tmp/azerlay-go-mod
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Record runner comparison metadata
+        run: |
+          set -euo pipefail
+          printf 'logical_cpu_count=%s\n' "$(getconf _NPROCESSORS_ONLN)"
+          printf 'runner_image=%s\nrunner_image_version=%s\n' "${ImageOS:-unknown}" "${ImageVersion:-unknown}"
+          uname -srmo
+          awk -F: '/model name/{sub(/^ +/, "", $2); print "cpu_model=" $2; exit}' /proc/cpuinfo
+          grep '^MemTotal:' /proc/meminfo
+
+      - name: Initialize isolated Nix job paths
+        run: |
+          set -euo pipefail
+          printf 'CI_NIX_STATE=%s/azerlay-nix-state\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          printf 'CI_NIX_OUTPUT=%s/azerlay-nix-output\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+
+      - name: Install verified official Nix runtime
+        run: |
+          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/nix-install-time.json" -- \
+            bash scripts/ci-nix-install.sh
+
+      - name: Prepare locked binary-substituted native environment
+        run: |
+          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/nix-prepare-time.json" -- \
+            python3 scripts/ci_nix_prepare.py --role "$CI_NIX_ROLE" --output "$CI_NIX_OUTPUT"
+
+      - name: Prepare complete Nix Go cache fingerprint
+        env:
+          CI_CACHE_JOB: ${{ github.job }}
+        run: |
+          set -euo pipefail
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command \
+            bash scripts/ci-nix-run.sh bash scripts/ci-nix-fingerprint.sh > .git/ci-native-cache-input
+
+      - name: Restore isolated Nix Go caches
+        uses: ./.github/actions/nix-go-cache
+        with:
+          tool-cache: 'false'
+
+      - name: Build, run, and inspect Nix native binary
+        run: |
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh bash -c '
+            set -euo pipefail
+            go version
+            go env GOOS GOARCH CGO_ENABLED CC
+            test "$(go env CGO_ENABLED)" = 1
+            pkg-config --modversion gtk4 gtk4-layer-shell-0
+            CGO_ENABLED=1 go build -o /tmp/azerlay ./cmd/azerlay
+            /tmp/azerlay version
+            readelf -d /tmp/azerlay
+          '
+
+      - name: Retain Nix setup and closure evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nix-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: |
+            .git/ci-native-cache-input
+            ${{ runner.temp }}/nix-install-time.json
+            ${{ runner.temp }}/nix-prepare-time.json
+            ${{ runner.temp }}/azerlay-nix-output/nix-version.txt
+            ${{ runner.temp }}/azerlay-nix-output/versions.json
+            ${{ runner.temp }}/azerlay-nix-output/dependency-installables.json
+            ${{ runner.temp }}/azerlay-nix-output/devshell-result.json
+            ${{ runner.temp }}/azerlay-nix-output/closure.json
+            ${{ runner.temp }}/azerlay-nix-output/closure-paths.txt
+            ${{ runner.temp }}/azerlay-nix-output/lock-sha256.txt
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  nix-vulnerability:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    env:
+      CI_NIX_ROLE: build
+      GOCACHE: /tmp/azerlay-go-build
+      GOMODCACHE: /tmp/azerlay-go-mod
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Record runner comparison metadata
+        run: |
+          set -euo pipefail
+          printf 'logical_cpu_count=%s\n' "$(getconf _NPROCESSORS_ONLN)"
+          printf 'runner_image=%s\nrunner_image_version=%s\n' "${ImageOS:-unknown}" "${ImageVersion:-unknown}"
+          uname -srmo
+          awk -F: '/model name/{sub(/^ +/, "", $2); print "cpu_model=" $2; exit}' /proc/cpuinfo
+          grep '^MemTotal:' /proc/meminfo
+
+      - name: Initialize isolated Nix job paths
+        run: |
+          set -euo pipefail
+          printf 'CI_NIX_STATE=%s/azerlay-nix-state\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          printf 'CI_NIX_OUTPUT=%s/azerlay-nix-output\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+
+      - name: Install verified official Nix runtime
+        run: |
+          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/nix-install-time.json" -- \
+            bash scripts/ci-nix-install.sh
+
+      - name: Prepare locked binary-substituted native environment
+        run: |
+          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/nix-prepare-time.json" -- \
+            python3 scripts/ci_nix_prepare.py --role "$CI_NIX_ROLE" --output "$CI_NIX_OUTPUT"
+
+      - name: Prepare complete Nix Go cache fingerprint
+        env:
+          CI_CACHE_JOB: ${{ github.job }}
+        run: |
+          set -euo pipefail
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command \
+            bash scripts/ci-nix-run.sh bash scripts/ci-nix-fingerprint.sh > .git/ci-native-cache-input
+
+      - name: Restore isolated Nix Go caches
+        uses: ./.github/actions/nix-go-cache
+        with:
+          tool-cache: 'true'
+
+      - name: Install govulncheck
+        env:
+          GOMODCACHE: /tmp/azerlay-tool-go-mod
+        run: |
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh bash -c '
+            set -euo pipefail
+            source .github/ci-tools.env
+            go install golang.org/x/vuln/cmd/govulncheck@"$GOVULNCHECK_VERSION"
+            du -sb "$GOMODCACHE/cache/download"
+          '
+
+      - name: Check reachable vulnerabilities
+        run: |
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh bash -c '
+            set -euo pipefail
+            govulncheck ./...
+          '
+
+      - name: Retain Nix setup and closure evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nix-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: |
+            .git/ci-native-cache-input
+            ${{ runner.temp }}/nix-install-time.json
+            ${{ runner.temp }}/nix-prepare-time.json
+            ${{ runner.temp }}/azerlay-nix-output/nix-version.txt
+            ${{ runner.temp }}/azerlay-nix-output/versions.json
+            ${{ runner.temp }}/azerlay-nix-output/dependency-installables.json
+            ${{ runner.temp }}/azerlay-nix-output/devshell-result.json
+            ${{ runner.temp }}/azerlay-nix-output/closure.json
+            ${{ runner.temp }}/azerlay-nix-output/closure-paths.txt
+            ${{ runner.temp }}/azerlay-nix-output/lock-sha256.txt
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  nix-licenses:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    env:
+      CI_NIX_ROLE: build
+      GOCACHE: /tmp/azerlay-go-build
+      GOMODCACHE: /tmp/azerlay-go-mod
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Record runner comparison metadata
+        run: |
+          set -euo pipefail
+          printf 'logical_cpu_count=%s\n' "$(getconf _NPROCESSORS_ONLN)"
+          printf 'runner_image=%s\nrunner_image_version=%s\n' "${ImageOS:-unknown}" "${ImageVersion:-unknown}"
+          uname -srmo
+          awk -F: '/model name/{sub(/^ +/, "", $2); print "cpu_model=" $2; exit}' /proc/cpuinfo
+          grep '^MemTotal:' /proc/meminfo
+
+      - name: Initialize isolated Nix job paths
+        run: |
+          set -euo pipefail
+          printf 'CI_NIX_STATE=%s/azerlay-nix-state\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          printf 'CI_NIX_OUTPUT=%s/azerlay-nix-output\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+
+      - name: Install verified official Nix runtime
+        run: |
+          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/nix-install-time.json" -- \
+            bash scripts/ci-nix-install.sh
+
+      - name: Prepare locked binary-substituted native environment
+        run: |
+          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/nix-prepare-time.json" -- \
+            python3 scripts/ci_nix_prepare.py --role "$CI_NIX_ROLE" --output "$CI_NIX_OUTPUT"
+
+      - name: Prepare complete Nix Go cache fingerprint
+        env:
+          CI_CACHE_JOB: ${{ github.job }}
+        run: |
+          set -euo pipefail
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command \
+            bash scripts/ci-nix-run.sh bash scripts/ci-nix-fingerprint.sh > .git/ci-native-cache-input
+
+      - name: Restore isolated Nix Go caches
+        uses: ./.github/actions/nix-go-cache
+        with:
+          tool-cache: 'true'
+
+      - name: Install go-licenses
+        env:
+          GOMODCACHE: /tmp/azerlay-tool-go-mod
+        run: |
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh bash -c '
+            set -euo pipefail
+            source .github/ci-tools.env
+            go install github.com/google/go-licenses/v2@"$GO_LICENSES_VERSION"
+            du -sb "$GOMODCACHE/cache/download"
+          '
+
+      - name: Report dependency licenses
+        run: |
+          nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh bash -c '
+            set -euo pipefail
+            go-licenses report ./... --include_tests --ignore=github.com/sh4869221b/azerlay > "$RUNNER_TEMP/nix-dependency-licenses.csv"
+          '
+
+      - name: Retain Nix dependency license report
+        uses: actions/upload-artifact@v4
+        with:
+          name: nix-dependency-licenses
+          path: ${{ runner.temp }}/nix-dependency-licenses.csv
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Retain Nix setup and closure evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nix-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: |
+            .git/ci-native-cache-input
+            ${{ runner.temp }}/nix-install-time.json
+            ${{ runner.temp }}/nix-prepare-time.json
+            ${{ runner.temp }}/azerlay-nix-output/nix-version.txt
+            ${{ runner.temp }}/azerlay-nix-output/versions.json
+            ${{ runner.temp }}/azerlay-nix-output/dependency-installables.json
+            ${{ runner.temp }}/azerlay-nix-output/devshell-result.json
+            ${{ runner.temp }}/azerlay-nix-output/closure.json
+            ${{ runner.temp }}/azerlay-nix-output/closure-paths.txt
+            ${{ runner.temp }}/azerlay-nix-output/lock-sha256.txt
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7

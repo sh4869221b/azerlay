@@ -30,7 +30,7 @@
 | 実行時制御 | CLI + 0600 Unix Domain Socket |
 | 権限 | 対象Azeron限定udev `uaccess`。root・`input`グループ不要 |
 | ネットワーク | 使用しない。テレメトリーなし |
-| 公開ライセンス | MPL-2.0推奨。公開前に最終確認 |
+| 公開ライセンス | 本体MIT。第三者の条件と公開前確認は別途維持 |
 
 設計上の最大の不確定要素は、Azeron Software 2.xの完全なexport型対応表、Cyborg IIのinput IDと物理ボタン位置の対応、Linux版Azeron Softwareローカル保存形式、機器改版ごとのVID/PIDとHID report構成、gotk4とgtk4-layer-shellの実機ABI連携である。これらは本書の「要調査事項」でリリース阻害範囲を明記する。
 
@@ -98,13 +98,12 @@ Azeronプロファイルとリアルタイム入力を表示するLinux/Wayland�
 
 ### 2.4 ライセンス
 
-推奨ライセンスは **MPL-2.0** とする。
+2026-10-07の所有者の選択により、本体のライセンスは **MIT** とする。
 
-理由:
-
-- オープンソースとして利用・改変・再配布しやすい。
-- ファイル単位のコピーレフトであり、派生物の改善を還元させつつ利用側への制約を過度に増やさない。
-- GTK、gotk4、gtk4-layer-shell等の依存関係と組み合わせやすい。
+商用利用・改変・再配布を広く認める。依存ライブラリをMITへ変更するものではない。
+MPL対象のgotk4のソース提供案内、LGPLライブラリの利用条件、第三者の著作権表示を維持する。
+以前のMPL-2.0推奨はこの決定で置き換える。公開準備完了とは別の決定であり、
+[公開安全性の決定](decisions/public-release-safety.md)と`THIRD_PARTY_NOTICES.md`を参照する。
 
 公開前に依存ライセンス一覧、NOTICE、SBOMを生成し、ライセンス互換性を再確認する。これは公開リリース前の必須確認である。
 
@@ -1910,7 +1909,7 @@ Go 1.27.xとnative依存が必要。配布用の実際の手順は`scripts/packa
 現在はローカルsource/binary tarballとlocal-source Arch PKGBUILDを提供する。
 PKGBUILDのchecksum placeholderは一時recipeで通常の`updpkgsums`により置換する。
 未公開Release URLや`SKIP`は使わない。GitHub Release/AUR公開、deb/rpmは今回の範囲外。
-license grantとdesktop ownerは未確定であり、local smoke packageも再配布許諾ではない。
+本体はMITであり第三者の条件も適用される。desktop ownerと公開準備完了は未確定であり、local smoke packageは公開リリースの認定ではない。
 
 GTK4等を内包した巨大なAppImageは初期の必須配布形式としない。Layer Shell、GObject、フォント、Wayland統合でDistribution側ライブラリとの相性確認が必要なためである。
 

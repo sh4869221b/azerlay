@@ -338,8 +338,10 @@ Every actual nonzero tool result fails the job.
 
 The CSV inventories Go dependencies; it is not an allowlist or a compatibility
 decision, and does not cover dynamically loaded or native libraries. The
-project license remains undecided, with dependency-license, NOTICE and SBOM
-decisions tracked separately in Issue #18.
+project uses MIT for its own material. Third-party notices and source
+availability are recorded in `THIRD_PARTY_NOTICES.md`; final native inventory,
+SBOM and release-readiness checks remain tracked in Issue #18. A successful
+license job does not establish that these checks are complete.
 
 ## Synthetic fixture policy
 
@@ -416,3 +418,26 @@ or a p95 campaign. Ordinary required commands retain count=1. Stress and JSON
 artifact overhead must stay separate from ordinary-budget conclusions; failures
 remain blocking. Large-decoder parallelism and larger architectural experiments
 are deferred under the revised goal.
+
+## Paired Ubuntu/Nix experiment
+
+PR #141 also carries the experimental [Nix native profile](ci-nix.md). Its four
+native jobs run on the same PR checkout as the four Ubuntu native jobs. Core,
+fuzz and rolling Arch compatibility remain in `CI` and count in both complete
+seven-gate profiles; count them only once in the actual 11-job experiment cost.
+`scripts/ci_compare_profiles.py` rejects differing source/base/repository or
+actual checkout commits, incomplete jobs, and failed-jobs-only reruns.
+
+The bounded first evaluation is one cold/refresh pair and one fresh warm pair.
+If an empty commit triggers the latter, record both head commits and their
+identical Git trees. This leaves package/workflow/cache inputs unchanged while
+running every gate again. Each Nix job still installs Nix and downloads its
+closure on a fresh hosted runner; “warm” describes Go cache evidence, not a
+persisted Nix store. Correctness failures require a separately identified
+corrective run, never a speed claim. Neither this small sample nor its fastest
+run establishes the p50/p95 target, and adoption awaits the owner's decision.
+
+Every comparison job logs runner image, kernel, CPU model/count and total memory.
+Historical private-repository observations are retained as history rather than
+pooled with these public-repository pairs: allocation, hardware and cache state
+may differ even when the hosted runner label has the same spelling.

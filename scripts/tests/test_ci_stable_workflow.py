@@ -9,6 +9,12 @@ JOBS = dict(re.findall(r"^  ([a-z][a-z-]*):\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", WO
 
 
 class StableWorkflowTests(unittest.TestCase):
+    def test_runner_metadata_is_recorded(self):
+        for job in JOBS.values():
+            self.assertIn("Record runner comparison metadata", job)
+            self.assertIn("logical_cpu_count", job)
+            self.assertIn("cpu_model=", job)
+
     def test_exact_gate_set_and_no_soft_failures(self):
         self.assertEqual(set(JOBS), {"test", "fuzz", "native-build", "vulnerability", "licenses", "generated-files", "arch-compatibility"})
         self.assertNotIn("continue-on-error", WORKFLOW)
@@ -44,6 +50,9 @@ class StableWorkflowTests(unittest.TestCase):
         self.assertIn("CGO_ENABLED=1 go build", arch)
         self.assertIn("readelf -d", arch)
         self.assertIn("arch-native-race-json", arch)
+        self.assertIn("libcap2-bin at-spi2-core", JOBS["test"])
+        self.assertIn("test -f /usr/share/dbus-1/services/org.a11y.Bus.service", JOBS["test"])
+        self.assertNotIn("GTK_A11Y", WORKFLOW)
 
     def test_existing_non_native_gates_remain(self):
         self.assertEqual(JOBS["fuzz"].count("-fuzztime=10s -parallel=1 -timeout=2m"), 7)
