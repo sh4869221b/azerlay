@@ -3,6 +3,9 @@ pkgver=0.0.0
 pkgrel=1
 pkgdesc='Azeron profile and overlay application for Linux Wayland'
 arch=('x86_64')
+# Azerlay-owned code is MIT. Third-party terms include a conservative module
+# inventory; actual inclusion of the gotk4 gioutil LGPL C helper is unverified.
+license=('MIT' 'MPL-2.0' 'ISC' 'Apache-2.0' 'BSD-3-Clause' 'LGPL-2.1-or-later')
 url='https://github.com/sh4869221b/azerlay'
 depends=('gtk4' 'gtk4-layer-shell' 'libgirepository' 'glib2' 'pango' 'harfbuzz'
          'gdk-pixbuf2' 'cairo' 'vulkan-icd-loader' 'graphene' 'glibc')
@@ -28,4 +31,9 @@ package() {
     "$pkgdir/usr/share/azerlay/integration/io.github.@OWNER@.azerlay.desktop.in"
   install -Dm644 README.md "$pkgdir/usr/share/doc/azerlay/README.md"
   cp -a docs "$pkgdir/usr/share/doc/azerlay/"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/azerlay/LICENSE"
+  install -Dm644 NOTICE "$pkgdir/usr/share/licenses/azerlay/NOTICE"
+  install -Dm644 THIRD_PARTY_NOTICES.md \
+    "$pkgdir/usr/share/licenses/azerlay/THIRD_PARTY_NOTICES.md"
+  cp -a LICENSES "$pkgdir/usr/share/licenses/azerlay/"
 }

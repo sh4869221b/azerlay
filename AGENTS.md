@@ -58,7 +58,7 @@ azerlay/
 - Keep tests colocated, deterministic, race-enabled, shuffled, and parallel where fixtures are isolated.
 - Treat `docs/design-research.md` as normative future design and the shorter architecture/security documents as implementation constraints.
 - Preserve stable machine-readable errors and avoid source-content disclosure at untrusted boundaries.
-- The license is not finalized; do not represent the repository as granting MPL-2.0 yet.
+- Azerlay-owned material uses MIT. Preserve third-party terms and notices; read `docs/decisions/public-release-safety.md` before changing release/license claims.
 
 ## ANTI-PATTERNS (THIS PROJECT)
 

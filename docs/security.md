@@ -45,5 +45,6 @@ must be synthetic and must exclude private profile data.
 
 ## License status
 
-The project license is not finalized. MPL-2.0 remains a recommendation pending
-the public-release dependency-license, NOTICE, and SBOM review.
+Azerlay-owned material is MIT-licensed. Third-party licenses remain applicable;
+see [third-party notices](../THIRD_PARTY_NOTICES.md). Public-release readiness
+remains subject to the [release-safety decision](decisions/public-release-safety.md).
