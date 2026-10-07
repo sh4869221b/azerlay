@@ -6,6 +6,16 @@ self-test is added to `generated-files` without removing any existing check. The
 measurement scripts never authenticate, start CI, mutate caches, or modify
 branch protection. Python 3.10+ is needed only for offline analysis.
 
+## Current and historical gate contracts
+
+Normal CI now uses six Nix/core/fuzz gates after the owner selected daily and
+pre-release full Arch verification. `ci_measure.py` defaults to those six gates.
+The earlier Ubuntu/Nix experiment used seven Ubuntu/shared gates plus four Nix
+native gates; its `ci_compare_profiles.py` contract remains explicitly frozen.
+See [comparison evidence](../ci-136-comparison/README.md) and
+[the adopted policy](../../ci-adoption.md). Never pool these different gate sets,
+conditions or trigger schedules into one latency cohort.
+
 ## Clocks and acceptance
 
 - **Required execution wall time:** earliest required job `started_at` through
@@ -58,7 +68,7 @@ protocol; the analyzer does not prove that its human-supplied label is true.
 
 The analyzer reports descriptive percentiles even with one sample and marks
 `small_sample_warning`. `ordinary_budget_observed` requires at least 20 complete,
-successful comparable samples, the complete six-job execution set, an ordinary
+successful comparable samples, the complete current seven-job execution set, an ordinary
 warm/source-only condition, p50 <=180 seconds and p95 <=300 seconds. Missing,
 skipped, failed or cancelled checks block the flag. `budget_applicable` is false
 for cold/refresh/historical cohorts; report those outcomes separately. The flag
@@ -88,7 +98,8 @@ python3 -m unittest discover -s scripts/tests -v
 python3 scripts/ci_measure.py run \
   --run docs/measurements/ci-60s/37160320446-run.json \
   --jobs docs/measurements/ci-60s/37160320446-jobs.json \
-  --condition historical --cohort main-09db7b3d-observation
+  --condition historical --cohort main-09db7b3d-observation \
+  --required test fuzz native-build vulnerability licenses generated-files
 python3 scripts/ci_measure.py summary \
   docs/measurements/ci-60s/37160320446-measurement.json
 ```

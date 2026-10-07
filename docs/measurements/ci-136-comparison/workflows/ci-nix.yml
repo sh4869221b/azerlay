@@ -1,4 +1,4 @@
-name: CI
+name: CI-Nix
 
 on:
   push:
@@ -12,10 +12,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
-# Normal PR/main gates use pinned Nix. Latest Arch runs independently each day
-# and through the explicit pre-release verification entrypoint.
+# Experimental four native roles. CI's fuzz/core/Arch gates are shared, not
+# deleted or duplicated. Compare the complete 7+4 evidence with the offline tool.
 jobs:
-  test:
+  nix-test:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     defaults:
@@ -156,47 +156,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-
-  fuzz:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Record runner comparison metadata
-        run: |
-          set -euo pipefail
-          printf 'logical_cpu_count=%s\n' "$(getconf _NPROCESSORS_ONLN)"
-          printf 'runner_image=%s\nrunner_image_version=%s\n' "${ImageOS:-unknown}" "${ImageVersion:-unknown}"
-          uname -srmo
-          awk -F: '/model name/{sub(/^ +/, "", $2); print "cpu_model=" $2; exit}' /proc/cpuinfo
-          grep '^MemTotal:' /proc/meminfo
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: 1.27.1
-          cache: true
-          cache-dependency-path: |
-            go.mod
-            go.sum
-
-      - name: Fuzz existing parsing stages
-        shell: bash
-        run: |
-          go test ./internal/profiledecode -run='^$' -fuzz='^FuzzNormalizeOuterText$' -fuzztime=10s -parallel=1 -timeout=2m
-          go test ./internal/profiledecode -run='^$' -fuzz='^FuzzDecodeBase64$' -fuzztime=10s -parallel=1 -timeout=2m
-          go test ./internal/profiledecode -run='^$' -fuzz='^FuzzDecodeLZMAEnvelope$' -fuzztime=10s -parallel=1 -timeout=2m
-          go test ./internal/profiledecode -run='^$' -fuzz='^FuzzDecodeMsgpackString$' -fuzztime=10s -parallel=1 -timeout=2m
-          go test ./internal/profiledecode -run='^$' -fuzz='^FuzzParseRoot$' -fuzztime=10s -parallel=1 -timeout=2m
-          go test ./internal/profileraw -run='^$' -fuzz='^FuzzParse$' -fuzztime=10s -parallel=1 -timeout=2m
-          go test ./internal/profileadapter -run='^$' -fuzz='^FuzzNormalize$' -fuzztime=10s -parallel=1 -timeout=2m
-
-
-  native-build:
+  nix-native-build:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     defaults:
@@ -249,7 +209,6 @@ jobs:
         uses: ./.github/actions/nix-go-cache
         with:
           tool-cache: 'false'
-          module-writer: 'true'
 
       - name: Build, run, and inspect Nix native binary
         run: |
@@ -285,8 +244,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-
-  vulnerability:
+  nix-vulnerability:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     defaults:
@@ -379,8 +337,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-
-  licenses:
+  nix-licenses:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     defaults:
@@ -480,80 +437,3 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
-
-  generated-files:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Record runner comparison metadata
-        run: |
-          set -euo pipefail
-          printf 'logical_cpu_count=%s\n' "$(getconf _NPROCESSORS_ONLN)"
-          printf 'runner_image=%s\nrunner_image_version=%s\n' "${ImageOS:-unknown}" "${ImageVersion:-unknown}"
-          uname -srmo
-          awk -F: '/model name/{sub(/^ +/, "", $2); print "cpu_model=" $2; exit}' /proc/cpuinfo
-          grep '^MemTotal:' /proc/meminfo
-
-      - name: Test CI measurement tools
-        run: python3 -m unittest discover -s scripts/tests -v
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: 1.27.1
-          cache: true
-          cache-dependency-path: |
-            go.mod
-            go.sum
-
-      # The exact manifest union is checked by test. Core race tests run here;
-      # production GTK/Wayland and process tests remain in the native test job.
-      - name: Validate and test core without CGo
-        env:
-          CGO_ENABLED: '0'
-        shell: bash
-        run: |
-          set -euo pipefail
-          mapfile -t core < scripts/ci-core-packages.txt
-          go env GOOS GOARCH CGO_ENABLED CC GOCACHE
-          python3 scripts/ci_check_packages.py --core-only
-          go test -shuffle=on -count=1 "${core[@]}"
-
-      - name: Validate and race-test core without GUI setup
-        id: core_race
-        shell: bash
-        run: |
-          set -euo pipefail
-          # setup-go's Ubuntu cache has no complete native ABI fingerprint.
-          # Keep core CGo/race cold, step-local and outside that cache.
-          race_cache=$(mktemp -d "$RUNNER_TEMP/azerlay-core-race.XXXXXX")
-          trap 'rm -rf "$race_cache"' EXIT
-          export GOCACHE="$race_cache" CGO_ENABLED=1
-          mapfile -t core < scripts/ci-core-packages.txt
-          go env GOOS GOARCH CGO_ENABLED CC GOCACHE
-          python3 scripts/ci_check_packages.py --core-only
-          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/core-race-timing.json" -- \
-            go test -race -json -shuffle=on -count=1 "${core[@]}" \
-            | tee "$RUNNER_TEMP/core-race-tests.jsonl"
-
-      - name: Upload core race diagnostics
-        if: ${{ always() && (steps.core_race.outcome == 'success' || steps.core_race.outcome == 'failure') }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: core-race-json-attempt-${{ github.run_attempt }}
-          path: |
-            ${{ runner.temp }}/core-race-tests.jsonl
-            ${{ runner.temp }}/core-race-timing.json
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Regenerate LZMA boundary fixtures
-        run: go run ./internal/profiledecode/testdata/generate
-
-      - name: Check generated fixtures
-        run: git diff --exit-code -- internal/profiledecode/testdata/zeros-64mib.lzma internal/profiledecode/testdata/zeros-64mib-plus-one.lzma

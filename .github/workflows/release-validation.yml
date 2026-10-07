@@ -1,0 +1,63 @@
+name: Pre-release validation
+
+# Validation only: there is deliberately no publisher, tagger, signing step,
+# release trigger, credential, or write permission. This cannot technically
+# block the owner from publishing manually through the GitHub UI or another
+# route. A passing run does not close the #18 / #39 publication-safety checks.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  full-arch:
+    name: Validate exact candidate on latest Arch
+    uses: ./.github/workflows/arch-ci.yml
+    with:
+      commit: ${{ github.sha }}
+
+  validation-complete:
+    name: Pre-release checks complete
+    needs: [full-arch]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Require same-commit full Arch success
+        env:
+          ARCH_RESULT: ${{ needs.full-arch.result }}
+          EXPECTED_COMMIT: ${{ github.sha }}
+          VALIDATED_COMMIT: ${{ needs.full-arch.outputs.validated-commit }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$ARCH_RESULT" = success
+          [[ "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          test "$VALIDATED_COMMIT" = "$EXPECTED_COMMIT"
+          {
+            printf 'Pre-release full Arch checks passed for `%s`.\n\n' "$VALIDATED_COMMIT"
+            printf 'This run validates code only. It does not publish, tag, sign, or authorize a release.\n\n'
+            printf 'Issues #18 and #39 must be completed; the following read-only check fails while either remains unresolved.\n\n'
+            printf 'Validate again if the candidate commit changes. Manual publication through the GitHub UI is not technically blocked by this workflow.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Require resolved publication blockers
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const blockers = [];
+            for (const issue_number of [18, 39]) {
+              const {data: issue} = await github.rest.issues.get({
+                ...context.repo, issue_number,
+              });
+              if (issue.pull_request || issue.number !== issue_number ||
+                  issue.state !== 'closed' || issue.state_reason !== 'completed') {
+                blockers.push(`#${issue_number}`);
+              }
+            }
+            await core.summary.addRaw('\nClosing these issues is a tracked prerequisite, not legal clearance. The owner must still review rights, privacy, notices, and the exact final artifacts before any publication.\n').write();
+            if (blockers.length) {
+              core.setFailed(`Publication-readiness review remains blocked: ${blockers.join(', ')} must be closed as completed. This workflow does not publish anything.`);
+            }
