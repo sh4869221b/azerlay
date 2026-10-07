@@ -1,0 +1,773 @@
+{
+  "total_count": 6,
+  "jobs": [
+    {
+      "id": 112612171609,
+      "run_id": 37565507636,
+      "workflow_name": "CI",
+      "head_branch": "codex/ci-135-measurement-contract",
+      "run_url": "https://api.github.com/repos/sh4869221b/azerlay/actions/runs/37565507636",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUL7Q388AAAAaODVfWQ",
+      "head_sha": "549e1c51b49cb937f8449105e0c09948e832ec9f",
+      "url": "https://api.github.com/repos/sh4869221b/azerlay/actions/jobs/112612171609",
+      "html_url": "https://github.com/sh4869221b/azerlay/actions/runs/37565507636/job/112612171609",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-07T03:10:26Z",
+      "started_at": "2026-10-07T03:10:28Z",
+      "completed_at": "2026-10-07T03:11:38Z",
+      "name": "native-build",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-07T03:10:28Z",
+          "completed_at": "2026-10-07T03:10:30Z"
+        },
+        {
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-07T03:10:30Z",
+          "completed_at": "2026-10-07T03:10:44Z"
+        },
+        {
+          "name": "Install Arch build dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-07T03:10:44Z",
+          "completed_at": "2026-10-07T03:11:02Z"
+        },
+        {
+          "name": "Check out repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-07T03:11:02Z",
+          "completed_at": "2026-10-07T03:11:03Z"
+        },
+        {
+          "name": "Prepare native Go cache input",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-07T03:11:03Z",
+          "completed_at": "2026-10-07T03:11:03Z"
+        },
+        {
+          "name": "Set up Go and native caches",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-07T03:11:03Z",
+          "completed_at": "2026-10-07T03:11:21Z"
+        },
+        {
+          "name": "Build, run, and inspect native binary",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-07T03:11:21Z",
+          "completed_at": "2026-10-07T03:11:26Z"
+        },
+        {
+          "name": "Post Set up Go and native caches",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-07T03:11:26Z",
+          "completed_at": "2026-10-07T03:11:26Z"
+        },
+        {
+          "name": "Post Check out repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-07T03:11:26Z",
+          "completed_at": "2026-10-07T03:11:26Z"
+        },
+        {
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-07T03:11:26Z",
+          "completed_at": "2026-10-07T03:11:36Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-07T03:11:36Z",
+          "completed_at": "2026-10-07T03:11:36Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/sh4869221b/azerlay/check-runs/112612171609",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000019117,
+      "runner_name": "GitHub Actions 1000019117",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 112612171759,
+      "run_id": 37565507636,
+      "workflow_name": "CI",
+      "head_branch": "codex/ci-135-measurement-contract",
+      "run_url": "https://api.github.com/repos/sh4869221b/azerlay/actions/runs/37565507636",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUL7Q388AAAAaODVf7w",
+      "head_sha": "549e1c51b49cb937f8449105e0c09948e832ec9f",
+      "url": "https://api.github.com/repos/sh4869221b/azerlay/actions/jobs/112612171759",
+      "html_url": "https://github.com/sh4869221b/azerlay/actions/runs/37565507636/job/112612171759",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-07T03:10:26Z",
+      "started_at": "2026-10-07T03:10:28Z",
+      "completed_at": "2026-10-07T03:11:26Z",
+      "name": "vulnerability",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-07T03:10:29Z",
+          "completed_at": "2026-10-07T03:10:30Z"
+        },
+        {
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-07T03:10:30Z",
+          "completed_at": "2026-10-07T03:10:38Z"
+        },
+        {
+          "name": "Install native build dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-07T03:10:38Z",
+          "completed_at": "2026-10-07T03:10:56Z"
+        },
+        {
+          "name": "Check out repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-07T03:10:56Z",
+          "completed_at": "2026-10-07T03:10:57Z"
+        },
+        {
+          "name": "Prepare native Go cache input",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-07T03:10:57Z",
+          "completed_at": "2026-10-07T03:10:57Z"
+        },
+        {
+          "name": "Set up Go and native caches",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-07T03:10:57Z",
+          "completed_at": "2026-10-07T03:11:12Z"
+        },
+        {
+          "name": "Install govulncheck",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-07T03:11:12Z",
+          "completed_at": "2026-10-07T03:11:14Z"
+        },
+        {
+          "name": "Check reachable vulnerabilities",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-07T03:11:14Z",
+          "completed_at": "2026-10-07T03:11:18Z"
+        },
+        {
+          "name": "Post Set up Go and native caches",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-07T03:11:18Z",
+          "completed_at": "2026-10-07T03:11:19Z"
+        },
+        {
+          "name": "Post Check out repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-07T03:11:19Z",
+          "completed_at": "2026-10-07T03:11:19Z"
+        },
+        {
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-10-07T03:11:19Z",
+          "completed_at": "2026-10-07T03:11:23Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-10-07T03:11:23Z",
+          "completed_at": "2026-10-07T03:11:23Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/sh4869221b/azerlay/check-runs/112612171759",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000019120,
+      "runner_name": "GitHub Actions 1000019120",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 112612171780,
+      "run_id": 37565507636,
+      "workflow_name": "CI",
+      "head_branch": "codex/ci-135-measurement-contract",
+      "run_url": "https://api.github.com/repos/sh4869221b/azerlay/actions/runs/37565507636",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUL7Q388AAAAaODVgBA",
+      "head_sha": "549e1c51b49cb937f8449105e0c09948e832ec9f",
+      "url": "https://api.github.com/repos/sh4869221b/azerlay/actions/jobs/112612171780",
+      "html_url": "https://github.com/sh4869221b/azerlay/actions/runs/37565507636/job/112612171780",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-07T03:10:26Z",
+      "started_at": "2026-10-07T03:10:29Z",
+      "completed_at": "2026-10-07T03:11:39Z",
+      "name": "licenses",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-07T03:10:30Z",
+          "completed_at": "2026-10-07T03:10:31Z"
+        },
+        {
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-07T03:10:31Z",
+          "completed_at": "2026-10-07T03:10:41Z"
+        },
+        {
+          "name": "Install native build dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-07T03:10:41Z",
+          "completed_at": "2026-10-07T03:11:02Z"
+        },
+        {
+          "name": "Check out repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-07T03:11:02Z",
+          "completed_at": "2026-10-07T03:11:03Z"
+        },
+        {
+          "name": "Prepare native Go cache input",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-07T03:11:03Z",
+          "completed_at": "2026-10-07T03:11:03Z"
+        },
+        {
+          "name": "Set up Go and native caches",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-07T03:11:03Z",
+          "completed_at": "2026-10-07T03:11:25Z"
+        },
+        {
+          "name": "Install go-licenses",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-07T03:11:25Z",
+          "completed_at": "2026-10-07T03:11:27Z"
+        },
+        {
+          "name": "Report dependency licenses",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-07T03:11:27Z",
+          "completed_at": "2026-10-07T03:11:28Z"
+        },
+        {
+          "name": "Upload dependency license report",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-07T03:11:28Z",
+          "completed_at": "2026-10-07T03:11:29Z"
+        },
+        {
+          "name": "Post Set up Go and native caches",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-10-07T03:11:29Z",
+          "completed_at": "2026-10-07T03:11:30Z"
+        },
+        {
+          "name": "Post Check out repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-10-07T03:11:30Z",
+          "completed_at": "2026-10-07T03:11:31Z"
+        },
+        {
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-10-07T03:11:31Z",
+          "completed_at": "2026-10-07T03:11:36Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-10-07T03:11:36Z",
+          "completed_at": "2026-10-07T03:11:36Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/sh4869221b/azerlay/check-runs/112612171780",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000019119,
+      "runner_name": "GitHub Actions 1000019119",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 112612171804,
+      "run_id": 37565507636,
+      "workflow_name": "CI",
+      "head_branch": "codex/ci-135-measurement-contract",
+      "run_url": "https://api.github.com/repos/sh4869221b/azerlay/actions/runs/37565507636",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUL7Q388AAAAaODVgHA",
+      "head_sha": "549e1c51b49cb937f8449105e0c09948e832ec9f",
+      "url": "https://api.github.com/repos/sh4869221b/azerlay/actions/jobs/112612171804",
+      "html_url": "https://github.com/sh4869221b/azerlay/actions/runs/37565507636/job/112612171804",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-07T03:10:26Z",
+      "started_at": "2026-10-07T03:10:28Z",
+      "completed_at": "2026-10-07T03:14:37Z",
+      "name": "test",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-07T03:10:29Z",
+          "completed_at": "2026-10-07T03:10:30Z"
+        },
+        {
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-07T03:10:30Z",
+          "completed_at": "2026-10-07T03:10:44Z"
+        },
+        {
+          "name": "Install native test dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-07T03:10:44Z",
+          "completed_at": "2026-10-07T03:11:12Z"
+        },
+        {
+          "name": "Check out repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-07T03:11:12Z",
+          "completed_at": "2026-10-07T03:11:14Z"
+        },
+        {
+          "name": "Prepare native Go cache input",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-07T03:11:14Z",
+          "completed_at": "2026-10-07T03:11:14Z"
+        },
+        {
+          "name": "Set up Go and native caches",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-07T03:11:14Z",
+          "completed_at": "2026-10-07T03:11:35Z"
+        },
+        {
+          "name": "Check complete package partition and core dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-07T03:11:35Z",
+          "completed_at": "2026-10-07T03:11:35Z"
+        },
+        {
+          "name": "Check formatting",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-07T03:11:35Z",
+          "completed_at": "2026-10-07T03:11:36Z"
+        },
+        {
+          "name": "Vet",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-07T03:11:36Z",
+          "completed_at": "2026-10-07T03:11:36Z"
+        },
+        {
+          "name": "Install Staticcheck",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-07T03:11:36Z",
+          "completed_at": "2026-10-07T03:11:40Z"
+        },
+        {
+          "name": "Staticcheck",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-07T03:11:40Z",
+          "completed_at": "2026-10-07T03:11:51Z"
+        },
+        {
+          "name": "Test",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-07T03:11:51Z",
+          "completed_at": "2026-10-07T03:12:48Z"
+        },
+        {
+          "name": "Upload native race diagnostics",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-07T03:12:48Z",
+          "completed_at": "2026-10-07T03:12:49Z"
+        },
+        {
+          "name": "Build",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-07T03:12:49Z",
+          "completed_at": "2026-10-07T03:12:52Z"
+        },
+        {
+          "name": "Stress native capture and isolated CLI fixtures",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-07T03:12:52Z",
+          "completed_at": "2026-10-07T03:14:27Z"
+        },
+        {
+          "name": "Upload CLI stress diagnostics",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-10-07T03:14:27Z",
+          "completed_at": "2026-10-07T03:14:28Z"
+        },
+        {
+          "name": "Post Set up Go and native caches",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 30,
+          "started_at": "2026-10-07T03:14:28Z",
+          "completed_at": "2026-10-07T03:14:28Z"
+        },
+        {
+          "name": "Post Check out repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 31,
+          "started_at": "2026-10-07T03:14:28Z",
+          "completed_at": "2026-10-07T03:14:29Z"
+        },
+        {
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 32,
+          "started_at": "2026-10-07T03:14:29Z",
+          "completed_at": "2026-10-07T03:14:34Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 33,
+          "started_at": "2026-10-07T03:14:34Z",
+          "completed_at": "2026-10-07T03:14:34Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/sh4869221b/azerlay/check-runs/112612171804",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000019118,
+      "runner_name": "GitHub Actions 1000019118",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 112612171816,
+      "run_id": 37565507636,
+      "workflow_name": "CI",
+      "head_branch": "codex/ci-135-measurement-contract",
+      "run_url": "https://api.github.com/repos/sh4869221b/azerlay/actions/runs/37565507636",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUL7Q388AAAAaODVgKA",
+      "head_sha": "549e1c51b49cb937f8449105e0c09948e832ec9f",
+      "url": "https://api.github.com/repos/sh4869221b/azerlay/actions/jobs/112612171816",
+      "html_url": "https://github.com/sh4869221b/azerlay/actions/runs/37565507636/job/112612171816",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-07T03:10:26Z",
+      "started_at": "2026-10-07T03:10:28Z",
+      "completed_at": "2026-10-07T03:12:28Z",
+      "name": "fuzz",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-07T03:10:30Z",
+          "completed_at": "2026-10-07T03:10:31Z"
+        },
+        {
+          "name": "Check out repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-07T03:10:31Z",
+          "completed_at": "2026-10-07T03:10:32Z"
+        },
+        {
+          "name": "Set up Go",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-07T03:10:32Z",
+          "completed_at": "2026-10-07T03:10:47Z"
+        },
+        {
+          "name": "Fuzz existing parsing stages",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-07T03:10:47Z",
+          "completed_at": "2026-10-07T03:12:24Z"
+        },
+        {
+          "name": "Post Set up Go",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-07T03:12:24Z",
+          "completed_at": "2026-10-07T03:12:24Z"
+        },
+        {
+          "name": "Post Check out repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-07T03:12:24Z",
+          "completed_at": "2026-10-07T03:12:24Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-07T03:12:24Z",
+          "completed_at": "2026-10-07T03:12:24Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/sh4869221b/azerlay/check-runs/112612171816",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000019121,
+      "runner_name": "GitHub Actions 1000019121",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 112612171846,
+      "run_id": 37565507636,
+      "workflow_name": "CI",
+      "head_branch": "codex/ci-135-measurement-contract",
+      "run_url": "https://api.github.com/repos/sh4869221b/azerlay/actions/runs/37565507636",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUL7Q388AAAAaODVgRg",
+      "head_sha": "549e1c51b49cb937f8449105e0c09948e832ec9f",
+      "url": "https://api.github.com/repos/sh4869221b/azerlay/actions/jobs/112612171846",
+      "html_url": "https://github.com/sh4869221b/azerlay/actions/runs/37565507636/job/112612171846",
+      "status": "completed",
+      "conclusion": "failure",
+      "created_at": "2026-10-07T03:10:26Z",
+      "started_at": "2026-10-07T03:10:28Z",
+      "completed_at": "2026-10-07T03:13:11Z",
+      "name": "generated-files",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-07T03:10:29Z",
+          "completed_at": "2026-10-07T03:10:30Z"
+        },
+        {
+          "name": "Check out repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-07T03:10:30Z",
+          "completed_at": "2026-10-07T03:10:31Z"
+        },
+        {
+          "name": "Test CI measurement tools",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-07T03:10:31Z",
+          "completed_at": "2026-10-07T03:10:33Z"
+        },
+        {
+          "name": "Set up Go",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-07T03:10:33Z",
+          "completed_at": "2026-10-07T03:10:47Z"
+        },
+        {
+          "name": "Validate and test core without CGo",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-07T03:10:47Z",
+          "completed_at": "2026-10-07T03:11:20Z"
+        },
+        {
+          "name": "Validate and race-test core without GUI setup",
+          "status": "completed",
+          "conclusion": "failure",
+          "number": 6,
+          "started_at": "2026-10-07T03:11:20Z",
+          "completed_at": "2026-10-07T03:13:08Z"
+        },
+        {
+          "name": "Upload core race diagnostics",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-07T03:13:08Z",
+          "completed_at": "2026-10-07T03:13:08Z"
+        },
+        {
+          "name": "Regenerate LZMA boundary fixtures",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 8,
+          "started_at": "2026-10-07T03:13:08Z",
+          "completed_at": "2026-10-07T03:13:08Z"
+        },
+        {
+          "name": "Check generated fixtures",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 9,
+          "started_at": "2026-10-07T03:13:08Z",
+          "completed_at": "2026-10-07T03:13:08Z"
+        },
+        {
+          "name": "Post Set up Go",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 17,
+          "started_at": "2026-10-07T03:13:08Z",
+          "completed_at": "2026-10-07T03:13:08Z"
+        },
+        {
+          "name": "Post Check out repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-10-07T03:13:08Z",
+          "completed_at": "2026-10-07T03:13:09Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-10-07T03:13:09Z",
+          "completed_at": "2026-10-07T03:13:09Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/sh4869221b/azerlay/check-runs/112612171846",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000019122,
+      "runner_name": "GitHub Actions 1000019122",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    }
+  ]
+}

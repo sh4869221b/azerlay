@@ -197,3 +197,31 @@ application/tool module caches hit. This is retained as a native-refresh
 observation and cache-priming run, not a warm A/B result or a speedup claim.
 The 22 Python tests also passed on Actions. Local runtime limitations above
 remain distinct from this successful hosted validation.
+
+## Bounded candidate validation: run 37565507636
+
+Candidate `549e1c51` completed all six jobs but failed the core race gate:
+`TestControlTimeoutClient/wrong-id` attempted its fake-server response after the
+fixture's shared 80 ms client deadline, receiving a broken pipe at 0.18 s. The
+other five gates passed, including the full native race suite and three shuffled
+repetitions of the changed native capture/CLI tests. The pure PNG helper's 20-repeat
+check and fixture regeneration were skipped after the core race failure. Retain
+this failure, rather than treating a retry as an independent successful sample.
+
+The workflow measured 249 s execution and 730 runner-seconds, including the extra
+native stress (94.77 s); it is diagnostic and ineligible for the ordinary budget.
+The ordinary native race command was 56.69 s (baseline 73.74 s), child user/system
+CPU 42.49/13.42 s (67.14/14.86 s), and maximum child RSS 629512 KiB (616860 KiB).
+These are single observations, not a performance acceptance or process-tree peak.
+
+The correction keeps the actual timeout case at 80 ms, uses the existing 5 s
+production allowance for response/cancellation cases, and keeps the fixture's
+3 s guards, exact error codes and closed-connection/no-retry assertions. A focused
+20-repeat race/shuffle check validates these cases in the corrective workflow.
+No production timeouts or 64 MiB boundary tests change.
+
+The native diagnostic upload reported only one file because its `runner.temp`
+expression used a host path inside a container job. The corrective workflow emits
+the actual shell `RUNNER_TEMP` as a step output for both native artifact paths;
+verify that both the JSONL and timing report upload. Timing values above remain
+available in the job log even for the original upload.
