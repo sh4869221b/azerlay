@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"encoding/json"
@@ -15,7 +15,7 @@ type controlReport struct {
 	Command       string         `json:"command"`
 	OK            bool           `json:"ok"`
 	Result        control.Result `json:"result"`
-	Error         *reportError   `json:"error"`
+	Error         *ReportError   `json:"error"`
 }
 
 func writeControlReport(report controlReport, jsonMode bool, stdout, stderr io.Writer) int {

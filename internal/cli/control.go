@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"context"
@@ -94,7 +94,7 @@ func runControl(cmd *cli.Command, stdout, stderr io.Writer) int {
 		errors.As(err, &failure)
 	}
 	if failure != nil {
-		report.Error = &reportError{failure.Code, failure.Stage, failure.Summary, failure.Remediation}
+		report.Error = &ReportError{failure.Code, failure.Stage, failure.Summary, failure.Remediation}
 	}
 	return writeControlReport(report, cmd.Bool("json"), stdout, stderr)
 }

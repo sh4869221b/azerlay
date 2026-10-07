@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"context"
@@ -70,7 +70,7 @@ func exportCommandOptions(cmd *cli.Command) (exportOptions, bool) {
 }
 
 func runExport(command string, options exportOptions, stdin io.Reader, stdout, stderr io.Writer) int {
-	var failure *reportError
+	var failure *ReportError
 	if options.help {
 		help := validateHelp
 		if command == "import" {
@@ -91,9 +91,9 @@ func runExport(command string, options exportOptions, stdin io.Reader, stdout, s
 	if command == "import" {
 		switch {
 		case len(bundle.Profiles) == 0 || options.index > len(bundle.Profiles):
-			failure = &reportError{"ERR_PROFILE_NOT_FOUND", "selection", "No profile exists at the requested position.", "Repeat import with --profile-index N and supply the input again; choose an index from a nonempty profile listing."}
+			failure = &ReportError{"ERR_PROFILE_NOT_FOUND", "selection", "No profile exists at the requested position.", "Repeat import with --profile-index N and supply the input again; choose an index from a nonempty profile listing."}
 		case options.index == 0 && len(bundle.Profiles) > 1:
-			failure = &reportError{"ERR_PROFILE_SELECTION_REQUIRED", "selection", "An explicit profile selection is required.", "Repeat import with --profile-index N and supply the input again."}
+			failure = &ReportError{"ERR_PROFILE_SELECTION_REQUIRED", "selection", "An explicit profile selection is required.", "Repeat import with --profile-index N and supply the input again."}
 		default:
 			index := options.index
 			if index == 0 {
@@ -141,7 +141,7 @@ func prepareSource(options exportOptions, stdin io.Reader) (prepared profilesour
 	}
 }
 
-func preparationFailure(err error) *reportError {
+func preparationFailure(err error) *ReportError {
 	// These boundaries guarantee their respective typed errors. Project only
 	// the stable code, never the underlying reader/file cause or source text.
 	var decode *profiledecode.DecodeError
@@ -149,11 +149,11 @@ func preparationFailure(err error) *reportError {
 	var normalize *profileadapter.NormalizeError
 	switch {
 	case errors.As(err, &decode):
-		return &reportError{string(decode.Code), "decode", "The export could not be decoded.", "Supply a complete export in a supported input format."}
+		return &ReportError{string(decode.Code), "decode", "The export could not be decoded.", "Supply a complete export in a supported input format."}
 	case errors.As(err, &raw):
-		return &reportError{string(raw.Code), "raw", "The export structure is invalid.", "Supply a structurally valid software export within the documented limits."}
+		return &ReportError{string(raw.Code), "raw", "The export structure is invalid.", "Supply a structurally valid software export within the documented limits."}
 	default:
 		errors.As(err, &normalize)
-		return &reportError{string(normalize.Code), "normalize", "The export could not be normalized.", "Attribute a supported exact software release and use an export within the documented semantic limits."}
+		return &ReportError{string(normalize.Code), "normalize", "The export could not be normalized.", "Attribute a supported exact software release and use an export within the documented semantic limits."}
 	}
 }

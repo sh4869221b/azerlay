@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"encoding/json"
@@ -17,10 +17,12 @@ type operationReport struct {
 	Command       string         `json:"command"`
 	OK            bool           `json:"ok"`
 	Result        *profileReport `json:"result"`
-	Error         *reportError   `json:"error"`
+	Error         *ReportError   `json:"error"`
 }
 
-type reportError struct {
+// ReportError carries only classified, privacy-safe CLI error fields.
+// It is shared with native startup; report envelopes stay private to this package.
+type ReportError struct {
 	Code        string `json:"code"`
 	Stage       string `json:"stage"`
 	Summary     string `json:"summary"`

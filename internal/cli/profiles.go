@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"context"
@@ -53,13 +53,13 @@ func runProfiles(jsonMode, help bool, stdout, stderr io.Writer) int {
 	return writeReport(report, jsonMode, stdout, stderr)
 }
 
-func storageFailure(err error) *reportError {
+func storageFailure(err error) *ReportError {
 	var failure *profilesource.Error
 	errors.As(err, &failure) // All source API errors have this privacy-safe type.
 	switch failure.Code {
 	case profilesource.ERR_PROFILE_NOT_FOUND:
-		return &reportError{failure.Code, "selection", "No saved profile selection was found.", "Import a supported export and select a profile first."}
+		return &ReportError{failure.Code, "selection", "No saved profile selection was found.", "Import a supported export and select a profile first."}
 	default:
-		return &reportError{profilesource.ERR_PROFILE_STORAGE, "storage", "Profile storage could not be accessed.", "Check the data directory and saved source integrity before retrying."}
+		return &ReportError{profilesource.ERR_PROFILE_STORAGE, "storage", "Profile storage could not be accessed.", "Check the data directory and saved source integrity before retrying."}
 	}
 }

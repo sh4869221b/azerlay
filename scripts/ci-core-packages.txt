@@ -1,0 +1,14 @@
+./internal/cli
+./internal/config
+./internal/control
+./internal/device
+./internal/diagnostics
+./internal/gameprofile
+./internal/input
+./internal/layout
+./internal/matching
+./internal/profile
+./internal/profileadapter
+./internal/profiledecode
+./internal/profileraw
+./internal/profilesource

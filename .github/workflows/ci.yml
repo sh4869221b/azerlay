@@ -48,12 +48,21 @@ jobs:
         with:
           tool-cache: 'true'
 
+      - name: Check complete package partition and core dependencies
+        env:
+          CGO_ENABLED: '1'
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          python3 scripts/ci_check_packages.py
+
       - name: Check formatting
         shell: bash
         run: |
           files=$(gofmt -l .)
           if [[ -n $files ]]; then
             printf 'Files require gofmt:\n%s\n' "$files"
+            gofmt -d .
             exit 1
           fi
 
@@ -282,6 +291,33 @@ jobs:
           cache-dependency-path: |
             go.mod
             go.sum
+
+      # Initial boundary proof deliberately duplicates core coverage while the
+      # native ./... gate remains intact. This is not the optimized job split.
+      - name: Validate and test core without CGo
+        env:
+          CGO_ENABLED: '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t core < scripts/ci-core-packages.txt
+          go env GOOS GOARCH CGO_ENABLED CC GOCACHE
+          python3 scripts/ci_check_packages.py --core-only
+          go test -shuffle=on -count=1 "${core[@]}"
+
+      - name: Validate and race-test core without GUI setup
+        shell: bash
+        run: |
+          set -euo pipefail
+          # setup-go's Ubuntu cache has no complete native ABI fingerprint.
+          # Keep this CGo/race proof cold, step-local and outside that cache.
+          race_cache=$(mktemp -d "$RUNNER_TEMP/azerlay-core-race.XXXXXX")
+          trap 'rm -rf "$race_cache"' EXIT
+          export GOCACHE="$race_cache" CGO_ENABLED=1
+          mapfile -t core < scripts/ci-core-packages.txt
+          go env GOOS GOARCH CGO_ENABLED CC GOCACHE
+          python3 scripts/ci_check_packages.py --core-only
+          go test -race -shuffle=on -count=1 "${core[@]}"
 
       - name: Regenerate LZMA boundary fixtures
         run: go run ./internal/profiledecode/testdata/generate
