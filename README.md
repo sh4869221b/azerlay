@@ -84,9 +84,10 @@ Local packaging targets Arch/CachyOS x86-64 and Hyprland. It packages the curren
 behavior described above, including live profile and physical-button rendering.
 GTK4, gtk4-layer-shell and their native shared-library dependencies must be
 installed on the destination. The binary archive does not bundle them.
-There is no published release assumed by these commands. The local smoke
-version `0.0.0` and package recipe make no redistribution license grant;
-the license and desktop application owner remain unresolved.
+There is no published release assumed by these commands. Azerlay-owned code is licensed under MIT; third-party terms remain applicable.
+The local smoke version `0.0.0` is not a published release. Public-release
+readiness and the desktop application owner remain unresolved; see the
+[release-safety decision](docs/decisions/public-release-safety.md).
 
 From a source checkout with the [development dependencies](#development):
 
@@ -542,9 +543,12 @@ a stale socket, or changes running visibility or selection.
 
 ## License
 
-The project license is not finalized. MPL-2.0 is recommended by the design,
-pending dependency-license, NOTICE, and SBOM review before a public release.
-No final license grant is made by this repository at this stage.
+Azerlay-owned source, documentation and original schematic assets are licensed
+under the [MIT License](LICENSE). Third-party components retain their own terms;
+see [third-party notices and source availability](THIRD_PARTY_NOTICES.md).
+The license choice does not mark this checkout as a qualified public release.
+Remaining checks are recorded in the
+[release-safety decision](docs/decisions/public-release-safety.md).
 
 ## Trademark notice
 

@@ -318,8 +318,10 @@ Every actual nonzero tool result fails the job.
 
 The CSV inventories Go dependencies; it is not an allowlist or a compatibility
 decision, and does not cover dynamically loaded or native libraries. The
-project license remains undecided, with dependency-license, NOTICE and SBOM
-decisions tracked separately in Issue #18.
+project uses MIT for its own material. Third-party notices and source
+availability are recorded in `THIRD_PARTY_NOTICES.md`; final native inventory,
+SBOM and release-readiness checks remain tracked in Issue #18. A successful
+license job does not establish that these checks are complete.
 
 ## Synthetic fixture policy
 
