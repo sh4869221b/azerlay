@@ -57,6 +57,15 @@ def measure(run, jobs_pages, condition, cohort, required=REQUIRED, event_at=None
     counts = Counter(j["name"] for j in jobs)
     errors = [f"required job {name}: expected one, found {counts[name]}" for name in required if counts[name] != 1]
     selected = [j for j in jobs if j["name"] in required]
+    if attempt > 1:
+        # GitHub can copy earlier successful jobs into a failed-jobs-only rerun,
+        # assigning new IDs/attempt numbers but retaining their old intervals.
+        # Such recovery is valid quality evidence, not an independent timing run.
+        attempt_start = timestamp(run.get("run_started_at"))
+        if attempt_start is None:
+            raise ValueError("rerun requires its run_started_at timestamp")
+        if any(j.get("started_at") and timestamp(j["started_at"]) < attempt_start for j in selected):
+            raise ValueError("partial rerun reuses prior job intervals; retain recovery separately")
     rows = []
     for j in selected:
         duration = seconds(j.get("started_at"), j.get("completed_at"))

@@ -68,6 +68,19 @@ class MeasurementTests(unittest.TestCase):
         pages = [dict(total_count=6, jobs=self.jobs["jobs"][:3]), dict(total_count=6, jobs=self.jobs["jobs"][3:])]
         self.assertTrue(ci.measure(self.run, pages, "warm", "synthetic-v1")["quality_success"])
 
+    def test_partial_rerun_copied_jobs_are_not_a_new_timing_sample(self):
+        self.run.update(run_attempt=2, run_started_at="2026-01-01T00:00:30Z")
+        for job in self.jobs["jobs"]:
+            job["run_attempt"] = 2
+        with self.assertRaisesRegex(ValueError, "reuses prior job intervals"):
+            self.sample()
+        for job in self.jobs["jobs"]:
+            job["started_at"] = "2026-01-01T00:00:31Z"
+        self.assertTrue(self.sample()["quality_success"])
+        del self.run["run_started_at"]
+        with self.assertRaisesRegex(ValueError, "run_started_at"):
+            self.sample()
+
     def test_nearest_rank(self):
         self.assertEqual(ci.quantiles(range(1, 21)), dict(n=20, p50=10, p95=19, max=20))
         self.assertIsNone(ci.quantiles([])["p95"])

@@ -9,12 +9,12 @@ explicit versions without changing the application's `go.mod` or `go.sum`.
 
 | Job | Checks | Job timeout |
 | --- | --- | --- |
-| `test` | Formatting, vet, Staticcheck, race tests, binary build | GitHub default (360 minutes) |
+| `test` | Formatting, all-package vet/Staticcheck, native race tests, binary build | GitHub default (360 minutes) |
 | `fuzz` | Seven existing fuzz targets, each with a 10-second fuzz allocation | 10 minutes |
 | `native-build` | Verify default CGo, compile the native binary in Arch, run version, and inspect shared libraries | 15 minutes |
 | `vulnerability` | Reachable Go vulnerability scan | 20 minutes |
 | `licenses` | Third-party Go dependency license CSV | 10 minutes |
-| `generated-files` | CI-tool tests, core CGO=0 and race boundary proof, regenerate both LZMA fixtures and reject differences | 15 minutes |
+| `generated-files` | CI-tool tests, core CGO=0 and race tests, regenerate both LZMA fixtures and reject differences | 15 minutes |
 
 The `test` job rejects any output from `gofmt -l .`, then runs:
 
@@ -22,22 +22,26 @@ The `test` job rejects any output from `gofmt -l .`, then runs:
 go vet ./...
 go install honnef.co/go/tools/cmd/staticcheck@2026.2.1
 staticcheck ./...
-scripts/test-wayland.sh go test -race -shuffle=on -count=1 ./...
+mapfile -t native < scripts/ci-native-packages.txt
+scripts/test-wayland.sh go test -race -shuffle=on -count=1 "${native[@]}"
 go build ./cmd/azerlay
 ```
 
-Ordinary tests run once, retaining the race detector, shuffled ordering and
-uncached execution, including the production GTK/CGo packages. Native child
+Every ordinary root-module package has one race/shuffle/uncached test run:
+core packages in `generated-files`, native packages in `test`. Core packages
+also receive a separate CGO=0 contract run. Production GTK/CGo remains native. Native child
 tests initialize GTK on their process main thread.
 Analyzer installation or execution failures fail CI; they are not suppressed.
 
-## Initial core boundary proof
+## Core/native test partition
 
 The [CLI/core boundary](cli-core-boundary.md) assigns every ordinary package to
 an explicit core or native manifest. Before formatting/vet, the native `test`
 job compares their exact disjoint union against `go list ./...` and checks the
 core dependency closure including tests for native/GTK imports. Its existing
-whole-repository formatting, vet, Staticcheck, race, Sway and build gates remain.
+whole-repository formatting, vet and Staticcheck remain. Its race command uses
+the five-package native manifest with the same non-root, two-output Sway launcher
+and current-checkout CLI build; the binary build also remains.
 Formatting failures print `gofmt -d .` for review from hosted logs.
 
 The existing `generated-files` job adds core-only dependency checks and tests
@@ -47,11 +51,13 @@ a new temporary GOCACHE, including for its dependency check, so setup-go's
 Ubuntu cache does not start reusing/saving CGo outputs without the native ABI
 fingerprint. The original fixture regeneration and diff steps remain afterward.
 
-This deliberately duplicates core coverage during initial hosted validation.
-Additional tests, cold race compilation and runner-seconds are overhead to
-measure, not an achieved optimization. No job IDs, package-install commands,
-required native checks or existing cache inputs change. A successful boundary
-proof alone does not complete issue #137 or demonstrate a CI speedup.
+After successful initial boundary validation, the native race command no longer
+repeats the 14 core packages. Their required race run stays in `generated-files`,
+which also retains actual fixture regeneration/diff. The manifest checker rejects
+omissions and overlap; failure in either job still fails the workflow. Job IDs,
+package-install commands and existing cache inputs are unchanged. The fresh
+core race cache and extra CGO=0 mode have a cost that remains part of measurement.
+This partition is a measured candidate, not a 60-second or p95 claim.
 
 ## Fuzz budget
 

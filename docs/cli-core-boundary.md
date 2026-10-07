@@ -59,32 +59,26 @@ lists native packages, so it can run on a runner without GTK or Sway.
 
 ## Required validation commands
 
-Use the repository's pinned Go/tool versions. The initial hosted proof keeps
-all six existing job IDs and the whole-repository native quality gate. The
-`test` job checks the full package partition and dependency boundary after its
-Go/cache setup, then retains repository-wide formatting, vet, Staticcheck,
-race/shuffle/count=1 tests under non-root two-output Sway, and binary build.
-Formatting failures also print `gofmt -d .` so hosted logs contain the exact
-correction when a local Go SDK is unavailable.
+Use the repository's pinned Go/tool versions. All six existing job IDs remain.
+The `test` job checks the exact root-package partition and dependency boundary,
+then runs repository-wide formatting, vet and Staticcheck, the five native
+packages under non-root two-output Sway with race/shuffle/count=1, and the binary
+build. Formatting failures print `gofmt -d .` for review from hosted logs.
 
-The existing Ubuntu `generated-files` job adds two checks after Go setup:
-CGO=0 core dependency validation and tests, then separate CGO=1 core dependency
-validation and race tests. It does not install or start GTK/Sway. The latter
-uses a fresh `RUNNER_TEMP` GOCACHE for the whole step, including dependency
-validation, and removes it on exit. This step-local override is never written
-to GITHUB_ENV; setup-go's existing Ubuntu build cache does not receive the new
-CGo/race outputs. Module downloads may still use its ordinary module cache.
-The original fixture regeneration and clean-diff checks remain afterward.
+The Ubuntu `generated-files` job owns the 14 core packages. It validates/tests
+CGO=0 separately from CGO=1 race/shuffle/count=1, without GTK/Sway setup. Its race
+step uses a fresh `RUNNER_TEMP` GOCACHE and deletes it, so the existing Ubuntu
+cache does not begin reusing native outputs without a complete ABI fingerprint.
+Fixture regeneration and clean-diff checks remain afterward.
 
-This deliberately runs core tests three times during the initial proof: once
-without CGo, once with race on Ubuntu, and once in the retained native all-package
-race gate. Extra test executions, a cold race compile, package listing and runner
-time are validation overhead, not a speedup. Native package-install commands
-and cache inputs stay unchanged. The native checker uses the Python already
-present through existing dependencies and fails if it is unavailable. This
-candidate does not remove native coverage, rename checks, adopt a final
-optimized split, or establish
-issue #137's performance acceptance criteria.
+The initial duplicate native/core proof passed at head e54d3b32 (vulnerability
+required a package-download retry). The partition now removes only the redundant
+core race execution from the native job. Every root-module package still has a
+required race run; core also has the additional CGO=0 contract run. The exact
+manifest union rejects missing/duplicate packages, and failure in either job
+fails the workflow. Package-install commands, cache inputs and native process
+coverage are unchanged. The fresh core race cache remains measurable overhead;
+this does not establish a 60-second or p95 performance result.
 
 These Bash commands also describe the individual verification units:
 
@@ -135,7 +129,7 @@ not an existing automated root-CI check. `internal/layershell/probe` has its own
 `go.mod` and was already outside root-module CI. The consumer fixture and
 research probe remain separately invoked tools, not omitted root packages.
 
-Before adopting separate required jobs, compare setup-inclusive core/native
+For this partition, compare setup-inclusive core/native
 wall time, compile work, aggregate runner-seconds and the complete workflow
 critical path using [the measurement contract](ci.md#ci-wide-60-second-measurement-contract).
 Removing the unconditional CLI `TestMain` from in-process tests establishes a

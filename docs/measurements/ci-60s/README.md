@@ -28,7 +28,12 @@ Plan the same for cold, Go dependency refresh, native/image refresh and tool
 refresh only after estimating their runner cost and receiving authorization for
 that experiment. A plan does not authorize dozens of CI runs. Keep priming runs
 separate and record every failed, cancelled, timed-out and outlier attempt.
-Reruns are new attempts, not replacements for failed observations.
+Reruns are new attempts, not replacements for failed observations. Failed-jobs-only
+reruns need separate recovery records: GitHub copies prior successful jobs with
+new IDs and attempt numbers but old execution timestamps. The analyzer rejects
+that mixed timing history using `run_started_at`, so prior runner time is not
+counted twice or presented as an independent successful sample. Preserve the
+failed attempt and the retry's raw data/quality outcome together.
 
 Each compared variant needs a fixed revision and documented environment cohort.
 Alternate baseline/candidate runs where practical; do not pool different
@@ -113,7 +118,7 @@ credentials, all environment variables, HOME, private profiles or fuzz inputs.
 | Invariant | Required gate / implementation | Migration rule |
 | --- | --- | --- |
 | Format, all-package vet and Staticcheck | `test`, `.github/workflows/ci.yml` | Include new core/native packages; no path-filter gap |
-| Race, shuffle, uncached all-package tests | `test`, `go test -race -shuffle=on -count=1 ./...` | Every package maps to a required gate; CGO=0 is not a replacement for native tests |
+| Race, shuffle, uncached all-package tests | `test` native manifest + `generated-files` core manifest, both `-race -shuffle=on -count=1` | Exact disjoint manifest union must equal root `go list ./...`; CGO=0 is additional, not a race/native replacement |
 | GTK main OS thread, non-root Sway, two outputs | `test`, `scripts/test-wayland.sh`, native subprocess tests | Keep production GTK/CGo and runtime ownership |
 | Current-checkout CLI/process contract and native build | `test` CLI TestMain and final build; `native-build` explicit/default CGo, version and ELF checks | No prebuilt executable or fake UI substitutes |
 | 64 MiB and 64 MiB+1, bounded complete decode, trailing-data rejection, zero-on-error | `test`, `internal/profiledecode`; `generated-files` actual zero-fixture regeneration and diff | Preserve real boundary sizes and safety seeds |
