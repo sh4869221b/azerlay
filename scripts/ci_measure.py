@@ -131,6 +131,33 @@ def validate_sample(sample):
             raise ValueError("invalid nonnegative finite duration")
     if sample["quality_success"] and (sample["errors"] or sample.get("status") != "completed" or sample.get("conclusion") != "success" or sample["execution_seconds"] is None or sample["runner_seconds"] is None):
         raise ValueError("inconsistent successful sample")
+    if sample["quality_success"]:
+        # Saved samples are inputs too: a stale success flag or edited aggregate
+        # must not certify missing/failed jobs or a shorter interval than the evidence.
+        jobs = sample.get("jobs")
+        if not isinstance(jobs, list) or len(jobs) != len(required) or not all(isinstance(j, dict) for j in jobs):
+            raise ValueError("successful sample requires complete job rows")
+        names = [j.get("name") for j in jobs]
+        ids = [j.get("id") for j in jobs]
+        if not all(isinstance(n, str) for n in names) or sorted(names) != sorted(required):
+            raise ValueError("successful sample jobs do not match required jobs")
+        if not all(type(i) is int and i >= 0 for i in ids) or len(set(ids)) != len(ids):
+            raise ValueError("successful sample requires distinct job IDs")
+        starts, ends, durations = [], [], []
+        for job in jobs:
+            if job.get("status") != "completed" or job.get("conclusion") != "success":
+                raise ValueError("successful sample contains a non-successful job")
+            if not isinstance(job.get("started_at"), str) or not isinstance(job.get("completed_at"), str):
+                raise ValueError("successful sample requires complete job intervals")
+            start, end = timestamp(job["started_at"]), timestamp(job["completed_at"])
+            duration = (end - start).total_seconds()
+            if duration < 0 or type(job.get("seconds")) not in (int, float) or job["seconds"] != duration:
+                raise ValueError("successful sample has an inconsistent job duration")
+            starts.append(start)
+            ends.append(end)
+            durations.append(duration)
+        if sample["execution_seconds"] != (max(ends) - min(starts)).total_seconds() or sample["runner_seconds"] != sum(durations):
+            raise ValueError("successful sample aggregates do not match job intervals")
 
 
 def summarize(samples):
@@ -165,14 +192,26 @@ def summarize(samples):
 
 
 def test_times(lines):
-    """Parse go test -json output without summing overlapping package/test times."""
+    """Keep Go's active elapsed and observed wall intervals distinct.
+
+    Parallel parent tests can report little Elapsed while waiting for children.
+    Neither clock can be summed across overlapping tests or packages.
+    Missing start events leave wall_seconds unknown, not zero.
+    """
     results = []
+    starts = {}
     for line in lines:
         event = json.loads(line)
+        key = (event.get("Package"), event.get("Test"))
+        if event.get("Action") in ("start", "run"):
+            starts[key] = event.get("Time")
         if event.get("Action") in ("pass", "fail", "skip"):
+            start = starts.pop(key, None)
             results.append({"package": event.get("Package"), "test": event.get("Test"),
-                            "action": event["Action"], "seconds": event.get("Elapsed")})
-    return sorted(results, key=lambda r: r["seconds"] if r["seconds"] is not None else -1, reverse=True)
+                            "action": event["Action"], "seconds": event.get("Elapsed"),
+                            "wall_seconds": seconds(start, event.get("Time"))})
+    return sorted(results, key=lambda r: (r["wall_seconds"] if r["wall_seconds"] is not None
+                                         else r["seconds"] if r["seconds"] is not None else -1), reverse=True)
 
 
 def main():

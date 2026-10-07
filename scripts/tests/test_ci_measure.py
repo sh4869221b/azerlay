@@ -1,6 +1,8 @@
 import copy
 import importlib.util
+import json
 import unittest
+from datetime import timedelta
 from pathlib import Path
 
 spec = importlib.util.spec_from_file_location("ci_measure", Path(__file__).parents[1] / "ci_measure.py")
@@ -19,6 +21,14 @@ class MeasurementTests(unittest.TestCase):
 
     def sample(self):
         return ci.measure(self.run, [self.jobs], "warm", "synthetic-v1")
+
+    def timed_sample(self, duration):
+        jobs = copy.deepcopy(self.jobs)
+        end = (ci.timestamp(jobs["jobs"][0]["started_at"]) + timedelta(seconds=duration)).isoformat()
+        for job in jobs["jobs"]:
+            job["completed_at"] = end
+        run = dict(self.run, updated_at=end)
+        return ci.measure(run, [jobs], "warm", "synthetic-v1")
 
     def test_distinct_clocks_and_runner_seconds(self):
         result = self.sample()
@@ -125,6 +135,46 @@ class MeasurementTests(unittest.TestCase):
         rows = [dict(sample, run_id=i) for i in range(20)]
         self.assertFalse(ci.summarize(rows)[0]["ordinary_budget_observed"])
 
+    def test_parallel_parent_wall_time_is_not_active_elapsed(self):
+        events = [
+            dict(Action="start", Package="p", Time="2026-01-01T00:00:00Z"),
+            dict(Action="run", Package="p", Test="Parent", Time="2026-01-01T00:00:01Z"),
+            dict(Action="run", Package="p", Test="Parent/child", Time="2026-01-01T00:00:01Z"),
+            dict(Action="pause", Package="p", Test="Parent/child", Time="2026-01-01T00:00:01Z"),
+            dict(Action="cont", Package="p", Test="Parent/child", Time="2026-01-01T00:00:02Z"),
+            dict(Action="pass", Package="p", Test="Parent/child", Elapsed=2, Time="2026-01-01T00:00:04Z"),
+            dict(Action="pass", Package="p", Test="Parent", Elapsed=.04, Time="2026-01-01T00:00:04Z"),
+            dict(Action="pass", Package="p", Elapsed=4, Time="2026-01-01T00:00:04Z"),
+        ]
+        rows = ci.test_times(map(json.dumps, events))
+        self.assertEqual(rows[0]["wall_seconds"], 4)
+        parent = next(r for r in rows if r["test"] == "Parent")
+        self.assertEqual(parent["seconds"], .04)
+        self.assertEqual(parent["wall_seconds"], 3)
+        self.assertEqual(next(r for r in rows if r["test"] == "Parent/child")["wall_seconds"], 3)
+
+    def test_test_wall_time_repetitions_and_incomplete_streams(self):
+        events = []
+        for start, end, action in [(1, 3, "pass"), (4, 7, "fail"), (8, 8, "skip")]:
+            events += [dict(Action="run", Package="p", Test="T", Time=f"2026-01-01T00:00:0{start}Z"),
+                       dict(Action=action, Package="p", Test="T", Time=f"2026-01-01T00:00:0{end}Z")]
+        # Terminal without a new start must not reuse the previous repetition.
+        events.append(dict(Action="pass", Package="p", Test="T", Elapsed=1,
+                           Time="2026-01-01T00:00:09Z"))
+        events.append(dict(Action="run", Package="p", Test="unfinished",
+                           Time="2026-01-01T00:00:09Z"))
+        rows = ci.test_times(map(json.dumps, events))
+        self.assertEqual([r["wall_seconds"] for r in rows], [3, 2, None, 0])
+        self.assertEqual(len(rows), 4)
+
+    def test_test_wall_time_does_not_mix_packages(self):
+        events = [dict(Action="run", Package="p", Test="T", Time="2026-01-01T00:00:00Z"),
+                  dict(Action="pass", Package="other", Test="T", Elapsed=2, Time="2026-01-01T00:00:02Z"),
+                  dict(Action="pass", Package="p", Test="T", Elapsed=1, Time="2026-01-01T00:00:01Z")]
+        rows = ci.test_times(map(json.dumps, events))
+        self.assertIsNone(rows[0]["wall_seconds"])
+        self.assertEqual(rows[1]["wall_seconds"], 1)
+
     def test_gate_order_does_not_split_cohort(self):
         first = self.sample()
         second = dict(first, run_id=2, required_jobs=list(reversed(first["required_jobs"])))
@@ -139,6 +189,58 @@ class MeasurementTests(unittest.TestCase):
                 sample = dict(self.sample(), **{field: value})
                 with self.assertRaises(ValueError):
                     ci.summarize([sample])
+
+    def test_successful_summary_requires_complete_job_rows(self):
+        for jobs in (None, [], {}, "jobs", [None] * 6, [{}] * 6,
+                     self.sample()["jobs"][:-1], self.sample()["jobs"] * 2):
+            with self.subTest(jobs=jobs):
+                sample = dict(self.sample(), jobs=jobs)
+                with self.assertRaises(ValueError):
+                    ci.summarize([sample])
+        sample = self.sample()
+        del sample["jobs"]
+        with self.assertRaises(ValueError):
+            ci.summarize([sample])
+
+    def test_successful_summary_checks_job_evidence(self):
+        for field, value in (("name", "unknown"), ("name", ci.REQUIRED[1]),
+                             ("id", 1), ("id", None), ("id", "0"), ("id", True),
+                             ("status", "in_progress"), ("conclusion", "failure"),
+                             ("conclusion", "cancelled"), ("conclusion", "skipped"),
+                             ("started_at", None), ("completed_at", None),
+                             ("started_at", "invalid"), ("started_at", 123),
+                             ("started_at", "2026-01-01T00:00:59Z"),
+                             ("completed_at", "2026-01-01T00:00:58"),
+                             ("seconds", None), ("seconds", True), ("seconds", -1),
+                             ("seconds", float("nan")), ("seconds", float("inf")),
+                             ("seconds", 1)):
+            with self.subTest(field=field, value=value):
+                sample = self.sample()
+                sample["jobs"][0][field] = value
+                with self.assertRaises(ValueError):
+                    ci.summarize([dict(sample, run_id=i) for i in range(20)])
+
+    def test_successful_summary_rejects_edited_aggregates(self):
+        for field in ("execution_seconds", "runner_seconds"):
+            with self.subTest(field=field):
+                sample = self.sample()
+                sample[field] = 1
+                with self.assertRaisesRegex(ValueError, "aggregates"):
+                    ci.summarize([sample])
+
+    def test_summary_retains_failed_and_incomplete_job_evidence(self):
+        for changes in (dict(conclusion="failure"), dict(conclusion="cancelled"),
+                        dict(status="in_progress", conclusion=None, completed_at=None),
+                        dict(name="unknown"), dict(name=ci.REQUIRED[1])):
+            with self.subTest(changes=changes):
+                jobs = copy.deepcopy(self.jobs)
+                jobs["jobs"][0].update(changes)
+                sample = ci.measure(self.run, [jobs], "warm", "synthetic-v1")
+                result = ci.summarize([sample])[0]
+                self.assertEqual(result["attempts"], 1)
+                self.assertEqual(result["successes"], 0)
+                self.assertEqual(result["non_success_rate"], 1)
+                self.assertFalse(result["ordinary_budget_observed"])
 
     def test_workflow_failure_blocks_quality(self):
         self.run["conclusion"] = "failure"
@@ -156,16 +258,13 @@ class MeasurementTests(unittest.TestCase):
         self.assertEqual(result["event_to_required_result_seconds"], 58)
 
     def test_target_boundary(self):
-        rows = [dict(self.sample(), run_id=i, execution_seconds=180) for i in range(20)]
+        rows = [dict(self.timed_sample(180), run_id=i) for i in range(20)]
         self.assertTrue(ci.summarize(rows)[0]["ordinary_budget_observed"])
-        for row in rows:
-            row["execution_seconds"] = 180.1
+        rows = [dict(self.timed_sample(180.1), run_id=i) for i in range(20)]
         self.assertFalse(ci.summarize(rows)[0]["ordinary_budget_observed"])
-        for row in rows:
-            row["execution_seconds"] = 180
-        rows[-1]["execution_seconds"] = rows[-2]["execution_seconds"] = 300
+        rows = [dict(self.timed_sample(180 if i < 18 else 300), run_id=i) for i in range(20)]
         self.assertTrue(ci.summarize(rows)[0]["ordinary_budget_observed"])
-        rows[-1]["execution_seconds"] = rows[-2]["execution_seconds"] = 300.1
+        rows = [dict(self.timed_sample(180 if i < 18 else 300.1), run_id=i) for i in range(20)]
         self.assertFalse(ci.summarize(rows)[0]["ordinary_budget_observed"])
 
     def test_ordinary_budget_does_not_apply_to_cold_or_refresh(self):

@@ -115,9 +115,16 @@ The Wayland command must run under the existing dedicated **non-root** user
 and ownership setup. This example does not replace it. JSON and profiles are
 optional diagnostic runs, timed separately from ordinary CI. Record paired
 instrumented/uninstrumented durations; do not assume their overhead is zero.
-The JSON parser ranks package/test terminal events without summing them. A
-truncated stream or crash requires the original command's exit status and log;
-a terminal-event list alone cannot establish complete test execution.
+The JSON parser preserves Go's reported active `seconds` and separately pairs
+package `start` / test `run` with terminal events to obtain `wall_seconds`.
+Parallel parents can have short active elapsed while waiting for child tests;
+the report ranks observed wall time when available and otherwise falls back to
+reported elapsed. Wall time includes scheduling pauses and child waits; it is
+not CPU time or isolated test execution cost. Repeated tests are paired
+independently. Missing starts leave wall time unknown. Neither clock is summed across overlapping parent, child,
+and package events. A truncated stream or crash requires the original command's
+exit status and log; a terminal-event list alone cannot establish complete test
+execution.
 
 The environment capture fails if required native tools are absent; partial files
 are not a successful capture. Retain separately from Actions logs: resolved Go,
@@ -244,3 +251,22 @@ native/core race manifests and run with `-race -shuffle=on -count=1`; CGO-disabl
 core validation, seven 10 s fuzz targets, and all other gates remain. The next
 single final-code validation retains JSON/timing instrumentation and must report
 that instrumentation when comparing results. No bulk workflow campaign is started.
+
+## Ordinary-count instrumented final validation
+
+[Run 37566672762](https://github.com/sh4869221b/azerlay/actions/runs/37566672762)
+at `709b05fdbb3e42051ac121a036bfefb126966b60` passed all six gates with ordinary
+counts after removing the temporary stress commands. Execution was 162 s,
+run-created to required result 164 s, and runner-seconds 635. Native race took
+55.58 s and core race 101.57 s. The exact native cache key hit and both files
+were uploaded for each race diagnostic artifact. This is one source-only,
+normal-count observation with JSON/timing instrumentation, stored as diagnostic
+so it cannot silently enter the ordinary budget cohort. It does not establish
+p50 or p95. No extra sampling campaign was run.
+
+A subsequent offline tooling audit tightened summary input validation: saved
+successful samples must agree with their embedded required job rows and derived
+execution/runner intervals. A top-level success flag cannot override missing,
+failed, duplicated, or incomplete job evidence. Parallel-test hotspot reports
+also now expose wall time rather than mistaking a parent's short active elapsed
+for the duration of its children.
