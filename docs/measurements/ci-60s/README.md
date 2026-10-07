@@ -225,3 +225,22 @@ expression used a host path inside a container job. The corrective workflow emit
 the actual shell `RUNNER_TEMP` as a step output for both native artifact paths;
 verify that both the JSONL and timing report upload. Timing values above remain
 available in the job log even for the original upload.
+
+## Corrected candidate and removal of one-off stress
+
+[Run 37566091667](https://github.com/sh4869221b/azerlay/actions/runs/37566091667)
+at `1d97a8d4327aef9d81a32cf6b393ed1e6bfb9c9f` passed all six gates, the three
+native/CLI repetitions, 20 pure PNG-helper repetitions, 20 timeout-client
+repetitions, and real boundary-fixture regeneration/diff. Native JSONL and timing
+artifacts each now upload both files. The observed execution was 244 s and
+744 runner-seconds, including 91.90 s of one-off native stress. Native ordinary
+race was 54.28 s (user/system CPU 43.56/8.86 s, maximum child RSS 627040 KiB);
+core race was 108.86 s. Selected events and metrics are retained beside the raw
+run/job data. This is a diagnostic sample, not ordinary p50/p95 evidence.
+
+After this successful validation, the one-off count3 native stress and count20
+helper/control invocations are removed. All named tests remain in the ordinary
+native/core race manifests and run with `-race -shuffle=on -count=1`; CGO-disabled
+core validation, seven 10 s fuzz targets, and all other gates remain. The next
+single final-code validation retains JSON/timing instrumentation and must report
+that instrumentation when comparing results. No bulk workflow campaign is started.
