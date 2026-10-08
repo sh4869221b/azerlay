@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -158,6 +159,108 @@ class ArchWorkflowContracts(unittest.TestCase):
         for name in GATES | {"revision"}:
             self.assertIn("${{ needs." + name + ".result }}", job)
         self.assertIn("VALIDATED_COMMIT: ${{ needs.revision.outputs.commit }}", job)
+
+
+class ArchBootstrapExecution(unittest.TestCase):
+    BOOTSTRAPS = {
+        "test": "Install native test dependencies",
+        "native-build": "Install Arch build dependencies",
+        "vulnerability": "Install native build dependencies",
+        "licenses": "Install native build dependencies",
+    }
+    PACKAGES = (
+        "python ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 "
+        "gtk4-layer-shell gobject-introspection"
+    ).split()
+    TEST_PACKAGES = "sway dbus grim noto-fonts-cjk noto-fonts-emoji".split()
+
+    def execute(self, job, statuses, setcap_status=0):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            log = root / "commands.jsonl"
+            for command in ("pacman", "sleep", "setcap"):
+                stub = root / command
+                stub.write_text(f"#!{sys.executable}\n" + '''import json
+import os
+from pathlib import Path
+import sys
+
+log = Path(os.environ["COMMAND_LOG"])
+calls = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+command = Path(sys.argv[0]).name
+with log.open("a") as output:
+    output.write(json.dumps([command, *sys.argv[1:]]) + "\\n")
+if command == "pacman":
+    statuses = json.loads(os.environ["PACMAN_STATUSES"])
+    attempt = sum(call[0] == "pacman" for call in calls)
+    sys.exit(statuses[min(attempt, len(statuses) - 1)])
+if command == "setcap":
+    sys.exit(int(os.environ["SETCAP_STATUS"]))
+''')
+                stub.chmod(0o700)
+            body = shell_body(ARCH_JOBS[job], self.BOOTSTRAPS[job])
+            env = {
+                **os.environ, "PATH": str(root) + os.pathsep + os.environ["PATH"],
+                "COMMAND_LOG": str(log), "PACMAN_STATUSES": json.dumps(statuses),
+                "SETCAP_STATUS": str(setcap_status),
+            }
+            result = subprocess.run(["bash", "-e", "-o", "pipefail", "-c", body],
+                                    env=env, cwd=root, capture_output=True, text=True,
+                                    timeout=5)
+            return result, [json.loads(line) for line in log.read_text().splitlines()]
+
+    def expected_calls(self, job, attempts, success):
+        packages = self.PACKAGES + (self.TEST_PACKAGES if job == "test" else [])
+        pacman = ["pacman", "-Syu", "--noconfirm", "--needed", *packages]
+        calls = []
+        for attempt in range(attempts):
+            if attempt:
+                calls.append(["sleep", str(10 * attempt)])
+            calls.append(pacman)
+        if success and job == "test":
+            calls.append(["setcap", "-r", "/usr/bin/sway"])
+        return calls
+
+    def test_immediate_success_never_waits(self):
+        for job in self.BOOTSTRAPS:
+            with self.subTest(job=job):
+                result, calls = self.execute(job, [0])
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(calls, self.expected_calls(job, 1, True))
+                self.assertEqual(result.stderr, "")
+
+    def test_transient_failure_recovers_on_second_or_last_attempt(self):
+        for job in self.BOOTSTRAPS:
+            for statuses in ([1, 0], [1, 1, 0]):
+                with self.subTest(job=job, statuses=statuses):
+                    result, calls = self.execute(job, statuses)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(calls, self.expected_calls(job, len(statuses), True))
+                    self.assertIn("retrying in 10s", result.stderr)
+                    if len(statuses) == 3:
+                        self.assertIn("retrying in 20s", result.stderr)
+                    self.assertNotIn("failed after", result.stderr)
+
+    def test_exhaustion_preserves_final_status_and_stops_before_setup(self):
+        for job in self.BOOTSTRAPS:
+            with self.subTest(job=job):
+                # A fourth success must never be reached; the last failure wins.
+                result, calls = self.execute(job, [1, 2, 23, 0])
+                self.assertEqual(result.returncode, 23, result.stderr)
+                self.assertEqual(calls, self.expected_calls(job, 3, False))
+                self.assertIn("failed after 3 attempts (exit 23)", result.stderr)
+
+    def test_permanent_installation_error_remains_blocking(self):
+        for job in self.BOOTSTRAPS:
+            with self.subTest(job=job):
+                result, calls = self.execute(job, [1])
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertEqual(calls, self.expected_calls(job, 3, False))
+
+    def test_sway_setup_failure_is_not_retried_or_masked(self):
+        result, calls = self.execute("test", [0], setcap_status=17)
+        self.assertEqual(result.returncode, 17, result.stderr)
+        self.assertEqual(calls, self.expected_calls("test", 1, True))
 
 
 class ReleaseWorkflowContracts(unittest.TestCase):

@@ -61,7 +61,22 @@ jobs:
     steps:
       - name: Install native test dependencies
         run: |
-          pacman -Syu --noconfirm --needed python ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection sway dbus grim noto-fonts-cjk noto-fonts-emoji
+          set -euo pipefail
+          # Bootstrap precedes checkout; keep this bounded retry self-contained.
+          for attempt in 1 2 3; do
+            if pacman -Syu --noconfirm --needed python ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection sway dbus grim noto-fonts-cjk noto-fonts-emoji; then
+              break
+            else
+              status=$?
+            fi
+            if (( attempt == 3 )); then
+              printf 'Arch package installation failed after %s attempts (exit %s).\n' "$attempt" "$status" >&2
+              exit "$status"
+            fi
+            delay=$((10 * attempt))
+            printf 'Arch package installation attempt %s failed (exit %s); retrying in %ss.\n' "$attempt" "$status" "$delay" >&2
+            sleep "$delay"
+          done
           setcap -r /usr/bin/sway
 
       - name: Check out repository
@@ -218,7 +233,23 @@ jobs:
       GOMODCACHE: /tmp/azerlay-go-mod
     steps:
       - name: Install Arch build dependencies
-        run: pacman -Syu --noconfirm --needed python ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection
+        run: |
+          set -euo pipefail
+          # Bootstrap precedes checkout; keep this bounded retry self-contained.
+          for attempt in 1 2 3; do
+            if pacman -Syu --noconfirm --needed python ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection; then
+              break
+            else
+              status=$?
+            fi
+            if (( attempt == 3 )); then
+              printf 'Arch package installation failed after %s attempts (exit %s).\n' "$attempt" "$status" >&2
+              exit "$status"
+            fi
+            delay=$((10 * attempt))
+            printf 'Arch package installation attempt %s failed (exit %s); retrying in %ss.\n' "$attempt" "$status" "$delay" >&2
+            sleep "$delay"
+          done
 
       - name: Check out repository
         uses: actions/checkout@v4
@@ -284,7 +315,23 @@ jobs:
       GOMODCACHE: /tmp/azerlay-go-mod
     steps:
       - name: Install native build dependencies
-        run: pacman -Syu --noconfirm --needed python ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection
+        run: |
+          set -euo pipefail
+          # Bootstrap precedes checkout; keep this bounded retry self-contained.
+          for attempt in 1 2 3; do
+            if pacman -Syu --noconfirm --needed python ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection; then
+              break
+            else
+              status=$?
+            fi
+            if (( attempt == 3 )); then
+              printf 'Arch package installation failed after %s attempts (exit %s).\n' "$attempt" "$status" >&2
+              exit "$status"
+            fi
+            delay=$((10 * attempt))
+            printf 'Arch package installation attempt %s failed (exit %s); retrying in %ss.\n' "$attempt" "$status" "$delay" >&2
+            sleep "$delay"
+          done
 
       - name: Check out repository
         uses: actions/checkout@v4
@@ -349,7 +396,23 @@ jobs:
       GOMODCACHE: /tmp/azerlay-go-mod
     steps:
       - name: Install native build dependencies
-        run: pacman -Syu --noconfirm --needed python ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection
+        run: |
+          set -euo pipefail
+          # Bootstrap precedes checkout; keep this bounded retry self-contained.
+          for attempt in 1 2 3; do
+            if pacman -Syu --noconfirm --needed python ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection; then
+              break
+            else
+              status=$?
+            fi
+            if (( attempt == 3 )); then
+              printf 'Arch package installation failed after %s attempts (exit %s).\n' "$attempt" "$status" >&2
+              exit "$status"
+            fi
+            delay=$((10 * attempt))
+            printf 'Arch package installation attempt %s failed (exit %s); retrying in %ss.\n' "$attempt" "$status" "$delay" >&2
+            sleep "$delay"
+          done
 
       - name: Check out repository
         uses: actions/checkout@v4

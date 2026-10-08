@@ -158,6 +158,19 @@ The separate [Arch full validation](../.github/workflows/arch-ci.yml) runs all
 six quality gates against rolling `archlinux:base` / `pacman -Syu`, once daily
 and through the pre-release verification entrypoint. It has no soft-failure path.
 
+Each of the four Arch native jobs retries only its pre-checkout package
+installation, at most three times, waiting 10 and then 20 seconds after failed
+attempts. Every attempt uses the same full `pacman -Syu --noconfirm --needed`
+transaction and package list, with normal package signature verification.
+Pacman's nonzero status does not reliably distinguish transient mirror failures
+from permanent errors, so any installation failure gets this finite retry budget;
+the third failure exits with its status and blocks the job. The job timeout still
+bounds total execution, including downloads. The shell stays inline because git,
+Python and repository scripts are not available before this bootstrap succeeds.
+Tests execute all four actual workflow bootstrap bodies with stubbed commands,
+covering immediate success, recovery, exhaustion and the subsequent Sway setup.
+Builds, scans and other gates retain their existing failure behavior.
+
 All hosts and GUI-free `fuzz`/`generated-files` jobs use standard `ubuntu-24.04`.
 Hosted images are maintained by GitHub, not immutable. The fresh core race cache
 remains outside setup-go's cache. Nix as a CI substrate does not qualify a new
