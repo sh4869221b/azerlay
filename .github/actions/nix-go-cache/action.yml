@@ -18,6 +18,7 @@ runs:
         test "$GOCACHE" = /tmp/azerlay-go-build
         nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh bash -c '
           test "$(go env GOVERSION)" = go1.27.2
+          test "$(go env GOROOT)" = "$AZERLAY_NIX_GO_ROOT"
           test "$(go env GOTOOLCHAIN)" = local
           command -v zstd
         '

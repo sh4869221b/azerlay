@@ -4,19 +4,22 @@
   # Source archive and NAR hash are committed in flake.lock. CI never updates it.
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/494ce7fd23ff6a5dff39e1fb11e9b6f2ac74bf25";
 
-  # Only Go comes from this security update; native tools/libraries stay pinned.
-  inputs.nixpkgs-go.url = "github:NixOS/nixpkgs/423bc95d0ed475b23dada7d1f9a6a6b66e9bede3";
+  # Upstream's prebuilt SDK is a hash-locked source, not a local Go build.
+  # Native dependency outputs still require the official signed Nix cache.
+  inputs.go-sdk = {
+    url = "https://go.dev/dl/go1.27.2.linux-amd64.tar.gz";
+    flake = false;
+  };
 
-  outputs = { nixpkgs, nixpkgs-go, ... }:
+  outputs = { nixpkgs, go-sdk, ... }:
     let
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
-      go = (import nixpkgs-go { inherit system; }).go_1_27;
       lib = pkgs.lib;
-      baseTools = with pkgs; [
-        go pkg-config python3 git bash coreutils findutils gnugrep gnused
+      baseTools = [ go-sdk.outPath ] ++ (with pkgs; [
+        pkg-config python3 git bash coreutils findutils gnugrep gnused
         gawk diffutils binutils which zstd cacert fontconfig
-      ];
+      ]);
       libraries = with pkgs; [
         gtk4 gtk4-layer-shell glib cairo pango gobject-introspection
       ];
@@ -28,6 +31,7 @@
           name = if withGUI then "azerlay-ci-test" else "azerlay-ci-build";
           packages = tools;
           buildInputs = libraries ++ fonts;
+          AZERLAY_NIX_GO_ROOT = "${go-sdk}";
           GOTOOLCHAIN = "local";
           CGO_ENABLED = "1";
           SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
@@ -54,7 +58,7 @@
       };
       ciVersions = {
         inherit system;
-        go = go.version;
+        go = lib.removePrefix "go" (builtins.head (lib.splitString "\n" (builtins.readFile "${go-sdk}/VERSION")));
         gtk4 = pkgs.gtk4.version;
         glib = pkgs.glib.version;
         layerShell = pkgs.gtk4-layer-shell.version;

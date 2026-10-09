@@ -36,25 +36,35 @@ GLib 2.88.0, Pango 1.57.0 and Sway 1.11;
 results compare pinned environments, not an identical library/compiler closure.
 Actual runtime versions and the complete evaluated closure are retained in CI.
 
-`buildGoModule` at this pin defaults to Go 1.26. This experiment deliberately
-uses a `go_1_27` devShell and persistent Go compilation caches. It does not use
-`buildGoModule`, whose ordinary temporary GOCACHE would change the experiment.
+Go is supplied by the official prebuilt Linux/AMD64 SDK as a non-flake source
+input. The exact URL and extracted-tree NAR hash are committed in `flake.lock`;
+Nix verifies that hash when fetching the archive. No Go build derivation is
+introduced. Native dependency outputs still require the default signed Nix
+cache with `--max-jobs 0 --builders ''`. The source input is already available
+during evaluation, just as the hash-verified nixpkgs source is. It remains a
+reference in the shell closure and therefore in the compiled-cache fingerprint.
 
 ### Go security update
 
-Go alone comes from nixpkgs revision
-`423bc95d0ed475b23dada7d1f9a6a6b66e9bede3`, the stable release backport of the
-Go-only 1.27.1 to 1.27.2 security update. Its source NAR hash is
-`sha256-xHuzdf865WilQC1s7SOR55zGLCQ083QXRf49lqwQCjI=`, computed with Nix
-from the exact official GitHub archive. Both input identities and hashes are
-strictly checked before evaluation. Native tools, libraries, compositor and
-fonts continue to come from the original input; updating the full snapshot
-would also change Sway's derivation.
+- Official SDK: `https://go.dev/dl/go1.27.2.linux-amd64.tar.gz`
+- Official compressed archive SHA-256, independently checked before pinning:
+  `ecbadb99091a3f46e31f5f934b068b1864eafa7995211b39eaddf76996045fe5`
+- Extracted SDK NAR hash, independently computed and confirmed by Nix fetching:
+  `sha256-cfmJqmWWpOFO5rSA0O74Wrw6C0a1mtyTTR3X7/fNbRc=`
+
+Preparation strictly checks both input identities and hashes. The SDK input
+must remain `flake = false`; its URL cannot redirect to a different archive in
+the lock. The expected Go version is checked against the SDK's `VERSION` file,
+then the cache action requires the actual `go env GOVERSION` and `GOROOT` to
+match the pinned SDK. `GOTOOLCHAIN=local` prevents automatic replacement.
+Native tools, libraries, compositor and fonts retain the original nixpkgs pin.
 
 This addresses [GO-2026-6604](https://pkg.go.dev/vuln/GO-2026-6604), a Windows
 junction-handling issue fixed in Go 1.27.2. The scheduled Arch vulnerability
 gate correctly failed with Go 1.27.1. All scanner commands, exact-version
-checks, signed-substitute requirements and failure behavior remain in place.
+checks, signed-substitute requirements and vulnerability failure behavior remain
+in place. This SDK source requires neither local Go compilation nor additional
+cache credentials or trust settings.
 
 ## Roles and invocation
 
@@ -78,7 +88,11 @@ Run every Go command through the same `ci-nix-run.sh` wrapper. Do not use
 `actions/setup-go` in these native jobs: Nix owns the compiler. The wrapper
 removes inherited GOROOT, uses GOTOOLCHAIN=local and GOENV=off, controls executable
 PATH and font discovery, and selects the CGo loader from Nix's compiler wrapper.
-It preserves stdenv CC/CXX and NIX compiler/linker flags. The runner and all
+It preserves stdenv CC/CXX and NIX compiler/linker flags. The upstream SDK
+has no Nix-specific `GO_LDSO` patch, so the wrapper supplies Go's documented
+`-I` linker flag and the pinned libc runtime search path through `GOFLAGS`.
+Both internal and external CGo links use the loader selected by `NIX_CC`; no
+host loader or inherited Go linker flags are used. The runner and all
 headless tests remain non-root. Existing `scripts/test-wayland.sh` retains the
 same two outputs, pixman compositor and Cairo GTK renderer.
 

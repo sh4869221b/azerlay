@@ -17,10 +17,11 @@ spec.loader.exec_module(nix)
 
 def lock_fixture():
     nodes = {'root': {'inputs': {name: name for name in nix.PINNED_INPUTS}}}
-    for name, (revision, nar_hash) in nix.PINNED_INPUTS.items():
-        source = {'type': 'github', 'owner': 'NixOS', 'repo': 'nixpkgs', 'rev': revision}
+    for name, (source, nar_hash) in nix.PINNED_INPUTS.items():
         nodes[name] = {'original': dict(source), 'locked': {
             **source, 'narHash': nar_hash, 'lastModified': 1}}
+        if name == 'go-sdk':
+            nodes[name]['flake'] = False
     return {'version': 7, 'root': 'root', 'nodes': nodes}
 
 
@@ -108,15 +109,30 @@ class NixPreparationTests(unittest.TestCase):
         root = Path(__file__).parents[2]
         flake = (root / 'flake.nix').read_text()
         self.assertIn('github:NixOS/nixpkgs/' + nix.REVISION, flake)
-        self.assertIn('github:NixOS/nixpkgs/' + nix.GO_REVISION, flake)
-        self.assertIn('go = (import nixpkgs-go { inherit system; }).go_1_27;', flake)
+        self.assertIn('url = "' + nix.GO_URL + '";', flake)
+        self.assertIn('flake = false;', flake)
+        self.assertIn('baseTools = [ go-sdk.outPath ]', flake)
+        self.assertIn('builtins.readFile "${go-sdk}/VERSION"', flake)
         self.assertIn('pkgs = import nixpkgs { inherit system; };', flake)
-        self.assertIn('go = go.version;', flake)
-        self.assertNotIn('pkgs.go_1_27', flake)
+        self.assertNotIn('go_1_27', flake)
         self.assertIn('GOTOOLCHAIN = "local"', flake)
         self.assertNotIn('nixConfig', flake)
         self.assertNotIn('trusted-public-keys', flake)
         self.assertNotIn('shellHook =', flake)
+
+    def test_sdk_source_redirects_and_flake_execution_are_rejected(self):
+        mutations = [
+            lambda x: x['nodes']['go-sdk']['original'].update(url='https://other.example/sdk.tar.gz'),
+            lambda x: x['nodes']['go-sdk']['locked'].update(url='https://go.dev/dl/go1.27.1.linux-amd64.tar.gz'),
+            lambda x: x['nodes']['go-sdk'].update(flake=True),
+            lambda x: x['nodes']['go-sdk'].pop('flake'),
+        ]
+        for mutate in mutations:
+            with self.subTest(mutate=mutate):
+                lock = lock_fixture()
+                mutate(lock)
+                with self.assertRaises(ValueError):
+                    nix.validate_lock(lock)
 
     def test_ci_go_versions_and_cache_keys_match(self):
         root = Path(__file__).parents[2]
@@ -129,6 +145,7 @@ class NixPreparationTests(unittest.TestCase):
         self.assertIn('go-version: ' + version, native)
         cache = (root / '.github/actions/nix-go-cache/action.yml').read_text()
         self.assertIn('= go' + version, cache)
+        self.assertIn('= "$AZERLAY_NIX_GO_ROOT"', cache)
         keys = [line for line in cache.splitlines() if 'key: ' in line]
         self.assertEqual(len(keys), 4)
         for key in keys:

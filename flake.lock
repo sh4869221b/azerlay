@@ -1,5 +1,18 @@
 {
   "nodes": {
+    "go-sdk": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1790972883,
+        "narHash": "sha256-cfmJqmWWpOFO5rSA0O74Wrw6C0a1mtyTTR3X7/fNbRc=",
+        "type": "tarball",
+        "url": "https://go.dev/dl/go1.27.2.linux-amd64.tar.gz"
+      },
+      "original": {
+        "type": "tarball",
+        "url": "https://go.dev/dl/go1.27.2.linux-amd64.tar.gz"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1791179034,
@@ -16,26 +29,10 @@
         "type": "github"
       }
     },
-    "nixpkgs-go": {
-      "locked": {
-        "lastModified": 1791492955,
-        "narHash": "sha256-xHuzdf865WilQC1s7SOR55zGLCQ083QXRf49lqwQCjI=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "423bc95d0ed475b23dada7d1f9a6a6b66e9bede3",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "423bc95d0ed475b23dada7d1f9a6a6b66e9bede3",
-        "type": "github"
-      }
-    },
     "root": {
       "inputs": {
-        "nixpkgs": "nixpkgs",
-        "nixpkgs-go": "nixpkgs-go"
+        "go-sdk": "go-sdk",
+        "nixpkgs": "nixpkgs"
       }
     }
   },
