@@ -18,7 +18,7 @@
 | 製品形態 | Linux/Wayland専用、単一プロセス・単一バイナリのAzeron入力オーバーレイ |
 | 初期正式対応機器 | Azeron Cyborg II 左手用（v1）。右手用はv1後の対応へ延期 |
 | 初期正式対応Compositor | Hyprland（v1目標）。Niriはv1後へ延期し、動作未検証 |
-| 初期ゲームプロファイル | Bodycam |
+| ゲームプロファイル | 物理入力ID・トリガー別の明示的なラベル上書き |
 | 実装言語 | Go 1.27.x |
 | GUI | GTK4 / gotk4 |
 | Overlay | gtk4-layer-shellを小型CGo bridgeから利用 |
@@ -127,7 +127,7 @@ Azerlayは、Azeron Softwareからエクスポートしたプロファイル、�
 
 オーバーレイはWayland Layer Shellの`overlay`層に配置し、キーボードフォーカスを取得せず、ポインター入力を透過する。ゲーム入力を横取り、再送、変換しない。
 
-Bodycamは最初に同梱するゲームラベルプロファイルと検証対象である。ただしAzerlay本体はゲーム非依存とする。
+Azerlay本体はゲーム非依存とする。ゲームプロファイルは明示的なラベル上書きに使用し、割当キーからゲーム内アクション名を推測しない。
 
 ### 3.1 代表的な利用状態
 
@@ -247,7 +247,6 @@ Layer Shellを実装する以下の環境は、動作確認後に「準対応」
 - 高リフレッシュレート
 - Proton上の実ゲーム（v1の表示確認はCyberpunk 2077で実施済み）
 
-Bodycamのbuilt-in profileとキーバインド調査は別要件として維持する。
 ゲーム上への通常overlay表示をv1の完了条件とし、詳細な性能・モード比較、
 HDR、VRR、Direct Scanout、Gamescopeとの相互作用は未検証のv1後調査とする。
 [表示確認と予備測定](decisions/fullscreen-performance.md)、
@@ -412,19 +411,17 @@ press/releaseやcounter、snapshot Sequenceは発火・完了・出力進行の�
 
 表示ラベルの優先順位は次とする。
 
-1. AzerlayのPhysical Control単位ユーザー上書き。
-2. Azeronプロファイルの非空`label`。
-3. ゲームプロファイルのCanonical Binding→Action対応。
-4. Canonical Bindingの人間向け表記。
-5. 不明値の場合は`Unknown (<raw>)`。
+1. AzerlayのPhysical Control・トリガー単位の空白のみでないユーザー上書き。
+2. Azeronプロファイルの`label`。空文字や空白のみのラベルもそのまま保持する。
 
-実際の割当名はラベルとは別に副表示できなければならない。例えば`Lean Left`の下に`Q`を表示する。
+明示的な上書きがない空ラベルは空のままとし、割当キーからゲーム内アクション名を補完しない。
+実際の割当名はラベルとは独立して表示する。`compact`では空ラベルの代わりに割当名を表示し、`normal`と`detailed`では専用のキー行に表示する。例えば明示した`Lean Left`の下に`Q`を表示する。
 
 | ID | 要件 |
 |---|---|
 | FR-090 | ラベル解決を上記優先順位で決定論的に行うこと。 |
-| FR-091 | Azeronラベルが空のときだけゲームラベルへフォールバックすること。 |
-| FR-092 | ゲームプロファイルが存在しなくてもキー名のみで利用可能なこと。 |
+| FR-091 | 明示的なPhysical Control単位の上書きがなければ、Azeronの空ラベルを保持すること。 |
+| FR-092 | ゲームプロファイルが存在しなくても実際の割当を表示できること。 |
 | FR-093 | ユーザー上書きは物理入力IDとトリガー種別をキーにし、同一キーを使う別ボタンへ誤適用しないこと。 |
 
 ### 7.8 設定・運用制御
@@ -923,39 +920,29 @@ indexから参照されず、Discoverは無視する。
 
 ---
 
-## 11. ゲームプロファイル
+## 11. 表示ラベルのユーザー上書き
 
 ### 11.1 目的
 
-Azeron側ラベルが空の場合に、割当キーからゲーム内アクション名を補完する。
+物理入力IDとトリガー種別を指定したユーザーのラベル上書きを提供する。Azeron側の空ラベルを割当キーから自動補完しない。
 
 ### 11.2 形式
 
 ```toml
 schema_version = 1
-id = "bodycam"
-name = "Bodycam"
-locale = "ja-JP"
-
-[bindings]
-"KEY_Q" = "左リーン"
-"KEY_E" = "右リーン / 使用"
-"KEY_R" = "リロード"
-"KEY_C" = "しゃがみ"
-"KEY_LEFTSHIFT" = "スプリント"
-"KEY_SPACE" = "ジャンプ / 乗り越え"
+id = "sample"
+name = "Synthetic Example"
 
 [controls]
-"input:15:single" = "右リーン / インタラクト"
+"input:15:single" = "Primary use"
 ```
 
 ### 11.3 要件
 
-- Built-inゲームプロファイルは`go:embed`で同梱する。
 - ユーザープロファイルが同じIDなら上書きする。
-- Canonical Binding単位とPhysical Control単位の両方を許可する。
+- ラベル上書きはPhysical Control・トリガー単位の`[controls]`で明示する。
 - ゲーム側のキーバインドを自動改変しない。
-- Bodycamの現行キー設定はゲーム版更新で変わり得るため、実ゲームのKey Bind画面で再確認する。**要調査・Bodycam同梱プロファイルのリリース阻害**。
+- ゲーム別のbuilt-inラベルやキーバインド調査をリリース要件としない。
 
 ---
 
@@ -1074,9 +1061,9 @@ Cairoで描画し、GPU専用APIや独自レンダリングエンジンを導入
 
 すべてを常時表示すると混雑する場合、表示密度を設定する。
 
-- `compact`: アクション名のみ
-- `normal`: アクション + キー
-- `detailed`: トリガー、マクロ、曖昧性も表示
+- `compact`: ラベル。空なら実際の割当名
+- `normal`: ラベルと専用キー行の実際の割当名
+- `detailed`: ラベルと専用キー行の実際の割当名に、トリガー、マクロ、曖昧性も表示
 
 ### 14.4 視覚状態
 
@@ -1843,8 +1830,7 @@ azerlay/
 │   │   ├── cyborg-ii-left.json
 │   │   └── cyborg-ii-right.json  # v1後の対応。v1の必須assetではない
 │   ├── games/
-│   │   ├── bodycam.ja-JP.toml
-│   │   └── bodycam.en-US.toml
+│   │   └── generic.toml  # 空のプロファイル。ゲーム別アクション表は同梱しない
 │   └── themes/
 ├── packaging/
 │   ├── arch/
@@ -2212,7 +2198,7 @@ Niriはv1後の対象で、動作未検証とする。
 
 ### AC-008 入力非干渉
 
-Azerlay起動前後でBodycamのAzeron入力が欠落・二重化・遅延増大しない。grab、inject、remapを行わない。
+Azerlay起動前後でゲームへのAzeron入力が欠落・二重化・遅延増大しない。grab、inject、remapを行わない。
 
 ### AC-009 曖昧性
 
@@ -2264,7 +2250,7 @@ fuzz testでpanic、無制限メモリ確保、部分保存が発生しない。
 | R-008 | GDK empty input regionのmap/remap/hotplug後挙動（[アプリ起点のremap実測](decisions/overlay-abi.md)あり。compositor起点のremapと物理hotplugは未検証） | 完全click-through | Overlay正式対応 |
 | R-009 | [connector選択、fractional scale、一時出力の消失・再作成](decisions/compositor-placement.md)。同じキーへの復帰は未検証、物理hotplugも未検証 | 複数モニター | Multi-monitor正式対応 |
 | R-010 | [ゲーム上の表示確認済み、詳細性能・Direct Scanout・VRR・HDR・Gamescopeはv1後のIssue #132](decisions/fullscreen-performance.md) | 性能・ゲーム互換性 | v1非阻害。性能保証は未検証 |
-| R-011 | Bodycam現行バージョンの全キーバインドとアクション名 | built-in game profile | Bodycamプロファイル |
+| R-011 | 廃止：ゲーム別キーバインドからの自動ラベル補完は行わない | 明示的なcontrol上書きを使用 | リリース非阻害 |
 | R-012 | プロジェクト名、GitHub名、商標、依存ライセンス | 公開上の安全 | 公開リリース |
 | R-013 | Azeron exportのSoftware 2.x各版、bundle/single、str8/fixstrの実在例 | parser互換性 | インポート互換表 |
 | R-014 | LevelDB/IndexedDB使用時の稼働中安全読取 | DB破損回避 | LocalSource |

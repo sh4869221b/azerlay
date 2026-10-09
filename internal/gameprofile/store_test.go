@@ -21,8 +21,6 @@ func TestStore(t *testing.T) {
 id="sample"
 name="A"
 locale="en"
-[bindings]
-KEY_U="A action"
 [controls]
 "input:15:single"="A control"
 `)
@@ -31,21 +29,20 @@ KEY_U="A action"
 	}
 	snapshotA := store.Snapshot()
 	a, ok := snapshotA.Lookup("sample")
-	if !ok || a.Name != "A" || a.Locale != "en" || a.Bindings[profile.CanonicalCode("KEY_U")] != "A action" || a.Controls[ControlKey{InputID: 15, Trigger: profile.TriggerSingle}] != "A control" {
+	if !ok || a.Name != "A" || a.Locale != "en" || a.Controls[ControlKey{InputID: 15, Trigger: profile.TriggerSingle}] != "A control" {
 		t.Fatalf("A: %+v, found=%t", a, ok)
 	}
-	a.Bindings[profile.CanonicalCode("KEY_U")] = "caller edit"
 	a.Controls[ControlKey{InputID: 15, Trigger: profile.TriggerSingle}] = "caller edit"
 	stillA, _ := store.Snapshot().Lookup("sample")
-	if stillA.Bindings[profile.CanonicalCode("KEY_U")] != "A action" || stillA.Controls[ControlKey{InputID: 15, Trigger: profile.TriggerSingle}] != "A control" {
+	if stillA.Controls[ControlKey{InputID: 15, Trigger: profile.TriggerSingle}] != "A control" {
 		t.Fatal("Lookup allowed caller mutation of the store")
 	}
 
 	writeProfile(t, dir, "replacement.toml", `schema_version=1
 id="sample"
 name="Broken"
-[bindings]
-KEY_U=7
+[controls]
+"input:15:single"=7
 `)
 	if err := os.Rename(filepath.Join(dir, "replacement.toml"), path); err != nil {
 		t.Fatal(err)
@@ -60,8 +57,6 @@ KEY_U=7
 	writeProfile(t, dir, "game.toml", `schema_version=1
 id="sample"
 name="B"
-[bindings]
-KEY_P="B action"
 `)
 	writeProfile(t, dir, "duplicate.toml", `schema_version=1
 id="sample"
@@ -80,11 +75,11 @@ name="Duplicate"
 		t.Fatal(err)
 	}
 	b, _ := store.Snapshot().Lookup("sample")
-	if b.Name != "B" || b.Locale != "" || len(b.Bindings) != 1 || b.Bindings[profile.CanonicalCode("KEY_P")] != "B action" || len(b.Controls) != 0 {
+	if b.Name != "B" || b.Locale != "" || len(b.Controls) != 0 {
 		t.Fatalf("repair did not publish B: %+v", b)
 	}
 	old, _ := snapshotA.Lookup("sample")
-	if old.Name != "A" || old.Bindings[profile.CanonicalCode("KEY_U")] != "A action" {
+	if old.Name != "A" || old.Controls[ControlKey{InputID: 15, Trigger: profile.TriggerSingle}] != "A control" {
 		t.Fatalf("old snapshot changed: %+v", old)
 	}
 

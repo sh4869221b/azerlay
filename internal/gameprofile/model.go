@@ -12,7 +12,6 @@ type Definition struct {
 	ID            string
 	Name          string
 	Locale        string
-	Bindings      map[profile.CanonicalCode]string
 	Controls      map[ControlKey]string
 }
 
@@ -25,7 +24,6 @@ func (c Catalog) Lookup(id string) (Definition, bool) {
 	if !ok {
 		return Definition{}, false
 	}
-	d.Bindings = cloneMap(d.Bindings)
 	d.Controls = cloneMap(d.Controls)
 	return d, true
 }

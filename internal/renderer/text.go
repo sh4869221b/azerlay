@@ -63,17 +63,20 @@ func controlText(control Control, options Options) []textSpec {
 	})
 	primary := assignments[0]
 	label := primary.Label
-	if label == "" {
+	if label == "" && options.Mode == "compact" {
 		label = primary.BindingDisplay
 	}
-	if label == "" {
+	if label == "" && primary.BindingDisplay == "" {
 		if primary.Kind == profile.BindingUnbound {
 			label = "UNBOUND"
 		} else {
 			label = "UNKNOWN"
 		}
 	}
-	lines := []textSpec{{text: label, size: 14}}
+	var lines []textSpec
+	if label != "" {
+		lines = append(lines, textSpec{text: label, size: 14})
+	}
 	if options.Mode == "compact" {
 		return lines
 	}
@@ -108,7 +111,10 @@ func controlText(control Control, options Options) []textSpec {
 	for _, assignment := range assignments[1:] {
 		text := fmt.Sprintf("%s: %s", triggerLabel(assignment.Trigger), assignment.Label)
 		if assignment.BindingDisplay != "" {
-			text += " · " + assignment.BindingDisplay
+			if assignment.Label != "" {
+				text += " · "
+			}
+			text += assignment.BindingDisplay
 		}
 		lines = append(lines, textSpec{text: text, size: 10, secondary: true})
 	}
