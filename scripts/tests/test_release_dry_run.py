@@ -19,14 +19,25 @@ class ReleaseDryRunTests(unittest.TestCase):
         scripts.mkdir(parents=True)
         shutil.copyfile(ROOT / "scripts/release-dry-run.sh", scripts / "release-dry-run.sh")
         (scripts / "package.sh").write_text(
-            '#!/bin/sh\nprintf "%s\\n" "$1" > "$2/package-called"\n'
+            '#!/bin/sh\nprintf "%s\\n" "$1" > "$2/package-called"\nexit 42\n'
         )
+        (self.repo / ".github").mkdir()
+        shutil.copyfile(ROOT / ".github/ci-tools.env", self.repo / ".github/ci-tools.env")
         (self.repo / ".gitignore").write_text(".omo/\n")
         self.git("init", "-q")
         self.git("add", ".")
         self.git("-c", "user.name=Test", "-c", "user.email=test@example.invalid",
                  "commit", "-qm", "candidate fixture")
         self.output = self.base / "output"
+        self.tools = self.base / "tools"
+        self.tools.mkdir()
+        for name, content in {"go": '#!/bin/sh\necho go1.27.2\n',
+                              "syft": '#!/bin/sh\necho \'{"version":"1.54.1"}\'\n'}.items():
+            tool = self.tools / name
+            tool.write_text(content)
+            tool.chmod(0o755)
+        self.schema = self.base / "schema.json"
+        self.schema.write_text("{}")
 
     def git(self, *args):
         return subprocess.run(["git", "-C", str(self.repo), *args], check=True,
@@ -35,6 +46,8 @@ class ReleaseDryRunTests(unittest.TestCase):
     def run_candidate(self, version="1.2.3", ref=None, output=None):
         env = dict(os.environ)
         env.pop("GITHUB_REF", None)
+        env["PATH"] = str(self.tools) + os.pathsep + env["PATH"]
+        env["SPDX_SCHEMA"] = str(self.schema)
         if ref is not None:
             env["GITHUB_REF"] = ref
         return subprocess.run(
@@ -51,7 +64,7 @@ class ReleaseDryRunTests(unittest.TestCase):
         for ref in (None, "refs/heads/release", "refs/tags/v1.2.3", "refs/tags/1.2.3"):
             with self.subTest(ref=ref):
                 result = self.run_candidate(ref=ref)
-                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.returncode, 42, result.stderr)
                 self.assertEqual((self.output / "package-called").read_text(), "1.2.3\n")
                 shutil.rmtree(self.output)
 
@@ -80,7 +93,7 @@ class ReleaseDryRunTests(unittest.TestCase):
         (self.repo / ".omo").mkdir()
         (self.repo / ".omo" / "local.txt").write_text("local workflow state\n")
         result = self.run_candidate()
-        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.returncode, 42, result.stderr)
 
     def test_nonempty_output_including_hidden_files_is_rejected(self):
         self.output.mkdir()
