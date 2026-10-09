@@ -1,0 +1,506 @@
+{
+  "attempt": 1,
+  "cohort": "ubuntu-20260927-arch-5b517-corrected-stress",
+  "commit": "1d97a8d4327aef9d81a32cf6b393ed1e6bfb9c9f",
+  "conclusion": "success",
+  "condition": "diagnostic",
+  "created_to_required_result_seconds": 247.0,
+  "created_to_updated_seconds": 248.0,
+  "errors": [],
+  "event_at": null,
+  "event_to_required_result_seconds": null,
+  "execution_seconds": 244.0,
+  "jobs": [
+    {
+      "completed_at": "2026-10-07T03:22:01Z",
+      "conclusion": "success",
+      "id": 112614027121,
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "name": "test",
+      "run_created_to_job_start_seconds": 3.0,
+      "runner_name": "GitHub Actions 1000019146",
+      "seconds": 244.0,
+      "started_at": "2026-10-07T03:17:57Z",
+      "status": "completed",
+      "steps": [
+        {
+          "conclusion": "success",
+          "name": "Set up job",
+          "seconds": 0.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Initialize containers",
+          "seconds": 15.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Install native test dependencies",
+          "seconds": 25.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Check out repository",
+          "seconds": 3.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Prepare native Go cache input",
+          "seconds": 0.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Set up Go and native caches",
+          "seconds": 22.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Check complete package partition and core dependencies",
+          "seconds": 1.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Check formatting",
+          "seconds": 0.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Vet",
+          "seconds": 1.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Install Staticcheck",
+          "seconds": 3.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Staticcheck",
+          "seconds": 12.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Test",
+          "seconds": 54.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Upload native race diagnostics",
+          "seconds": 1.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Build",
+          "seconds": 4.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Stress native capture and isolated CLI fixtures",
+          "seconds": 92.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Upload CLI stress diagnostics",
+          "seconds": 1.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Set up Go and native caches",
+          "seconds": 0.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Check out repository",
+          "seconds": 1.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Stop containers",
+          "seconds": 5.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Complete job",
+          "seconds": 0.0
+        }
+      ],
+      "url": "https://github.com/sh4869221b/azerlay/actions/runs/37566091667/job/112614027121"
+    },
+    {
+      "completed_at": "2026-10-07T03:20:50Z",
+      "conclusion": "success",
+      "id": 112614027311,
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "name": "generated-files",
+      "run_created_to_job_start_seconds": 3.0,
+      "runner_name": "GitHub Actions 1000019148",
+      "seconds": 173.0,
+      "started_at": "2026-10-07T03:17:57Z",
+      "status": "completed",
+      "steps": [
+        {
+          "conclusion": "success",
+          "name": "Set up job",
+          "seconds": 2.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Check out repository",
+          "seconds": 1.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Test CI measurement tools",
+          "seconds": 2.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Set up Go",
+          "seconds": 13.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Validate and test core without CGo",
+          "seconds": 33.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Validate and race-test core without GUI setup",
+          "seconds": 115.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Upload core race diagnostics",
+          "seconds": 1.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Regenerate LZMA boundary fixtures",
+          "seconds": 1.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Check generated fixtures",
+          "seconds": 0.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Set up Go",
+          "seconds": 1.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Check out repository",
+          "seconds": 0.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Complete job",
+          "seconds": 0.0
+        }
+      ],
+      "url": "https://github.com/sh4869221b/azerlay/actions/runs/37566091667/job/112614027311"
+    },
+    {
+      "completed_at": "2026-10-07T03:19:46Z",
+      "conclusion": "success",
+      "id": 112614027331,
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "name": "fuzz",
+      "run_created_to_job_start_seconds": 3.0,
+      "runner_name": "GitHub Actions 1000019147",
+      "seconds": 109.0,
+      "started_at": "2026-10-07T03:17:57Z",
+      "status": "completed",
+      "steps": [
+        {
+          "conclusion": "success",
+          "name": "Set up job",
+          "seconds": 2.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Check out repository",
+          "seconds": 1.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Set up Go",
+          "seconds": 17.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Fuzz existing parsing stages",
+          "seconds": 86.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Set up Go",
+          "seconds": 0.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Check out repository",
+          "seconds": 0.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Complete job",
+          "seconds": 0.0
+        }
+      ],
+      "url": "https://github.com/sh4869221b/azerlay/actions/runs/37566091667/job/112614027331"
+    },
+    {
+      "completed_at": "2026-10-07T03:19:05Z",
+      "conclusion": "success",
+      "id": 112614027338,
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "name": "licenses",
+      "run_created_to_job_start_seconds": 3.0,
+      "runner_name": "GitHub Actions 1000019149",
+      "seconds": 68.0,
+      "started_at": "2026-10-07T03:17:57Z",
+      "status": "completed",
+      "steps": [
+        {
+          "conclusion": "success",
+          "name": "Set up job",
+          "seconds": 1.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Initialize containers",
+          "seconds": 10.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Install native build dependencies",
+          "seconds": 24.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Check out repository",
+          "seconds": 2.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Prepare native Go cache input",
+          "seconds": 0.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Set up Go and native caches",
+          "seconds": 16.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Install go-licenses",
+          "seconds": 2.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Report dependency licenses",
+          "seconds": 1.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Upload dependency license report",
+          "seconds": 1.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Set up Go and native caches",
+          "seconds": 1.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Check out repository",
+          "seconds": 1.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Stop containers",
+          "seconds": 6.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Complete job",
+          "seconds": 0.0
+        }
+      ],
+      "url": "https://github.com/sh4869221b/azerlay/actions/runs/37566091667/job/112614027338"
+    },
+    {
+      "completed_at": "2026-10-07T03:19:14Z",
+      "conclusion": "success",
+      "id": 112614027430,
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "name": "vulnerability",
+      "run_created_to_job_start_seconds": 3.0,
+      "runner_name": "GitHub Actions 1000019150",
+      "seconds": 77.0,
+      "started_at": "2026-10-07T03:17:57Z",
+      "status": "completed",
+      "steps": [
+        {
+          "conclusion": "success",
+          "name": "Set up job",
+          "seconds": 0.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Initialize containers",
+          "seconds": 15.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Install native build dependencies",
+          "seconds": 18.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Check out repository",
+          "seconds": 1.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Prepare native Go cache input",
+          "seconds": 0.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Set up Go and native caches",
+          "seconds": 22.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Install govulncheck",
+          "seconds": 1.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Check reachable vulnerabilities",
+          "seconds": 4.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Set up Go and native caches",
+          "seconds": 1.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Check out repository",
+          "seconds": 1.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Stop containers",
+          "seconds": 10.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Complete job",
+          "seconds": 0.0
+        }
+      ],
+      "url": "https://github.com/sh4869221b/azerlay/actions/runs/37566091667/job/112614027430"
+    },
+    {
+      "completed_at": "2026-10-07T03:19:10Z",
+      "conclusion": "success",
+      "id": 112614027472,
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "name": "native-build",
+      "run_created_to_job_start_seconds": 3.0,
+      "runner_name": "GitHub Actions 1000019151",
+      "seconds": 73.0,
+      "started_at": "2026-10-07T03:17:57Z",
+      "status": "completed",
+      "steps": [
+        {
+          "conclusion": "success",
+          "name": "Set up job",
+          "seconds": 1.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Initialize containers",
+          "seconds": 13.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Install Arch build dependencies",
+          "seconds": 22.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Check out repository",
+          "seconds": 2.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Prepare native Go cache input",
+          "seconds": 0.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Set up Go and native caches",
+          "seconds": 20.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Build, run, and inspect native binary",
+          "seconds": 5.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Set up Go and native caches",
+          "seconds": 0.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Check out repository",
+          "seconds": 1.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Stop containers",
+          "seconds": 4.0
+        },
+        {
+          "conclusion": "success",
+          "name": "Complete job",
+          "seconds": 0.0
+        }
+      ],
+      "url": "https://github.com/sh4869221b/azerlay/actions/runs/37566091667/job/112614027472"
+    }
+  ],
+  "quality_success": true,
+  "required_jobs": [
+    "test",
+    "fuzz",
+    "native-build",
+    "vulnerability",
+    "licenses",
+    "generated-files"
+  ],
+  "run_id": 37566091667,
+  "runner_seconds": 744.0,
+  "schema_version": 1,
+  "status": "completed",
+  "url": "https://github.com/sh4869221b/azerlay/actions/runs/37566091667"
+}

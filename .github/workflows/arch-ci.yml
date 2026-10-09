@@ -1,0 +1,585 @@
+name: Full Arch validation
+
+# Scheduled time: 20:17 UTC / 05:17 JST the following day. GitHub schedules
+# use the latest default-branch commit and may be delayed. The workflow must
+# be present on that branch. Manual validation also runs this complete suite.
+on:
+  schedule:
+    - cron: '17 20 * * *'
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      commit:
+        description: Exact caller github.sha; arbitrary revisions are rejected.
+        required: true
+        type: string
+    outputs:
+      validated-commit:
+        description: Exact commit whose six full Arch gates all succeeded.
+        value: ${{ jobs.arch-validation.outputs.commit }}
+
+permissions:
+  contents: read
+
+# A daily run must never cancel an in-progress pre-release validation.
+concurrency:
+  group: arch-full-${{ github.run_id }}-${{ github.run_attempt }}
+  cancel-in-progress: false
+
+jobs:
+  revision:
+    name: Resolve exact validation commit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    outputs:
+      commit: ${{ steps.revision.outputs.commit }}
+    steps:
+      - name: Validate immutable commit
+        id: revision
+        env:
+          REQUESTED_COMMIT: ${{ inputs.commit || github.sha }}
+          TRIGGER_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$TRIGGER_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          test "$REQUESTED_COMMIT" = "$TRIGGER_COMMIT"
+          printf 'commit=%s\n' "$TRIGGER_COMMIT" >> "$GITHUB_OUTPUT"
+
+  test:
+    name: Arch test
+    timeout-minutes: 60
+    needs: revision
+    runs-on: ubuntu-24.04
+    container: archlinux:base
+    defaults:
+      run:
+        shell: bash
+    env:
+      GOCACHE: /tmp/azerlay-go-build
+      GOMODCACHE: /tmp/azerlay-go-mod
+    steps:
+      - name: Install native test dependencies
+        run: |
+          set -euo pipefail
+          # Bootstrap precedes checkout; keep this bounded retry self-contained.
+          for attempt in 1 2 3; do
+            if pacman -Syu --noconfirm --needed python ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection sway dbus grim noto-fonts-cjk noto-fonts-emoji; then
+              break
+            else
+              status=$?
+            fi
+            if (( attempt == 3 )); then
+              printf 'Arch package installation failed after %s attempts (exit %s).\n' "$attempt" "$status" >&2
+              exit "$status"
+            fi
+            delay=$((10 * attempt))
+            printf 'Arch package installation attempt %s failed (exit %s); retrying in %ss.\n' "$attempt" "$status" "$delay" >&2
+            sleep "$delay"
+          done
+          setcap -r /usr/bin/sway
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact checked-out commit
+        env:
+          EXPECTED_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual=$(git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD)
+          test "$actual" = "$EXPECTED_COMMIT"
+          printf 'checked_out_commit=%s\n' "$actual"
+
+      - name: Prepare native Go cache input
+        env:
+          CI_CACHE_JOB: ${{ github.job }}
+          CI_NATIVE_WORKFLOW: .github/workflows/arch-ci.yml
+        run: bash scripts/ci-native-fingerprint.sh > .git/ci-native-cache-input
+
+      - name: Upload native environment fingerprint
+        uses: actions/upload-artifact@v4
+        with:
+          name: arch-native-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: .git/ci-native-cache-input
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Set up Go and native caches
+        uses: ./.github/actions/native-go-cache
+        with:
+          tool-cache: 'true'
+
+      - name: Check complete package partition and core dependencies
+        env:
+          CGO_ENABLED: '1'
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          python3 scripts/ci_check_packages.py
+
+      - name: Check formatting
+        shell: bash
+        run: |
+          files=$(gofmt -l .)
+          if [[ -n $files ]]; then
+            printf 'Files require gofmt:\n%s\n' "$files"
+            gofmt -d .
+            exit 1
+          fi
+
+      - name: Vet
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          go vet ./...
+
+      - name: Install Staticcheck
+        env:
+          GOTOOLCHAIN: local
+          GOMODCACHE: /tmp/azerlay-tool-go-mod
+        run: |
+          bash scripts/ci-install-staticcheck.sh
+          du -sb "$GOMODCACHE/cache/download"
+
+      - name: Staticcheck
+        run: staticcheck ./...
+
+      - name: Test
+        id: native_race
+        run: |
+          set -euo pipefail
+          useradd --create-home --user-group azerlay-test
+          mkdir -p "$GOCACHE" "$GOMODCACHE"
+          chown -R azerlay-test:azerlay-test "$GITHUB_WORKSPACE" "$GOCACHE" "$GOMODCACHE"
+          mapfile -t native < scripts/ci-native-packages.txt
+          printf 'diagnostic_dir=%s\n' "$RUNNER_TEMP" >> "$GITHUB_OUTPUT"
+          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/native-race-timing.json" -- \
+            runuser -u azerlay-test -- env PATH="$PATH" GOCACHE="$GOCACHE" GOMODCACHE="$GOMODCACHE" scripts/test-wayland.sh go test -race -json -shuffle=on -count=1 "${native[@]}" \
+            | tee "$RUNNER_TEMP/native-race-tests.jsonl"
+
+      - name: Upload native race diagnostics
+        if: ${{ always() && (steps.native_race.outcome == 'success' || steps.native_race.outcome == 'failure') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: arch-native-race-json-attempt-${{ github.run_attempt }}
+          path: |
+            ${{ steps.native_race.outputs.diagnostic_dir }}/native-race-tests.jsonl
+            ${{ steps.native_race.outputs.diagnostic_dir }}/native-race-timing.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Build
+        run: go build ./cmd/azerlay
+
+  # GUI-free jobs retain the original non-root Ubuntu host layout.
+  fuzz:
+    name: Arch fuzz
+    needs: revision
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact checked-out commit
+        env:
+          EXPECTED_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual=$(git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD)
+          test "$actual" = "$EXPECTED_COMMIT"
+          printf 'checked_out_commit=%s\n' "$actual"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.27.2
+          cache: true
+          cache-dependency-path: |
+            go.mod
+            go.sum
+
+      - name: Fuzz existing parsing stages
+        shell: bash
+        run: |
+          go test ./internal/profiledecode -run='^$' -fuzz='^FuzzNormalizeOuterText$' -fuzztime=10s -parallel=1 -timeout=2m
+          go test ./internal/profiledecode -run='^$' -fuzz='^FuzzDecodeBase64$' -fuzztime=10s -parallel=1 -timeout=2m
+          go test ./internal/profiledecode -run='^$' -fuzz='^FuzzDecodeLZMAEnvelope$' -fuzztime=10s -parallel=1 -timeout=2m
+          go test ./internal/profiledecode -run='^$' -fuzz='^FuzzDecodeMsgpackString$' -fuzztime=10s -parallel=1 -timeout=2m
+          go test ./internal/profiledecode -run='^$' -fuzz='^FuzzParseRoot$' -fuzztime=10s -parallel=1 -timeout=2m
+          go test ./internal/profileraw -run='^$' -fuzz='^FuzzParse$' -fuzztime=10s -parallel=1 -timeout=2m
+          go test ./internal/profileadapter -run='^$' -fuzz='^FuzzNormalize$' -fuzztime=10s -parallel=1 -timeout=2m
+
+  native-build:
+    name: Arch native-build
+    needs: revision
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    container: archlinux:base
+    defaults:
+      run:
+        shell: bash
+    env:
+      GOCACHE: /tmp/azerlay-go-build
+      GOMODCACHE: /tmp/azerlay-go-mod
+    steps:
+      - name: Install Arch build dependencies
+        run: |
+          set -euo pipefail
+          # Bootstrap precedes checkout; keep this bounded retry self-contained.
+          for attempt in 1 2 3; do
+            if pacman -Syu --noconfirm --needed python ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection; then
+              break
+            else
+              status=$?
+            fi
+            if (( attempt == 3 )); then
+              printf 'Arch package installation failed after %s attempts (exit %s).\n' "$attempt" "$status" >&2
+              exit "$status"
+            fi
+            delay=$((10 * attempt))
+            printf 'Arch package installation attempt %s failed (exit %s); retrying in %ss.\n' "$attempt" "$status" "$delay" >&2
+            sleep "$delay"
+          done
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact checked-out commit
+        env:
+          EXPECTED_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual=$(git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD)
+          test "$actual" = "$EXPECTED_COMMIT"
+          printf 'checked_out_commit=%s\n' "$actual"
+
+      - name: Prepare native Go cache input
+        env:
+          CI_CACHE_JOB: ${{ github.job }}
+          CI_NATIVE_WORKFLOW: .github/workflows/arch-ci.yml
+        run: bash scripts/ci-native-fingerprint.sh > .git/ci-native-cache-input
+
+      - name: Upload native environment fingerprint
+        uses: actions/upload-artifact@v4
+        with:
+          name: arch-native-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: .git/ci-native-cache-input
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Set up Go and native caches
+        uses: ./.github/actions/native-go-cache
+        with:
+          module-writer: 'true'
+
+      - name: Build, run, and inspect native binary
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          go version
+          go env GOOS GOARCH CGO_ENABLED CC
+          # The former default-CGo build and explicit-CGo smoke must agree.
+          # Fail on drift rather than silently dropping a distinct build condition.
+          test "$(go env CGO_ENABLED)" = 1
+          pkg-config --modversion gtk4 gtk4-layer-shell-0
+          CGO_ENABLED=1 go build -o /tmp/azerlay ./cmd/azerlay
+          /tmp/azerlay version
+          readelf -d /tmp/azerlay
+
+  vulnerability:
+    name: Arch vulnerability
+    needs: revision
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    container: archlinux:base
+    defaults:
+      run:
+        shell: bash
+    env:
+      GOCACHE: /tmp/azerlay-go-build
+      GOMODCACHE: /tmp/azerlay-go-mod
+    steps:
+      - name: Install native build dependencies
+        run: |
+          set -euo pipefail
+          # Bootstrap precedes checkout; keep this bounded retry self-contained.
+          for attempt in 1 2 3; do
+            if pacman -Syu --noconfirm --needed python ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection; then
+              break
+            else
+              status=$?
+            fi
+            if (( attempt == 3 )); then
+              printf 'Arch package installation failed after %s attempts (exit %s).\n' "$attempt" "$status" >&2
+              exit "$status"
+            fi
+            delay=$((10 * attempt))
+            printf 'Arch package installation attempt %s failed (exit %s); retrying in %ss.\n' "$attempt" "$status" "$delay" >&2
+            sleep "$delay"
+          done
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact checked-out commit
+        env:
+          EXPECTED_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual=$(git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD)
+          test "$actual" = "$EXPECTED_COMMIT"
+          printf 'checked_out_commit=%s\n' "$actual"
+
+      - name: Prepare native Go cache input
+        env:
+          CI_CACHE_JOB: ${{ github.job }}
+          CI_NATIVE_WORKFLOW: .github/workflows/arch-ci.yml
+        run: bash scripts/ci-native-fingerprint.sh > .git/ci-native-cache-input
+
+      - name: Upload native environment fingerprint
+        uses: actions/upload-artifact@v4
+        with:
+          name: arch-native-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: .git/ci-native-cache-input
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Set up Go and native caches
+        uses: ./.github/actions/native-go-cache
+        with:
+          tool-cache: 'true'
+
+      - name: Install govulncheck
+        env:
+          GOMODCACHE: /tmp/azerlay-tool-go-mod
+        run: |
+          source .github/ci-tools.env
+          go install golang.org/x/vuln/cmd/govulncheck@"$GOVULNCHECK_VERSION"
+          du -sb "$GOMODCACHE/cache/download"
+
+      - name: Check reachable vulnerabilities
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          govulncheck ./...
+
+  licenses:
+    name: Arch licenses
+    needs: revision
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    container: archlinux:base
+    defaults:
+      run:
+        shell: bash
+    env:
+      GOCACHE: /tmp/azerlay-go-build
+      GOMODCACHE: /tmp/azerlay-go-mod
+    steps:
+      - name: Install native build dependencies
+        run: |
+          set -euo pipefail
+          # Bootstrap precedes checkout; keep this bounded retry self-contained.
+          for attempt in 1 2 3; do
+            if pacman -Syu --noconfirm --needed python ca-certificates git curl tar gzip zstd base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection; then
+              break
+            else
+              status=$?
+            fi
+            if (( attempt == 3 )); then
+              printf 'Arch package installation failed after %s attempts (exit %s).\n' "$attempt" "$status" >&2
+              exit "$status"
+            fi
+            delay=$((10 * attempt))
+            printf 'Arch package installation attempt %s failed (exit %s); retrying in %ss.\n' "$attempt" "$status" "$delay" >&2
+            sleep "$delay"
+          done
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact checked-out commit
+        env:
+          EXPECTED_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual=$(git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD)
+          test "$actual" = "$EXPECTED_COMMIT"
+          printf 'checked_out_commit=%s\n' "$actual"
+
+      - name: Prepare native Go cache input
+        env:
+          CI_CACHE_JOB: ${{ github.job }}
+          CI_NATIVE_WORKFLOW: .github/workflows/arch-ci.yml
+        run: bash scripts/ci-native-fingerprint.sh > .git/ci-native-cache-input
+
+      - name: Upload native environment fingerprint
+        uses: actions/upload-artifact@v4
+        with:
+          name: arch-native-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: .git/ci-native-cache-input
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Set up Go and native caches
+        uses: ./.github/actions/native-go-cache
+        with:
+          tool-cache: 'true'
+
+      - name: Install go-licenses
+        env:
+          GOMODCACHE: /tmp/azerlay-tool-go-mod
+        run: |
+          source .github/ci-tools.env
+          go install github.com/google/go-licenses/v2@"$GO_LICENSES_VERSION"
+          du -sb "$GOMODCACHE/cache/download"
+
+      - name: Report dependency licenses
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          go-licenses report ./... --include_tests --ignore=github.com/sh4869221b/azerlay > "$RUNNER_TEMP/dependency-licenses.csv"
+
+      - name: Upload dependency license report
+        uses: actions/upload-artifact@v4
+        with:
+          name: arch-dependency-licenses
+          path: ${{ runner.temp }}/dependency-licenses.csv
+          if-no-files-found: error
+          retention-days: 7
+
+  generated-files:
+    name: Arch generated-files
+    needs: revision
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact checked-out commit
+        env:
+          EXPECTED_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual=$(git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD)
+          test "$actual" = "$EXPECTED_COMMIT"
+          printf 'checked_out_commit=%s\n' "$actual"
+
+      - name: Test CI measurement tools
+        run: python3 -m unittest discover -s scripts/tests -v
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.27.2
+          cache: true
+          cache-dependency-path: |
+            go.mod
+            go.sum
+
+      # The exact manifest union is checked by test. Core race tests run here;
+      # production GTK/Wayland and process tests remain in the native test job.
+      - name: Validate and test core without CGo
+        env:
+          CGO_ENABLED: '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t core < scripts/ci-core-packages.txt
+          go env GOOS GOARCH CGO_ENABLED CC GOCACHE
+          python3 scripts/ci_check_packages.py --core-only
+          go test -shuffle=on -count=1 "${core[@]}"
+
+      - name: Validate and race-test core without GUI setup
+        id: core_race
+        shell: bash
+        run: |
+          set -euo pipefail
+          # setup-go's Ubuntu cache has no complete native ABI fingerprint.
+          # Keep core CGo/race cold, step-local and outside that cache.
+          race_cache=$(mktemp -d "$RUNNER_TEMP/azerlay-core-race.XXXXXX")
+          trap 'rm -rf "$race_cache"' EXIT
+          export GOCACHE="$race_cache" CGO_ENABLED=1
+          mapfile -t core < scripts/ci-core-packages.txt
+          go env GOOS GOARCH CGO_ENABLED CC GOCACHE
+          python3 scripts/ci_check_packages.py --core-only
+          python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/core-race-timing.json" -- \
+            go test -race -json -shuffle=on -count=1 "${core[@]}" \
+            | tee "$RUNNER_TEMP/core-race-tests.jsonl"
+
+      - name: Upload core race diagnostics
+        if: ${{ always() && (steps.core_race.outcome == 'success' || steps.core_race.outcome == 'failure') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: arch-core-race-json-attempt-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/core-race-tests.jsonl
+            ${{ runner.temp }}/core-race-timing.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Regenerate LZMA boundary fixtures
+        run: go run ./internal/profiledecode/testdata/generate
+
+      - name: Check generated fixtures
+        run: git diff --exit-code -- internal/profiledecode/testdata/zeros-64mib.lzma internal/profiledecode/testdata/zeros-64mib-plus-one.lzma
+
+  arch-validation:
+    name: All full Arch gates passed
+    needs: [revision, test, fuzz, native-build, vulnerability, licenses, generated-files]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    outputs:
+      commit: ${{ steps.validated.outputs.commit }}
+    steps:
+      - name: Require every full Arch gate
+        id: validated
+        env:
+          REVISION_RESULT: ${{ needs.revision.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+          FUZZ_RESULT: ${{ needs.fuzz.result }}
+          NATIVE_BUILD_RESULT: ${{ needs.native-build.result }}
+          VULNERABILITY_RESULT: ${{ needs.vulnerability.result }}
+          LICENSES_RESULT: ${{ needs.licenses.result }}
+          GENERATED_FILES_RESULT: ${{ needs.generated-files.result }}
+          EXPECTED_COMMIT: ${{ github.sha }}
+          VALIDATED_COMMIT: ${{ needs.revision.outputs.commit }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for result in "$REVISION_RESULT" "$TEST_RESULT" "$FUZZ_RESULT" "$NATIVE_BUILD_RESULT" "$VULNERABILITY_RESULT" "$LICENSES_RESULT" "$GENERATED_FILES_RESULT"; do
+            test "$result" = success
+          done
+          [[ "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          test "$VALIDATED_COMMIT" = "$EXPECTED_COMMIT"
+          printf 'commit=%s\n' "$VALIDATED_COMMIT" >> "$GITHUB_OUTPUT"
+          printf 'All six full Arch quality gates passed for `%s`.\n' "$VALIDATED_COMMIT" >> "$GITHUB_STEP_SUMMARY"

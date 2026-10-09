@@ -1,0 +1,64 @@
+[
+  {
+    "attempts": 1,
+    "budget": {
+      "minimum_samples": 20,
+      "p50_seconds": 180,
+      "p95_seconds": 300
+    },
+    "budget_applicable": false,
+    "cohort": "ubuntu-20260927-arch-5b517-candidate-stress",
+    "commit": "549e1c51b49cb937f8449105e0c09948e832ec9f",
+    "complete_initial_gate_set": true,
+    "condition": "diagnostic",
+    "metrics": {
+      "created_to_required_result_seconds": {
+        "max": 252.0,
+        "n": 1,
+        "p50": 252.0,
+        "p95": 252.0
+      },
+      "event_to_required_result_seconds": {
+        "max": null,
+        "n": 0,
+        "p50": null,
+        "p95": null
+      },
+      "execution_seconds": {
+        "max": 249.0,
+        "n": 1,
+        "p50": 249.0,
+        "p95": 249.0
+      },
+      "runner_seconds": {
+        "max": 730.0,
+        "n": 1,
+        "p50": 730.0,
+        "p95": 730.0
+      }
+    },
+    "non_success_rate": 1.0,
+    "ordinary_budget_observed": false,
+    "required_jobs": [
+      "fuzz",
+      "generated-files",
+      "licenses",
+      "native-build",
+      "test",
+      "vulnerability"
+    ],
+    "runs": [
+      {
+        "attempt": 1,
+        "errors": [
+          "required job generated-files: completed/failure",
+          "workflow: completed/failure"
+        ],
+        "run_id": 37565507636,
+        "url": "https://github.com/sh4869221b/azerlay/actions/runs/37565507636"
+      }
+    ],
+    "small_sample_warning": true,
+    "successes": 0
+  }
+]

@@ -1,0 +1,61 @@
+[
+  {
+    "attempts": 1,
+    "budget": {
+      "minimum_samples": 20,
+      "p50_seconds": 180,
+      "p95_seconds": 300
+    },
+    "budget_applicable": false,
+    "cohort": "2026-10-07-before-test-only-candidate",
+    "commit": "ff969e371a4db0cceb057339d4714c5032fd5e99",
+    "complete_initial_gate_set": true,
+    "condition": "diagnostic",
+    "metrics": {
+      "created_to_required_result_seconds": {
+        "max": 198.0,
+        "n": 1,
+        "p50": 198.0,
+        "p95": 198.0
+      },
+      "event_to_required_result_seconds": {
+        "max": null,
+        "n": 0,
+        "p50": null,
+        "p95": null
+      },
+      "execution_seconds": {
+        "max": 196.0,
+        "n": 1,
+        "p50": 196.0,
+        "p95": 196.0
+      },
+      "runner_seconds": {
+        "max": 655.0,
+        "n": 1,
+        "p50": 655.0,
+        "p95": 655.0
+      }
+    },
+    "non_success_rate": 0.0,
+    "ordinary_budget_observed": false,
+    "required_jobs": [
+      "fuzz",
+      "generated-files",
+      "licenses",
+      "native-build",
+      "test",
+      "vulnerability"
+    ],
+    "runs": [
+      {
+        "attempt": 1,
+        "errors": [],
+        "run_id": 37562258365,
+        "url": "https://github.com/sh4869221b/azerlay/actions/runs/37562258365"
+      }
+    ],
+    "small_sample_warning": true,
+    "successes": 1
+  }
+]

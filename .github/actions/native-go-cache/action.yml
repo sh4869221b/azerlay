@@ -14,7 +14,7 @@ runs:
       id: go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.27.1
+        go-version: 1.27.2
         cache: false
 
     - name: Check cache paths and compression
@@ -39,9 +39,10 @@ runs:
       uses: actions/cache@v4
       with:
         path: /tmp/azerlay-go-build
-        # The input includes the job and COMPLETE installed native package list.
+        # The input includes distro, image/install recipe, native tools, job and
+        # the COMPLETE installed package list. Ubuntu and Arch never share builds.
         # No restore prefix may cross that compatibility boundary.
-        key: azerlay-build-v1-${{ runner.os }}-${{ runner.arch }}-go-${{ steps.go.outputs.go-version }}-${{ hashFiles('go.mod', 'go.sum', '.github/ci-tools.env', '.git/ci-native-cache-input') }}
+        key: azerlay-build-v2-${{ runner.os }}-${{ runner.arch }}-go-${{ steps.go.outputs.go-version }}-${{ hashFiles('go.mod', 'go.sum', '.github/ci-tools.env', '.git/ci-native-cache-input') }}
 
     - name: Download and verify application modules
       shell: bash
@@ -61,4 +62,4 @@ runs:
         path: /tmp/azerlay-tool-go-mod/cache/download
         # A single owning job installs and saves its own tool graph. Native
         # package updates cannot invalidate these downloaded Go modules.
-        key: azerlay-tool-mod-v2-${{ runner.os }}-${{ runner.arch }}-go-${{ steps.go.outputs.go-version }}-${{ github.job }}-${{ hashFiles('.github/ci-tools.env') }}
+        key: azerlay-tool-mod-v2-${{ runner.os }}-${{ runner.arch }}-go-${{ steps.go.outputs.go-version }}-${{ github.job }}-${{ hashFiles('.github/ci-tools.env', 'scripts/ci-staticcheck/go.mod', 'scripts/ci-staticcheck/go.sum') }}
