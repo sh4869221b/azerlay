@@ -5,7 +5,7 @@
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/494ce7fd23ff6a5dff39e1fb11e9b6f2ac74bf25";
 
   # Only Go comes from this security update; native tools/libraries stay pinned.
-  inputs.nixpkgs-go.url = "github:NixOS/nixpkgs/4b4931b2f5d285574aa1fbdbbf58e6aab595d31c";
+  inputs.nixpkgs-go.url = "github:NixOS/nixpkgs/423bc95d0ed475b23dada7d1f9a6a6b66e9bede3";
 
   outputs = { nixpkgs, nixpkgs-go, ... }:
     let

@@ -43,9 +43,9 @@ uses a `go_1_27` devShell and persistent Go compilation caches. It does not use
 ### Go security update
 
 Go alone comes from nixpkgs revision
-`4b4931b2f5d285574aa1fbdbbf58e6aab595d31c`, whose Go update is 1.27.1 to
-1.27.2. Its source NAR hash is
-`sha256-eyAGCckuYqKz0aV3P0iCuo9z/0UrWA+xnehWN/UDXYo=`, computed with Nix
+`423bc95d0ed475b23dada7d1f9a6a6b66e9bede3`, the stable release backport of the
+Go-only 1.27.1 to 1.27.2 security update. Its source NAR hash is
+`sha256-xHuzdf865WilQC1s7SOR55zGLCQ083QXRf49lqwQCjI=`, computed with Nix
 from the exact official GitHub archive. Both input identities and hashes are
 strictly checked before evaluation. Native tools, libraries, compositor and
 fonts continue to come from the original input; updating the full snapshot

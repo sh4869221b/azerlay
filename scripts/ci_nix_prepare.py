@@ -16,8 +16,8 @@ from pathlib import Path
 
 REVISION = "494ce7fd23ff6a5dff39e1fb11e9b6f2ac74bf25"
 NAR_HASH = "sha256-Ni0LBydzaCi8oek12r4mVreuFHqYlM1eTD6SfiENKfw="
-GO_REVISION = "4b4931b2f5d285574aa1fbdbbf58e6aab595d31c"
-GO_NAR_HASH = "sha256-eyAGCckuYqKz0aV3P0iCuo9z/0UrWA+xnehWN/UDXYo="
+GO_REVISION = "423bc95d0ed475b23dada7d1f9a6a6b66e9bede3"
+GO_NAR_HASH = "sha256-xHuzdf865WilQC1s7SOR55zGLCQ083QXRf49lqwQCjI="
 PINNED_INPUTS = {
     "nixpkgs": (REVISION, NAR_HASH),
     "nixpkgs-go": (GO_REVISION, GO_NAR_HASH),
