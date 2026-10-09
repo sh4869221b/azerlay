@@ -1,5 +1,30 @@
 # Device and permission troubleshooting
 
+## Start with doctor
+
+Run the read-only diagnostic report first:
+
+```sh
+azerlay doctor --json
+```
+
+Exit `0` means no findings, `1` means warnings, `2` means a diagnostic or
+argument error, and `3` means an internal diagnostic or output failure. A
+healthy current installation can still return `1`: library, Layer Shell and
+monitor checks are not implemented and appear as warnings. Doctor checks only
+that `WAYLAND_DISPLAY` is set; it does not test compositor connectivity. Device
+checks inspect identity and read-only access without consuming reports or
+testing notification readiness. Use `azerlay status --json` for live runtime
+state.
+
+Doctor reads the configuration and profile that would be used at the next
+start. A missing configuration returns `2` with `ERR_CONFIG_NOT_FOUND`; create
+the documented `schema_version = 1` file before retrying. `--help` performs no
+checks. `--include-bindings` displays labels and normalized bindings for that
+invocation only. Device inspection and some reports can include serials or
+paths. Review output before sharing it; do not send private exports, macro
+contents, or indiscriminate logs.
+
 ## Local profile selection and recovery
 
 Use `azerlay status --json` to inspect `active_profile` and `degraded_reasons`.
@@ -36,6 +61,29 @@ import when saved selection is unavailable. An active local last-good remains st
 after update failure. Azerlay never follows official UI active/favorite state,
 opens its browser databases, or writes its store.
 
+## Imported profile selection
+
+Use `azerlay profiles show --json` to inspect the persisted imported selection.
+If no usable selection exists, import an official Software 2.0.2 export with an
+explicit one-based profile ordinal, then inspect the result:
+
+```sh
+azerlay import --software-release 2.0.2 --profile-index N <export-file> --json
+azerlay profiles show --json
+```
+
+`ERR_PROFILE_NOT_FOUND` means the requested profile or saved source is absent;
+choose an ordinal from a nonempty export or restore the configured source.
+`ERR_PROFILE_AMBIGUOUS` means the requested imported ID or name is not unique;
+select an exact unique imported ID or name. `ERR_PROFILE_SOURCE_UNAVAILABLE` means the
+selected source cannot be resolved; correct `source` and its selectors in the
+[profile configuration](config.md#profile), then restart. `ERR_PROFILE_STORAGE`
+means stored profile data could not be read; preserve the original and inspect
+the storage condition before replacing it. A `profiles select` acknowledgement
+changes the running session selection; check `azerlay status --json` for the
+resulting active profile. Persisted selection continues to come from
+configuration and saved import state.
+
 ## Overlay click-through and monitor recovery
 
 `show`, `hide`, and `toggle` report accepted requested visibility; GTK applies
@@ -43,8 +91,11 @@ the request asynchronously. Use `azerlay status --json` to compare `visible`
 with `overlay.mapped` and `overlay.input_region_applied`. The last field means
 the empty GDK input-region call was issued for the mapped surface. GDK does not
 report compositor acknowledgement, so the field alone cannot prove that input
-reaches another application. Device input monitoring and profile rendering are
-not implemented.
+reaches another application. The raw-only runtime feeds last-observed physical
+button state to the overlay and combines it with the selected imported or local
+profile's static metadata. `devices list`, `devices inspect` and doctor only
+check identity or access; they do not consume input reports. See
+[input recovery](#internal-input-recovery) for the live-state limits.
 
 If status contains `OVERLAY_MONITOR_UNAVAILABLE` at stage `overlay`, an
 explicitly configured monitor is absent or ambiguous. The request is retained
@@ -212,6 +263,12 @@ can mask failure of this narrower rule; review existing administrator rules
 without automatically deleting unrelated rules. Revocation denies fresh opens,
 not descriptors already open before the ACL changed.
 
+Expect `Active=yes`, a local `Seat=...`, and an ACL that allows the current
+session user to open this qualified node. If the active user's ACL is absent,
+check the targeted packaging rule and re-enumerate after the session or rule
+condition is corrected. Do not grant access to unrelated devices or change
+group membership.
+
 A successful read-only open proves access for the invoking process only. It
 does not prove that the specific uaccess rule is installed, that access is
 least-privilege, or that seat ACL grant/revocation works. Discovery does not
@@ -233,6 +290,12 @@ Follow the [default configuration setup](../README.md#configuration-and-optional
 to create `schema_version = 1` without replacing an existing configuration.
 For `ERR_CONFIG_INVALID`, correct the existing file using the
 [configuration contract](config.md); reinstalling the package does not repair it.
+`azerlay reload --json` only acknowledges the request. Check `azerlay status
+--json` afterward for `degraded_reasons` and the eventual configuration result.
+An invalid reload retains the last-good settings; after fixing the same file,
+request reload again and confirm the configuration failure clears. Profile
+selection settings take effect at the next start, not through configuration
+reload.
 
 `ERR_RUNTIME_WAYLAND` means the display environment is missing or the display
 cannot be reached. Start from the current user's active Wayland session, check
@@ -240,6 +303,24 @@ cannot be reached. Start from the current user's active Wayland session, check
 manager. Import `XDG_CURRENT_DESKTOP` only when it is set. Do not invent a display
 name or use X11 as a fallback. `ERR_LAYER_SHELL_UNAVAILABLE` requires a supported
 Layer Shell compositor; Hyprland is the v1 target.
+
+For a read-only session check, inspect the values and active seat from the same
+terminal that will run Azerlay:
+
+```sh
+printf 'WAYLAND_DISPLAY=%s\nXDG_RUNTIME_DIR=%s\n' "$WAYLAND_DISPLAY" "$XDG_RUNTIME_DIR"
+loginctl show-session "$XDG_SESSION_ID" -p Active -p Seat
+```
+
+Expect a nonempty display name, a runtime directory owned by the current user,
+and an active local session. Doctor only checks that `WAYLAND_DISPLAY` is
+nonempty; a successful doctor session check does not prove `run` can connect.
+For Arch/CachyOS native-library startup failures, compare the loader message or
+unit log with the GTK4 and gtk4-layer-shell packages in the
+[installation instructions](../README.md#native-installation). Use
+`systemctl --user status azerlay.service` to inspect the service state and any
+recorded exit reason;
+`pacman -Q gtk4 gtk4-layer-shell` shows whether those packages are installed.
 
 The optional user service retries failures every two seconds. Stop it with
 `systemctl --user stop azerlay.service` while correcting configuration or
@@ -305,3 +386,27 @@ platform grant is separate from Azerlay's hidraw-only rule. Other physical
 products/releases/revisions remain untested. This isolated result does not rely
 on the historical host's broad VID-only `0666` permissions and does not qualify
 notifications, input runtime wiring, or authoritative current button state.
+
+## Control socket and client failures
+
+Control commands require the running instance's same-user socket. For
+`ERR_CONTROL_RUNTIME`, check that `XDG_RUNTIME_DIR` is set to the current user's
+private runtime directory. For `ERR_CONTROL_PERMISSION`, run the client as the
+same user that owns the instance and runtime directory; do not broaden socket
+permissions. `ERR_CONTROL_TIMEOUT` has an uncertain operation result: inspect
+`azerlay status --json` before repeating a command.
+
+| Diagnostic | Next check | Expected result |
+| --- | --- | --- |
+| `WARN_CONTROL_NOT_RUNNING`, `WARN_CONTROL_STALE`, or `ERR_CONTROL_UNAVAILABLE` | Check `azerlay status --json` and whether the intended foreground process or user service is running. Start the intended instance with `azerlay run --foreground` when none is running. | A responsive instance returns status. Azerlay performs its own stale-socket recovery at startup; do not remove a socket by hand. |
+| `ERR_CONTROL_RUNTIME` | Print `XDG_RUNTIME_DIR` and inspect its owner and mode with `stat -c '%U %a %n' "$XDG_RUNTIME_DIR"`. | The directory exists, belongs to the current user and is private. |
+| `ERR_CONTROL_PERMISSION` | Compare the account running the client with the instance owner; use the same user and runtime directory. | The control connection is permitted without changing socket modes. |
+| `ERR_CONTROL_TIMEOUT` | Read `azerlay status --json` before retrying the timed-out action. | Status shows whether the requested state has already changed. |
+| `ERR_CONTROL_VERSION` | Use a client and server that speak protocol version 1; use matching Azerlay builds for the extended status fields. | The control request is accepted and `status --json` includes the expected fields. |
+
+Doctor reports an absent or stale socket as a warning, while unsafe runtime
+paths, access failures and malformed communication are errors. A successful
+`show`, `hide`, `toggle` or `reload` response acknowledges acceptance only;
+inspect status for mapped state, configuration results and degraded reasons.
+See the [control protocol](control-protocol.md) for its same-user boundary and
+stable error contract.
