@@ -374,9 +374,30 @@ Every actual nonzero tool result fails the job.
 The CSV inventories Go dependencies; it is not an allowlist or a compatibility
 decision, and does not cover dynamically loaded or native libraries. The
 project uses MIT for its own material. Third-party notices and source
-availability are recorded in `THIRD_PARTY_NOTICES.md`; final native inventory,
-SBOM and release-readiness checks remain tracked in Issue #18. A successful
-license job does not establish that these checks are complete.
+availability are recorded in `THIRD_PARTY_NOTICES.md`; remaining distribution
+conditions are recorded in
+[`decisions/public-release-safety.md`](decisions/public-release-safety.md). A
+successful license job does not establish that these checks are complete.
+
+## Manual release candidate dry-run
+
+The manual `release-dry-run.yml` workflow prepares a non-publishing candidate.
+Dispatch it from a branch or tag that contains the workflow and enter the
+candidate version. The selected workflow ref itself supplies the source
+revision; there is no separate revision input. For a tag, remove exactly one
+leading `v` from the tag name for the version input, and the workflow rejects a
+mismatch before packaging. Branch refs use the explicit version input.
+
+The workflow runs full Arch validation before packaging and produces source and
+binary archives, matching SPDX 2.3 JSON and license-report sidecars,
+`release-notes.md`, and `SHA256SUMS`. It validates both SPDX documents against
+the pinned SPDX 2.3 schema and checks the listed checksums. Review and retain
+the workflow artifact as a candidate only; a successful dry-run does not
+resolve the distribution conditions in the release-safety decision or complete
+AC-016. The workflow does not sign or publish artifacts. Signing and
+publication require a separate later action after the remaining conditions are
+met. Dispatch is available only for refs that contain the workflow, which means
+older tags without it cannot run this dry-run.
 
 ## Synthetic fixture policy
 
