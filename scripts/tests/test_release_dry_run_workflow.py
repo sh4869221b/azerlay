@@ -13,12 +13,12 @@ JOBS = jobs(WORKFLOW)
 
 
 class ReleaseDryRunWorkflowTests(unittest.TestCase):
-    def execute(self, body, **values):
+    def execute(self, body, cwd=None, **values):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "output"
             summary = Path(directory) / "summary"
             result = subprocess.run(
-                ["bash", "-c", body], capture_output=True, text=True,
+                ["bash", "-c", body], capture_output=True, text=True, cwd=cwd,
                 env={**os.environ, "GITHUB_OUTPUT": str(output),
                      "GITHUB_STEP_SUMMARY": str(summary), **values},
             )
@@ -84,7 +84,7 @@ class ReleaseDryRunWorkflowTests(unittest.TestCase):
         steps = step_blocks(JOBS["build"])
         candidate = next(step for step in steps if step.startswith("Upload candidate outputs\n"))
         paths = re.findall(r"^            (.+)$", candidate, re.M)
-        prefix = "${{ runner.temp }}/release-candidate/"
+        prefix = "${{ steps.artifacts.outputs.directory }}/"
         name = "azerlay-${{ steps.candidate.outputs.version }}"
         self.assertCountEqual(paths, [prefix + name + suffix for suffix in (
             "-source.tar.gz", "-linux-x86_64.tar.gz", "-source.spdx.json",
@@ -96,6 +96,25 @@ class ReleaseDryRunWorkflowTests(unittest.TestCase):
                 self.assertIn("retention-days: 7", step)
         self.assertIn('"$RUNNER_TEMP/release-candidate"', JOBS["build"])
         self.assertIn("path: scripts/release-smoke.sh", JOBS["build"])
+
+    def test_candidate_step_emits_actual_container_output_directory(self):
+        step = next(step for step in step_blocks(JOBS["build"])
+                    if step.startswith("Generate non-publishing candidate\n"))
+        self.assertIn("id: artifacts", step)
+        body = shell_body(JOBS["build"], "Generate non-publishing candidate")
+        with tempfile.TemporaryDirectory() as directory:
+            scripts = Path(directory) / "scripts"
+            scripts.mkdir()
+            (scripts / "release-dry-run.sh").write_text(
+                'test "$1" = "$VERSION" && test "$2" = "$RUNNER_TEMP/release-candidate"\n'
+            )
+            for runtime_temp in ("/__w/_temp", "/a container/temp with spaces"):
+                with self.subTest(runtime_temp=runtime_temp):
+                    result, output, _ = self.execute(
+                        body, cwd=directory, VERSION="1.2.3", RUNNER_TEMP=runtime_temp,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(output, f"directory={runtime_temp}/release-candidate\n")
 
     def test_clean_runtime_has_only_runtime_packages_and_no_checkout_or_build(self):
         runtime = JOBS["runtime"]
