@@ -90,6 +90,43 @@ func TestUnicodeLayout(t *testing.T) {
 	}
 }
 
+func TestEmptyLabelDisplaysAssignment(t *testing.T) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	control := Control{Assignments: []Assignment{
+		{Trigger: profile.TriggerSingle, Kind: profile.BindingKeyboard, BindingDisplay: "W"},
+		{Trigger: profile.TriggerLong, Kind: profile.BindingKeyboard, BindingDisplay: "Left Ctrl+U"},
+	}}
+	definition := testTextDefinition(260, 90)
+	for _, test := range []struct {
+		mode string
+		want []string
+	}{
+		{"compact", []string{"W"}},
+		{"normal", []string{"W"}},
+		{"detailed", []string{"W", "HOLD: Left Ctrl+U"}},
+	} {
+		t.Run(test.mode, func(t *testing.T) {
+			options := Options{Scale: 1, Opacity: 1, FontScale: 1, Mode: test.mode}
+			if got := textValues(controlText(control, options)); !reflect.DeepEqual(got, test.want) {
+				t.Fatalf("empty label: got %v, want %v", got, test.want)
+			}
+			frame := Prepare(NewSnapshot(definition, Content{Controls: map[string]Control{"button": control}}), options, 296, 126)
+			if frame == nil || len(frame.controls) != 1 || len(frame.controls[0].lines) != len(test.want) {
+				t.Fatalf("assignment frame missing lines: %+v", frame)
+			}
+			for i, want := range test.want {
+				if got := frame.controls[0].lines[i].layout.Text(); got != want {
+					t.Fatalf("rendered line %d: got %q, want %q", i, got, want)
+				}
+			}
+			if control.Assignments[0].Label != "" || control.Assignments[1].Label != "" {
+				t.Fatal("rendering populated an empty label")
+			}
+		})
+	}
+}
+
 func TestMultiTriggerPriority(t *testing.T) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()

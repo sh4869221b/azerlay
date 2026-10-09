@@ -9,7 +9,7 @@ func TestEmbeddedGeneric(t *testing.T) {
 		t.Fatal(err)
 	}
 	d, ok := catalog.Lookup("generic")
-	if !ok || d.SchemaVersion != 1 || d.ID != "generic" || d.Name != "Generic" || len(d.Bindings) != 0 || len(d.Controls) != 0 {
+	if !ok || d.SchemaVersion != 1 || d.ID != "generic" || d.Name != "Generic" || len(d.Controls) != 0 {
 		t.Fatalf("generic: %+v, found=%t", d, ok)
 	}
 }

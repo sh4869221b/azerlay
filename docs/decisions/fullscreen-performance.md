@@ -7,7 +7,6 @@ above Cyberpunk 2077 in borderless mode on Hyprland. This satisfies Issue #16's
 revised v1 completion condition: display the overlay above a real game.
 Detailed performance conditions are nonblocking post-v1 work in
 [Issue #132](https://github.com/sh4869221b/azerlay/issues/132).
-The Bodycam built-in profile and keybinding research remain separate requirements.
 
 The tested tuple was Hyprland 0.56.2, GTK 4.22.5, gtk4-layer-shell 1.3.0,
 NVIDIA RTX 4070 / driver 615.71.09, Cyberpunk 2077 2.31 (Steam build 20383525),

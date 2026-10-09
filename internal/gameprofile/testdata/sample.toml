@@ -2,9 +2,5 @@ schema_version = 1
 id = "sample"
 name = "Synthetic Example"
 
-[bindings]
-KEY_U = "Use"
-KEY_P = "Pause"
-
 [controls]
 "input:15:single" = "Primary use"

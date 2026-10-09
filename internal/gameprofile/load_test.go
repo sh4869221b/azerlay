@@ -23,8 +23,6 @@ func TestLoadReplacement(t *testing.T) {
 id = "sample"
 name = "Embedded"
 locale = "en"
-[bindings]
-KEY_U = "Embedded action"
 [controls]
 "input:15:single" = "Embedded control"
 `)}}
@@ -33,23 +31,24 @@ KEY_U = "Embedded action"
 id = "sample"
 name = "User"
 locale = "ja"
-[bindings]
-KEY_Q = "Inert mapping"
+[controls]
+"input:16:single" = "User control"
 `)
 	catalog, err := loadFromFS(builtIn, dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	d, ok := catalog.Lookup("sample")
-	if !ok || d.Name != "User" || d.Locale != "ja" || len(d.Bindings) != 1 || len(d.Controls) != 0 || d.Bindings[profile.CanonicalCode("KEY_Q")] != "Inert mapping" {
+	userKey := ControlKey{InputID: 16, Trigger: profile.TriggerSingle}
+	if !ok || d.Name != "User" || d.Locale != "ja" || len(d.Controls) != 1 || d.Controls[userKey] != "User control" {
 		t.Fatalf("whole replacement failed: %+v, found=%t", d, ok)
 	}
-	if _, ok := d.Bindings[profile.CanonicalCode("KEY_U")]; ok {
-		t.Fatal("embedded-only binding survived replacement")
+	if _, ok := d.Controls[ControlKey{InputID: 15, Trigger: profile.TriggerSingle}]; ok {
+		t.Fatal("embedded-only control survived replacement")
 	}
-	d.Bindings[profile.CanonicalCode("KEY_Q")] = "changed"
+	d.Controls[userKey] = "changed"
 	again, _ := catalog.Lookup("sample")
-	if again.Bindings[profile.CanonicalCode("KEY_Q")] != "Inert mapping" {
+	if again.Controls[userKey] != "User control" {
 		t.Fatal("Lookup returned shared mapping")
 	}
 	if _, ok := catalog.Lookup("../sample"); ok {
@@ -67,7 +66,7 @@ func TestLoadMissingAndDuplicate(t *testing.T) {
 	if _, ok := catalog.Lookup("generic"); !ok {
 		t.Fatal("embedded generic missing")
 	}
-	if d, ok := catalog.Lookup("unknown"); ok || len(d.Bindings) != 0 || len(d.Controls) != 0 {
+	if d, ok := catalog.Lookup("unknown"); ok || len(d.Controls) != 0 {
 		t.Fatalf("unknown ID: %+v, found=%t", d, ok)
 	}
 	if _, err := os.Stat(dir); !errors.Is(err, os.ErrNotExist) {
@@ -110,7 +109,7 @@ extra=1`, "decode"},
 		{"empty id", `schema_version=1
 id="  "
 name="X"`, "validation"},
-		{"invalid binding", "schema_version=1\nid=\"x\"\nname=\"X\"\n[bindings]\nkey_U=\"x\"", "validation"},
+		{"removed binding table", "schema_version=1\nid=\"x\"\nname=\"X\"\n[bindings]\nKEY_U=\"Use\"", "decode"},
 		{"invalid control", "schema_version=1\nid=\"x\"\nname=\"X\"\n[controls]\n\"input:015:single\"=\"x\"", "validation"},
 		{"unknown trigger", "schema_version=1\nid=\"x\"\nname=\"X\"\n[controls]\n\"input:15:hold\"=\"x\"", "validation"},
 		{"extra segment", "schema_version=1\nid=\"x\"\nname=\"X\"\n[controls]\n\"input:15:single:x\"=\"x\"", "validation"},

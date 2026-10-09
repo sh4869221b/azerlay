@@ -28,7 +28,7 @@ conservative loss suspicion, not continuity proof; an undetected final lost
 release can leave stale state indefinitely. No timeout fabricates release.
 Managed reconnect retains the selected serial or, without serial, the same USB
 parent, while allowing hidraw renumbering. `run` connects those observations to
-the selected imported or local profile and game labels in the overlay.
+the selected imported or local profile and explicit label overrides in the overlay.
 Live analog/output-key state and long/double/macro completion
 remain unsupported. Static profile labels, assignments, stick configuration and
 output candidates remain available. See [input recovery](docs/troubleshooting.md#internal-input-recovery)
@@ -62,7 +62,7 @@ request a confirmation or infer them from USB identity.
 status without changing state; unavailable backend checks remain warnings.
 
 The initial supported target is Linux/Wayland on x86-64 with left-hand Azeron
-Cyborg II, Arch/CachyOS, Hyprland, and a Bodycam game profile. Niri and right-hand
+Cyborg II, Arch/CachyOS, and Hyprland. Niri and right-hand
 Cyborg II are deferred beyond v1 and remain unverified. Ubuntu is excluded from
 v1; implementation and qualification are tracked in
 [Issue #98](https://github.com/sh4869221b/azerlay/issues/98).
@@ -317,7 +317,7 @@ include IDs, labels, bindings, macros, unknown fields, or other private export
 content. The raw export version is reported metadata. It isn't the
 `--software-release` attribution and doesn't establish Software support.
 
-## Game profile labels (internal library)
+## Game profile label overrides
 
 Game profiles can supply display labels without changing the actual Azeron
 assignment. Put `.toml` files in `$XDG_CONFIG_HOME/azerlay/games/`. When
@@ -330,38 +330,37 @@ schema_version = 1
 id = "sample"
 name = "Synthetic Example"
 
-[bindings]
-KEY_U = "Use"
-KEY_P = "Pause"
-
 [controls]
 "input:15:single" = "Primary use"
 ```
 
 `schema_version = 1`, `id`, and `name` are required. `locale` is optional and
-does not select a translation automatically. `[bindings]` uses case-sensitive
-`KEY_` or `BTN_` symbolic codes; a code in this file does not make an unsupported
-export binding convertible. `[controls]` uses a positive decimal input ID and
-the exact `single`, `long`, or `double` trigger. The filename does not set the
-ID. Unknown fields, invalid types, and invalid keys reject the complete file.
+does not select a translation automatically. `[controls]` uses a positive
+decimal input ID and the exact `single`, `long`, or `double` trigger. The filename
+does not set the ID. Unknown fields, invalid types, and invalid keys reject the
+complete file.
+
+The former `[bindings]` key-to-action table is no longer supported and is
+rejected as an unknown field. Use `[controls]` for explicit label overrides.
 
 A user file with the same ID as a built-in profile replaces that entire profile,
-including its name, locale, and mappings. Duplicate IDs among user files are
-invalid. Azerlay currently embeds only an empty `generic` profile; it includes
-no Bodycam bindings. A missing game ID provides no game mappings.
+including its name, locale, and control overrides. Duplicate IDs among user
+files are invalid. Azerlay currently embeds only an empty `generic` profile.
+The configuration default remains `profile.game = "bodycam"`; a missing game ID
+provides no control overrides.
 
-For each normalized binding, a non-blank physical-control label wins first,
-then a non-empty Azeron label, then a non-blank game binding label, then the
-binding's human-readable assignment. Blank or whitespace-only game labels fall
-through; an Azeron label containing only whitespace remains a literal label.
-Game binding labels apply to single unmodified keys and Turbo codes, not to a
-key inside a chord, multi-action binding, or macro. `BindingDisplay` remains a
-separate description of the actual assignment, including for `Unknown` values.
+For each normalized binding, a non-blank physical-control override wins first;
+otherwise the Azeron label is preserved, including empty or whitespace-only
+labels. Empty labels stay empty unless explicitly overridden for that control
+and trigger. Game actions are not inferred from assigned keys.
+`BindingDisplay` remains a separate description of the actual assignment,
+including for `Unknown` values. Compact mode displays the assignment when the
+label is empty; normal and detailed modes show the assignment on a dedicated
+key line.
 
 The library supports explicit synchronous reload while retaining the last good
-catalog after an invalid edit. `run` and GTK do not yet load or render these game
-labels; `profile.game` in application configuration does not activate this
-library at runtime.
+catalog after an invalid edit. `run` loads the selected game's control overrides
+for overlay display.
 
 ## Device CLI
 

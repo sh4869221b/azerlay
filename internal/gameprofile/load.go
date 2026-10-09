@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -20,11 +19,8 @@ type document struct {
 	ID            string            `toml:"id"`
 	Name          string            `toml:"name"`
 	Locale        string            `toml:"locale"`
-	Bindings      map[string]string `toml:"bindings"`
 	Controls      map[string]string `toml:"controls"`
 }
-
-var bindingKeyPattern = regexp.MustCompile(`^(KEY|BTN)_[A-Z0-9_]+$`)
 
 func Load(userDir string) (Catalog, error) {
 	if userDir == "" {
@@ -101,14 +97,7 @@ func parse(data []byte) (Definition, error) {
 		return Definition{}, invalid("validation", "id and name must be non-empty")
 	}
 	d := Definition{SchemaVersion: raw.SchemaVersion, ID: raw.ID, Name: raw.Name, Locale: raw.Locale,
-		Bindings: make(map[profile.CanonicalCode]string, len(raw.Bindings)),
 		Controls: make(map[ControlKey]string, len(raw.Controls))}
-	for key, value := range raw.Bindings {
-		if !bindingKeyPattern.MatchString(key) {
-			return Definition{}, invalid("validation", "invalid binding key")
-		}
-		d.Bindings[profile.CanonicalCode(key)] = value
-	}
 	for key, value := range raw.Controls {
 		parts := strings.Split(key, ":")
 		if len(parts) != 3 || parts[0] != "input" {
