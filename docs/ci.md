@@ -23,12 +23,29 @@ The `test` job rejects any output from `gofmt -l .`, then runs:
 
 ```sh
 go vet ./...
-go install honnef.co/go/tools/cmd/staticcheck@2026.2.1
+bash scripts/ci-install-staticcheck.sh
 staticcheck ./...
 mapfile -t native < scripts/ci-native-packages.txt
 scripts/test-wayland.sh go test -race -json -shuffle=on -count=1 "${native[@]}"
 go build ./cmd/azerlay
 ```
+
+Staticcheck currently uses the exact Go 1.27.2 compatibility source from
+[upstream PR #1834](https://github.com/dominikh/go-tools/pull/1834), commit
+`a0a7f6a7b6af6eaa66e22ff3a5f78725e27decf2`. This is an unmerged development
+commit, not a tagged release. Staticcheck 2026.2.1's old importer cannot decode
+Go 1.27.2 export format V5. The upstream fix updates `x/tools` to v0.51.0 and
+replaces two removed private-symbol links with their equivalent implementations.
+The [Go tools V5 decoder change](https://github.com/golang/tools/commit/89ed5c340cb6d4a9437f801cfc718ac5980c938d)
+explains the format compatibility requirement.
+
+`scripts/ci-staticcheck` is a separate CI-only module. Its replacement pin and
+checksums select that exact compatibility source without changing application
+`go.mod` or `go.sum`. Installation requires Go 1.27.2, checks the exact source and
+importer versions, uses `-mod=readonly`, and verifies module contents. Both Arch
+and Nix use the same installer; tool cache keys include the tool module's lock
+files. Replace this temporary source pin with a compatible tagged upstream
+release when one is available. All default Staticcheck findings still fail CI.
 
 Every ordinary root-module package has a required race/shuffle/uncached test run:
 core packages in `generated-files`, native packages in `test`. Core packages

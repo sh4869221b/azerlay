@@ -142,8 +142,7 @@ jobs:
         env:
           GOMODCACHE: /tmp/azerlay-tool-go-mod
         run: |
-          source .github/ci-tools.env
-          go install honnef.co/go/tools/cmd/staticcheck@"$STATICCHECK_VERSION"
+          bash scripts/ci-install-staticcheck.sh
           du -sb "$GOMODCACHE/cache/download"
 
       - name: Staticcheck

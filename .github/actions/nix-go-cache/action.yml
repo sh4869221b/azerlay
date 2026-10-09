@@ -55,4 +55,4 @@ runs:
       uses: actions/cache@v4
       with:
         path: /tmp/azerlay-tool-go-mod/cache/download
-        key: azerlay-tool-mod-v2-${{ runner.os }}-${{ runner.arch }}-go-1.27.2-${{ github.job }}-${{ hashFiles('.github/ci-tools.env') }}
+        key: azerlay-tool-mod-v2-${{ runner.os }}-${{ runner.arch }}-go-1.27.2-${{ github.job }}-${{ hashFiles('.github/ci-tools.env', 'scripts/ci-staticcheck/go.mod', 'scripts/ci-staticcheck/go.sum') }}

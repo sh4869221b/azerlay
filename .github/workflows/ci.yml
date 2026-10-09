@@ -95,8 +95,7 @@ jobs:
         run: |
           nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh bash -c '
             set -euo pipefail
-            source .github/ci-tools.env
-            go install honnef.co/go/tools/cmd/staticcheck@"$STATICCHECK_VERSION"
+            bash scripts/ci-install-staticcheck.sh
             du -sb "$GOMODCACHE/cache/download"
           '
 
