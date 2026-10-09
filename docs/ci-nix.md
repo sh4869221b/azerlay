@@ -27,7 +27,8 @@ directory encodings matched official fixture Git blobs
 the committed NAR hash when fetching/evaluating the flake in CI. A mismatch must
 fail; never auto-update the lock to bypass it.
 
-Verified package definitions at this revision: Go 1.27.1, GTK 4.22.4,
+The native input remains at this revision; Go uses the separate security pin
+below. Expected package versions: Go 1.27.2, GTK 4.22.4,
 gtk4-layer-shell 1.3.0, GLib 2.88.3, Cairo 1.18.4, Pango 1.57.1, Sway 1.12,
 grim 1.5.0, AT-SPI 2.60.6 and D-Bus 1.16.2. Preparation validates these exact
 versions before downloading the dependency closure. The Ubuntu candidate uses
@@ -38,6 +39,22 @@ Actual runtime versions and the complete evaluated closure are retained in CI.
 `buildGoModule` at this pin defaults to Go 1.26. This experiment deliberately
 uses a `go_1_27` devShell and persistent Go compilation caches. It does not use
 `buildGoModule`, whose ordinary temporary GOCACHE would change the experiment.
+
+### Go security update
+
+Go alone comes from nixpkgs revision
+`4b4931b2f5d285574aa1fbdbbf58e6aab595d31c`, whose Go update is 1.27.1 to
+1.27.2. Its source NAR hash is
+`sha256-eyAGCckuYqKz0aV3P0iCuo9z/0UrWA+xnehWN/UDXYo=`, computed with Nix
+from the exact official GitHub archive. Both input identities and hashes are
+strictly checked before evaluation. Native tools, libraries, compositor and
+fonts continue to come from the original input; updating the full snapshot
+would also change Sway's derivation.
+
+This addresses [GO-2026-6604](https://pkg.go.dev/vuln/GO-2026-6604), a Windows
+junction-handling issue fixed in Go 1.27.2. The scheduled Arch vulnerability
+gate correctly failed with Go 1.27.1. All scanner commands, exact-version
+checks, signed-substitute requirements and failure behavior remain in place.
 
 ## Roles and invocation
 

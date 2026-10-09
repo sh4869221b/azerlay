@@ -29,8 +29,8 @@ The links identify corresponding upstream source, not a floating latest release.
 
 The Go project additionally provides the patent grant reproduced in
 `LICENSES/golang-PATENTS.txt`. Runtime source and notices for the currently
-specified Go 1.27.1 toolchain are available at
-https://github.com/golang/go/tree/go1.27.1 ; see
+specified Go 1.27.2 toolchain are available at
+https://github.com/golang/go/tree/go1.27.2 ; see
 `LICENSES/go-runtime-BSD-3-Clause.txt` and `LICENSES/go-runtime-PATENTS.txt`.
 Record the actual toolchain when producing a release and update this entry if
 it differs. Check notices for bundled code/data inside modules as well as their

@@ -2,7 +2,7 @@
 
 [CI](../.github/workflows/ci.yml) runs for pull requests and pushes to `main`.
 It has read-only repository permissions and cancels superseded runs for the
-same pull request. All Go jobs use Go 1.27.1. CI-only tools are installed with
+same pull request. All Go jobs use Go 1.27.2. CI-only tools are installed with
 explicit versions without changing the application's `go.mod` or `go.sum`.
 The owner selected pinned Nix for normal CI on 2026-10-07. Latest Arch runs
 independently each day and through manual pre-release verification; see the
@@ -152,7 +152,7 @@ from this job by `-run='^$'`. Longer fuzz campaigns are outside PR CI.
 ## Distribution builds and GTK coverage
 
 `test`, `native-build`, `vulnerability`, and `licenses` use the pinned
-[Nix native environment](ci-nix.md), including the locked Go 1.27.1 and native
+[Nix native environment](ci-nix.md), including the locked Go 1.27.2 and native
 closure. The four roles retain current-checkout build/scan/test commands.
 The separate [Arch full validation](../.github/workflows/arch-ci.yml) runs all
 six quality gates against rolling `archlinux:base` / `pacman -Syu`, once daily
