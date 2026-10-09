@@ -78,6 +78,25 @@ Gamescope remain unverified, nonblocking post-v1 research in
 [Issue #132](https://github.com/sh4869221b/azerlay/issues/132). See the
 [game-display decision and preliminary measurements](docs/decisions/fullscreen-performance.md).
 
+## Quick start
+
+1. Install a local build using [Native installation](#native-installation).
+   These commands use an unpublished local package or archive.
+2. Create a configuration with `schema_version = 1` and select an imported or
+   supported local profile; see [profile configuration](docs/config.md#profile)
+   and [configuration and optional autostart](#configuration-and-optional-autostart).
+3. For the imported-profile route, import an official Software 2.0.2 export
+   with an explicit profile ordinal; see [Profile export CLI](#profile-export-cli).
+4. In the active Wayland session, run `azerlay run --foreground`. From another
+   terminal, use `azerlay status --json` to inspect runtime state and `azerlay
+   show` to request visibility.
+5. Configure autostart only if desired, using the user-service or Hyprland
+   option in [Configuration and optional autostart](#configuration-and-optional-autostart).
+
+The [compatibility matrix](docs/compatibility.md), [acceptance evidence](docs/acceptance.md),
+and [troubleshooting guide](docs/troubleshooting.md) describe the current scope,
+remaining proof gaps and recovery steps.
+
 ## Native installation
 
 Local packaging targets Arch/CachyOS x86-64 and Hyprland. It packages the current
@@ -396,9 +415,11 @@ errors, and retains partial results. See the
 List output omits serial and detailed metadata. **Inspect output includes serial
 values when available**, even without a path; review it before sharing. These
 commands do not require a running instance or configuration and do not change
-permissions. Doctor implements passive device checks; the input library is not yet wired
-into the runtime overlay. See [device troubleshooting](docs/troubleshooting.md) for stable
-diagnostic codes and the limits of access and uaccess packaging validation.
+permissions. Doctor and the device commands only check metadata and access; the
+raw-only runtime consumes reports and feeds last-observed physical-button state
+to the overlay. Readable access does not confirm notification initialization.
+See [device troubleshooting](docs/troubleshooting.md#device-discovery-and-permissions)
+for stable diagnostic codes and the limits of access and uaccess packaging validation.
 
 ## Run and control CLI
 
@@ -423,9 +444,12 @@ Shell reports `ERR_LAYER_SHELL_UNAVAILABLE`. GTK is restricted to Wayland.
 
 `run` prints initial text status and stays running. With no saved profile, status
 has `active_profile:null` and degraded reasons, and startup prints guidance to
-import a supported profile and use `status` and `profiles select`. No device
-backend or live profile-to-renderer connection is available yet. The renderer
-can display a supplied snapshot, as described in [overlay appearance](docs/overlay.md).
+import a supported profile and use `status` and `profiles select`. `run`
+connects raw-only physical-button observations and the selected imported or
+local profile to the overlay. Initial and reopened snapshots are unknown; an
+undetected final lost release can leave the last
+observation stale, as described in [Status](#status). Live analog and output-key
+state remain unsupported. See [overlay appearance](docs/overlay.md).
 A second `run` against a responsive instance
 prints its status and exits 0 without loading the second invocation's config.
 
@@ -530,11 +554,13 @@ a stale socket, or changes running visibility or selection.
 
 ## Project documents
 
+- [Compatibility and qualification matrix](docs/compatibility.md)
+- [Acceptance evidence](docs/acceptance.md)
 - [System design and research](docs/design-research.md)
 - [Architecture principles](docs/architecture.md)
 - [Security principles](docs/security.md)
 - [Cyborg II device identity and permission decision](docs/decisions/device-identity.md)
-- [Device and permission troubleshooting](docs/troubleshooting.md)
+- [Troubleshooting for device, overlay, profile, configuration, session and socket failures](docs/troubleshooting.md)
 - [CI and synthetic fixture policy](docs/ci.md)
 - [Configuration schema and reload behavior](docs/config.md)
 - [Control protocol and CLI](docs/control-protocol.md)
