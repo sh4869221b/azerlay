@@ -104,9 +104,10 @@ behavior described above, including live profile and physical-button rendering.
 GTK4, gtk4-layer-shell and their native shared-library dependencies must be
 installed on the destination. The binary archive does not bundle them.
 There is no published release assumed by these commands. Azerlay-owned code is licensed under MIT; third-party terms remain applicable.
-The local smoke version `0.0.0` is not a published release. Public-release
-readiness and the desktop application owner remain unresolved; see the
-[release-safety decision](docs/decisions/public-release-safety.md).
+The local smoke version `0.0.0` is not a published release. A manual,
+non-publishing candidate dry-run and its remaining distribution conditions are
+described in [CI documentation](docs/ci.md#manual-release-candidate-dry-run)
+and the [release-safety decision](docs/decisions/public-release-safety.md).
 
 From a source checkout with the [development dependencies](#development):
 
@@ -121,6 +122,20 @@ The source archive includes current working files and embedded assets, without
 Git metadata, `.omo`, or the output directory. Existing final archives are
 refused. Other versions must be explicit numeric dotted versions, optionally
 with a prerelease suffix.
+
+### Release candidate dry-run
+
+Maintainers can dispatch the manual `release-dry-run.yml` workflow from a
+candidate branch or tag. The selected workflow ref is the source revision used
+for the run; there is no separate revision input. Supply the candidate version
+without a leading `v` for a versioned tag (for example, tag `v1.2.3` requires
+version `1.2.3`). A successful dry-run provides source and binary archives,
+SPDX 2.3 JSON and matching license reports, `release-notes.md`, and
+`SHA256SUMS`; the workflow validates the SPDX schema and checks every listed
+checksum. It does not publish or sign the candidate. Signing and publication
+are later actions after the remaining conditions in the release-safety
+decision are resolved; AC-016 remains incomplete until public release and
+clean-environment installation evidence exists.
 
 ### Arch package
 

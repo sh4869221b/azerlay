@@ -1,0 +1,200 @@
+name: Release candidate dry-run
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Explicit candidate version; tags must match after one leading v.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  full-arch:
+    uses: ./.github/workflows/arch-ci.yml
+    with:
+      commit: ${{ github.sha }}
+
+  build:
+    name: Build release candidate
+    needs: [full-arch]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    container: archlinux:base
+    defaults:
+      run:
+        shell: bash
+    outputs:
+      commit: ${{ steps.candidate.outputs.commit }}
+      version: ${{ steps.candidate.outputs.version }}
+    steps:
+      - name: Require same-commit full Arch success
+        id: candidate
+        env:
+          ARCH_RESULT: ${{ needs.full-arch.result }}
+          VALIDATED_COMMIT: ${{ needs.full-arch.outputs.validated-commit }}
+          EXPECTED_COMMIT: ${{ github.sha }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          test "$ARCH_RESULT" = success
+          [[ "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          test "$VALIDATED_COMMIT" = "$EXPECTED_COMMIT"
+          [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+)+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$ ]]
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            tag=${GITHUB_REF#refs/tags/}
+            test "${tag#v}" = "$VERSION"
+          fi
+          printf 'commit=%s\nversion=%s\n' "$EXPECTED_COMMIT" "$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Install candidate build dependencies
+        run: |
+          set -euo pipefail
+          pacman -Syu --noconfirm --needed python python-jsonschema ca-certificates git curl tar gzip base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection
+
+      - name: Check out candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact checked-out commit
+        env:
+          EXPECTED_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          actual=$(git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD)
+          test "$actual" = "$EXPECTED_COMMIT"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Set up candidate Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.27.2
+          cache: false
+
+      - name: Install pinned Syft and SPDX schema
+        run: |
+          set -euo pipefail
+          source .github/ci-tools.env
+          tools="$RUNNER_TEMP/release-tools"
+          mkdir -p "$tools"
+          archive="syft_${SYFT_VERSION#v}_linux_amd64.tar.gz"
+          checksums="syft_${SYFT_VERSION#v}_checksums.txt"
+          base="https://github.com/anchore/syft/releases/download/$SYFT_VERSION"
+          curl --fail --location --proto '=https' --tlsv1.2 "$base/$archive" -o "$tools/$archive"
+          curl --fail --location --proto '=https' --tlsv1.2 "$base/$checksums" -o "$tools/$checksums"
+          (
+            cd "$tools"
+            awk -v archive="$archive" '$2 == archive {print; found=1} END {if (!found) exit 1}' "$checksums" | sha256sum -c -
+            tar -xzf "$archive" syft
+          )
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            "https://raw.githubusercontent.com/anchore/syft/$SYFT_VERSION/schema/spdx-json/spdx-schema-2.3.json" \
+            -o "$tools/spdx-schema-2.3.json"
+          printf 'SYFT=%s/syft\nSPDX_SCHEMA=%s/spdx-schema-2.3.json\n' "$tools" "$tools" >> "$GITHUB_ENV"
+
+      - name: Generate non-publishing candidate
+        env:
+          VERSION: ${{ steps.candidate.outputs.version }}
+          CGO_ENABLED: '1'
+        run: |
+          set -euo pipefail
+          bash scripts/release-dry-run.sh "$VERSION" "$RUNNER_TEMP/release-candidate"
+
+      - name: Upload candidate outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-candidate
+          path: |
+            ${{ runner.temp }}/release-candidate/azerlay-${{ steps.candidate.outputs.version }}-source.tar.gz
+            ${{ runner.temp }}/release-candidate/azerlay-${{ steps.candidate.outputs.version }}-linux-x86_64.tar.gz
+            ${{ runner.temp }}/release-candidate/azerlay-${{ steps.candidate.outputs.version }}-source.spdx.json
+            ${{ runner.temp }}/release-candidate/azerlay-${{ steps.candidate.outputs.version }}-linux-x86_64.spdx.json
+            ${{ runner.temp }}/release-candidate/azerlay-${{ steps.candidate.outputs.version }}-source.licenses.json
+            ${{ runner.temp }}/release-candidate/azerlay-${{ steps.candidate.outputs.version }}-linux-x86_64.licenses.json
+            ${{ runner.temp }}/release-candidate/release-notes.md
+            ${{ runner.temp }}/release-candidate/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload runtime smoke helper
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-smoke-helper
+          path: scripts/release-smoke.sh
+          if-no-files-found: error
+          retention-days: 7
+
+  runtime:
+    name: Clean Arch runtime smoke
+    needs: [build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    container: archlinux:base
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Install runtime dependencies and inspection tool
+        run: |
+          set -euo pipefail
+          pacman -Syu --noconfirm --needed gtk4 gtk4-layer-shell libgirepository glib2 pango harfbuzz gdk-pixbuf2 cairo vulkan-icd-loader graphene glibc binutils
+
+      - name: Download candidate outputs
+        uses: actions/download-artifact@v4
+        with:
+          name: release-candidate
+          path: ${{ runner.temp }}/release-candidate
+
+      - name: Download runtime smoke helper
+        uses: actions/download-artifact@v4
+        with:
+          name: release-smoke-helper
+          path: ${{ runner.temp }}/release-smoke-helper
+
+      - name: Verify checksums and smoke as ordinary user
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          set -euo pipefail
+          for tool in go gcc cc clang pkg-config; do
+            if command -v "$tool"; then
+              printf 'Unexpected build tool in clean runtime: %s\n' "$tool" >&2
+              exit 1
+            fi
+          done
+          useradd --create-home --user-group azerlay-smoke
+          chown -R azerlay-smoke:azerlay-smoke "$RUNNER_TEMP/release-candidate" "$RUNNER_TEMP/release-smoke-helper"
+          cd "$RUNNER_TEMP/release-candidate"
+          runuser -u azerlay-smoke -- sha256sum -c SHA256SUMS
+          runuser -u azerlay-smoke -- bash "$RUNNER_TEMP/release-smoke-helper/release-smoke.sh" \
+            "$RUNNER_TEMP/release-candidate/azerlay-$VERSION-linux-x86_64.tar.gz" "$VERSION"
+
+  dry-run-complete:
+    name: Require complete candidate dry-run
+    needs: [full-arch, build, runtime]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Require every candidate job at the same commit
+        env:
+          ARCH_RESULT: ${{ needs.full-arch.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          RUNTIME_RESULT: ${{ needs.runtime.result }}
+          VALIDATED_COMMIT: ${{ needs.full-arch.outputs.validated-commit }}
+          BUILT_COMMIT: ${{ needs.build.outputs.commit }}
+          EXPECTED_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$ARCH_RESULT" = success
+          test "$BUILD_RESULT" = success
+          test "$RUNTIME_RESULT" = success
+          [[ "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          test "$VALIDATED_COMMIT" = "$EXPECTED_COMMIT"
+          test "$BUILT_COMMIT" = "$EXPECTED_COMMIT"
+          printf 'Candidate dry-run passed for %s. No publication or signing was performed; publication conditions and AC-016 remain separate.\n' "$EXPECTED_COMMIT" >> "$GITHUB_STEP_SUMMARY"

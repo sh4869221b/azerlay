@@ -73,7 +73,7 @@ exit 91
                 env=env, capture_output=True, text=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            expected = required_legal_files(ROOT)
+            expected = required_legal_files(ROOT) + ["CHANGELOG.md"]
             for archive in output.glob("*.tar.gz"):
                 with self.subTest(archive=archive.name), tarfile.open(archive) as packed:
                     for relative in expected:
