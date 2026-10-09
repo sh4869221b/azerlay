@@ -51,7 +51,7 @@ if [[ "$output_dir" == "$repo_root/"* ]]; then
   excludes+=(--exclude="${output_dir#"$repo_root/"}")
 fi
 tar "${excludes[@]}" -C "$repo_root" -cf - -- \
-  go.mod go.sum cmd internal scripts packaging README.md docs \
+  go.mod go.sum cmd internal scripts packaging README.md CHANGELOG.md docs \
   LICENSE NOTICE THIRD_PARTY_NOTICES.md LICENSES |
   tar -C "$source_root" -xf -
 (
@@ -59,7 +59,7 @@ tar "${excludes[@]}" -C "$repo_root" -cf - -- \
   GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -trimpath -buildvcs=false \
     -ldflags "-X main.version=$version" -o "$binary_root/bin/azerlay" ./cmd/azerlay
 )
-cp -a -- "$source_root/README.md" "$source_root/docs" \
+cp -a -- "$source_root/README.md" "$source_root/CHANGELOG.md" "$source_root/docs" \
   "$source_root/LICENSE" "$source_root/NOTICE" \
   "$source_root/THIRD_PARTY_NOTICES.md" "$source_root/LICENSES" "$binary_root/"
 cp -a -- "$source_root/packaging/udev/71-azerlay.rules" \
