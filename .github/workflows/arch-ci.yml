@@ -140,6 +140,7 @@ jobs:
 
       - name: Install Staticcheck
         env:
+          GOTOOLCHAIN: local
           GOMODCACHE: /tmp/azerlay-tool-go-mod
         run: |
           bash scripts/ci-install-staticcheck.sh

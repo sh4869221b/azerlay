@@ -1,5 +1,6 @@
 """Fail-closed guards for the temporary, isolated Staticcheck source pin."""
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -26,7 +27,7 @@ set -euo pipefail
 printf '%s\\n' "$*" >> "$GO_COMMAND_LOG"
 case "$*" in
   'env GOVERSION') printf '%s\\n' "$TEST_GO_VERSION" ;;
-  'env GOTOOLCHAIN') printf '%s\\n' "$TEST_TOOLCHAIN" ;;
+  'env GOTOOLCHAIN') printf '%s\\n' "${GOTOOLCHAIN:-auto}" ;;
   *'{{.Replace.Path}}@{{.Replace.Version}}'*) printf '%s\\n' "$TEST_SOURCE" ;;
   *'{{.Version}}'*) printf '%s\\n' "$TEST_IMPORTER" ;;
   'install -mod=readonly honnef.co/go/tools/cmd/staticcheck')
@@ -40,7 +41,7 @@ esac
                         if line and not line.startswith('#'))
             env = dict(os.environ, PATH=str(binaries) + ':' + os.environ['PATH'],
                        GO_COMMAND_LOG=str(root / 'commands'), TEST_GO_VERSION='go1.27.2',
-                       TEST_TOOLCHAIN='local',
+                       GOTOOLCHAIN='local',
                        TEST_SOURCE='github.com/stefanb/go-tools@' + pins['STATICCHECK_VERSION'],
                        TEST_IMPORTER=pins['STATICCHECK_X_TOOLS_VERSION'])
             env.update(changes)
@@ -55,7 +56,7 @@ esac
                                         'mod verify'])
 
     def test_wrong_toolchain_source_or_importer_stops_before_install(self):
-        for change in ({'TEST_GO_VERSION': 'go1.27.1'}, {'TEST_TOOLCHAIN': 'auto'},
+        for change in ({'TEST_GO_VERSION': 'go1.27.1'}, {'GOTOOLCHAIN': 'auto'},
                        {'TEST_SOURCE': 'github.com/other/go-tools@latest'},
                        {'TEST_SOURCE': 'github.com/stefanb/go-tools@latest'},
                        {'TEST_IMPORTER': 'v0.44.1'}):
@@ -63,6 +64,27 @@ esac
                 result, commands = self.run_installer(**change)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertFalse(any(command.startswith('install ') for command in commands))
+
+    def test_arch_and_nix_invocations_select_local_from_default_auto(self):
+        arch = (ROOT / '.github/workflows/arch-ci.yml').read_text()
+        install = arch.split('      - name: Install Staticcheck\n', 1)[1].split('      - name:', 1)[0]
+        setting = re.search(r'^          GOTOOLCHAIN: (\S+)$', install, re.M)
+        arch_toolchain = setting.group(1) if setting else 'auto'
+        self.assertEqual(arch_toolchain, 'local')
+
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        install = workflow.split('      - name: Install Staticcheck\n', 1)[1].split('      - name:', 1)[0]
+        self.assertIn('--command bash scripts/ci-nix-run.sh', install)
+        wrapper = (ROOT / 'scripts/ci-nix-run.sh').read_text()
+        export = re.search(r'^export GOTOOLCHAIN=.*$', wrapper, re.M).group(0)
+        environment = subprocess.run(
+            ['bash', '-c', export + '\nprintf %s "$GOTOOLCHAIN"'],
+            env=dict(os.environ, GOTOOLCHAIN='auto'), capture_output=True, text=True, check=True)
+        self.assertEqual(environment.stdout, 'local')
+        for toolchain in (arch_toolchain, environment.stdout):
+            result, commands = self.run_installer(GOTOOLCHAIN=toolchain)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('install -mod=readonly honnef.co/go/tools/cmd/staticcheck', commands)
 
     def test_checksum_failure_propagates(self):
         result, _ = self.run_installer(TEST_VERIFY_STATUS='8')
