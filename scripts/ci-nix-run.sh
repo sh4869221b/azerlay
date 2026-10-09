@@ -18,17 +18,24 @@ for directory in "$CI_NIX_STATE" "$GOCACHE" "$GOMODCACHE"; do
 done
 if (($# == 0)); then printf 'A command is required\n' >&2; exit 2; fi
 if ((EUID == 0)); then printf 'Nix comparison tests must be non-root\n' >&2; exit 1; fi
-unset GOROOT GOTOOLDIR
-export GOTOOLCHAIN=local CGO_ENABLED=1 GOENV=off GOFLAGS=
+unset GOROOT GOTOOLDIR GO_LDSO
+export GOTOOLCHAIN=local CGO_ENABLED=1 GOENV=off
 export GOOS=linux GOARCH=amd64 GOAMD64=v1
-# Match the Nix Go builder's explicit dynamic loader selection for CGo.
+# The unmodified upstream SDK uses Go's linker flag instead of Nix's patch.
+# This selects the pinned loader for both internal and external CGo links.
 : "${NIX_CC:?Pinned Nix C compiler is required}"
 if [[ "$NIX_CC" != /nix/store/* || ! -f "$NIX_CC/nix-support/dynamic-linker" ]]; then
   printf 'Missing pinned C compiler dynamic linker\n' >&2
   exit 1
 fi
-export GO_LDSO
-GO_LDSO=$(cat "$NIX_CC/nix-support/dynamic-linker")
+nix_ldso=$(cat "$NIX_CC/nix-support/dynamic-linker")
+if [[ "$nix_ldso" != /nix/store/* || ! -f "$nix_ldso" ]]; then
+  printf 'Missing pinned dynamic linker\n' >&2
+  exit 1
+fi
+# Internal links also need libc's runtime search path; external links retain
+# the compiler wrapper's other native-library rpaths. Quote one GOFLAGS token.
+export GOFLAGS="'-ldflags=-I=$nix_ldso -r=${nix_ldso%/*}'"
 export GOBIN="$CI_NIX_STATE/bin" GOPATH="$CI_NIX_STATE/go"
 export PATH="$GOBIN:$AZERLAY_NIX_PATH"
 export HOME="$CI_NIX_STATE/home"

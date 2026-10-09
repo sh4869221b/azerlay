@@ -3,6 +3,7 @@ import copy
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import tempfile
 import unittest
@@ -15,11 +16,13 @@ spec.loader.exec_module(nix)
 
 
 def lock_fixture():
-    source = {'type': 'github', 'owner': 'NixOS', 'repo': 'nixpkgs', 'rev': nix.REVISION}
-    return {'version': 7, 'root': 'root', 'nodes': {
-        'root': {'inputs': {'nixpkgs': 'nixpkgs'}},
-        'nixpkgs': {'original': dict(source), 'locked': {
-            **source, 'narHash': nix.NAR_HASH, 'lastModified': 1}}}}
+    nodes = {'root': {'inputs': {name: name for name in nix.PINNED_INPUTS}}}
+    for name, (source, nar_hash) in nix.PINNED_INPUTS.items():
+        nodes[name] = {'original': dict(source), 'locked': {
+            **source, 'narHash': nar_hash, 'lastModified': 1}}
+        if name == 'go-sdk':
+            nodes[name]['flake'] = False
+    return {'version': 7, 'root': 'root', 'nodes': nodes}
 
 
 def derivation_show_fixture():
@@ -40,23 +43,26 @@ class NixPreparationTests(unittest.TestCase):
         self.assertTrue(nix.validate_lock(lock_fixture()).startswith('sha256-'))
 
     def test_revision_source_extra_inputs_and_hash_rejected(self):
-        mutations = [
-            lambda x: x['nodes']['nixpkgs']['locked'].update(rev='main'),
-            lambda x: x['nodes']['nixpkgs']['original'].update(owner='other'),
-            lambda x: x['nodes'].update(extra={}),
-            lambda x: x['nodes']['nixpkgs']['locked'].update(narHash='sha256-fake'),
-            lambda x: x['nodes']['nixpkgs']['locked'].update(narHash='sha256-' + base64.b64encode(b'x' * 32).decode()),
-            lambda x: x['nodes']['nixpkgs']['original'].update(dir='redirected'),
-            lambda x: x['nodes']['nixpkgs']['locked'].update(host='other.example'),
-            lambda x: x['nodes'].update(nixpkgs=None),
-            lambda x: x.update(version=8),
-        ]
-        for mutate in mutations:
-            with self.subTest(mutate=mutate):
-                lock = copy.deepcopy(lock_fixture())
-                mutate(lock)
-                with self.assertRaises(ValueError):
-                    nix.validate_lock(lock)
+        for name in nix.PINNED_INPUTS:
+            mutations = [
+                lambda x: x['nodes'][name]['locked'].update(rev='main'),
+                lambda x: x['nodes'][name]['original'].update(owner='other'),
+                lambda x: x['nodes'].update(extra={}),
+                lambda x: x['nodes'][name]['locked'].update(narHash='sha256-fake'),
+                lambda x: x['nodes'][name]['locked'].update(narHash='sha256-' + base64.b64encode(b'x' * 32).decode()),
+                lambda x: x['nodes'][name]['original'].update(dir='redirected'),
+                lambda x: x['nodes'][name]['locked'].update(host='other.example'),
+                lambda x: x['nodes'].update({name: None}),
+                lambda x: x['nodes']['root']['inputs'].update({name: 'other'}),
+                lambda x: x['nodes']['root']['inputs'].pop(name),
+                lambda x: x.update(version=8),
+            ]
+            for mutate in mutations:
+                with self.subTest(name=name, mutate=mutate):
+                    lock = copy.deepcopy(lock_fixture())
+                    mutate(lock)
+                    with self.assertRaises(ValueError):
+                        nix.validate_lock(lock)
 
     def test_old_and_new_derivation_formats(self):
         path = '0' * 32 + '-gtk4.drv'
@@ -103,11 +109,53 @@ class NixPreparationTests(unittest.TestCase):
         root = Path(__file__).parents[2]
         flake = (root / 'flake.nix').read_text()
         self.assertIn('github:NixOS/nixpkgs/' + nix.REVISION, flake)
-        self.assertIn('go_1_27', flake)
+        self.assertIn('url = "' + nix.GO_URL + '";', flake)
+        self.assertIn('flake = false;', flake)
+        self.assertIn('baseTools = [ go-sdk.outPath ]', flake)
+        self.assertIn('builtins.readFile "${go-sdk}/VERSION"', flake)
+        self.assertIn('pkgs = import nixpkgs { inherit system; };', flake)
+        self.assertNotIn('go_1_27', flake)
         self.assertIn('GOTOOLCHAIN = "local"', flake)
         self.assertNotIn('nixConfig', flake)
         self.assertNotIn('trusted-public-keys', flake)
         self.assertNotIn('shellHook =', flake)
+
+    def test_sdk_source_redirects_and_flake_execution_are_rejected(self):
+        mutations = [
+            lambda x: x['nodes']['go-sdk']['original'].update(url='https://other.example/sdk.tar.gz'),
+            lambda x: x['nodes']['go-sdk']['locked'].update(url='https://go.dev/dl/go1.27.1.linux-amd64.tar.gz'),
+            lambda x: x['nodes']['go-sdk'].update(flake=True),
+            lambda x: x['nodes']['go-sdk'].pop('flake'),
+        ]
+        for mutate in mutations:
+            with self.subTest(mutate=mutate):
+                lock = lock_fixture()
+                mutate(lock)
+                with self.assertRaises(ValueError):
+                    nix.validate_lock(lock)
+
+    def test_ci_go_versions_and_cache_keys_match(self):
+        root = Path(__file__).parents[2]
+        version = nix.EXPECTED_VERSIONS['go']
+        self.assertEqual(version, '1.27.2')
+        for name in ('ci.yml', 'arch-ci.yml'):
+            workflow = (root / '.github/workflows' / name).read_text()
+            self.assertEqual(set(re.findall(r'go-version: (\S+)', workflow)), {version})
+        native = (root / '.github/actions/native-go-cache/action.yml').read_text()
+        self.assertIn('go-version: ' + version, native)
+        cache = (root / '.github/actions/nix-go-cache/action.yml').read_text()
+        self.assertIn('= go' + version, cache)
+        self.assertIn('= "$AZERLAY_NIX_GO_ROOT"', cache)
+        keys = [line for line in cache.splitlines() if 'key: ' in line]
+        self.assertEqual(len(keys), 4)
+        for key in keys:
+            if 'cache-primary-key' not in key:
+                self.assertIn('-go-' + version + '-', key)
+
+    def test_previous_go_version_is_rejected_before_dependency_fetch(self):
+        versions = {**nix.EXPECTED_VERSIONS, 'go': '1.27.1'}
+        commands = self.run_preparation(versions=versions)
+        self.assertFalse(any(c[1] == 'build' for c in commands))
 
     def test_committed_lock_has_valid_fixed_identity(self):
         import json

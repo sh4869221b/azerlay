@@ -2,7 +2,7 @@
 
 [CI](../.github/workflows/ci.yml) runs for pull requests and pushes to `main`.
 It has read-only repository permissions and cancels superseded runs for the
-same pull request. All Go jobs use Go 1.27.1. CI-only tools are installed with
+same pull request. All Go jobs use Go 1.27.2. CI-only tools are installed with
 explicit versions without changing the application's `go.mod` or `go.sum`.
 The owner selected pinned Nix for normal CI on 2026-10-07. Latest Arch runs
 independently each day and through manual pre-release verification; see the
@@ -23,12 +23,29 @@ The `test` job rejects any output from `gofmt -l .`, then runs:
 
 ```sh
 go vet ./...
-go install honnef.co/go/tools/cmd/staticcheck@2026.2.1
+bash scripts/ci-install-staticcheck.sh
 staticcheck ./...
 mapfile -t native < scripts/ci-native-packages.txt
 scripts/test-wayland.sh go test -race -json -shuffle=on -count=1 "${native[@]}"
 go build ./cmd/azerlay
 ```
+
+Staticcheck currently uses the exact Go 1.27.2 compatibility source from
+[upstream PR #1834](https://github.com/dominikh/go-tools/pull/1834), commit
+`a0a7f6a7b6af6eaa66e22ff3a5f78725e27decf2`. This is an unmerged development
+commit, not a tagged release. Staticcheck 2026.2.1's old importer cannot decode
+Go 1.27.2 export format V5. The upstream fix updates `x/tools` to v0.51.0 and
+replaces two removed private-symbol links with their equivalent implementations.
+The [Go tools V5 decoder change](https://github.com/golang/tools/commit/89ed5c340cb6d4a9437f801cfc718ac5980c938d)
+explains the format compatibility requirement.
+
+`scripts/ci-staticcheck` is a separate CI-only module. Its replacement pin and
+checksums select that exact compatibility source without changing application
+`go.mod` or `go.sum`. Installation requires Go 1.27.2, checks the exact source and
+importer versions, uses `-mod=readonly`, and verifies module contents. Both Arch
+and Nix use the same installer; tool cache keys include the tool module's lock
+files. Replace this temporary source pin with a compatible tagged upstream
+release when one is available. All default Staticcheck findings still fail CI.
 
 Every ordinary root-module package has a required race/shuffle/uncached test run:
 core packages in `generated-files`, native packages in `test`. Core packages
@@ -152,7 +169,7 @@ from this job by `-run='^$'`. Longer fuzz campaigns are outside PR CI.
 ## Distribution builds and GTK coverage
 
 `test`, `native-build`, `vulnerability`, and `licenses` use the pinned
-[Nix native environment](ci-nix.md), including the locked Go 1.27.1 and native
+[Nix native environment](ci-nix.md), including the locked Go 1.27.2 and native
 closure. The four roles retain current-checkout build/scan/test commands.
 The separate [Arch full validation](../.github/workflows/arch-ci.yml) runs all
 six quality gates against rolling `archlinux:base` / `pacman -Syu`, once daily

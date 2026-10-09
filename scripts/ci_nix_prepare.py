@@ -16,10 +16,16 @@ from pathlib import Path
 
 REVISION = "494ce7fd23ff6a5dff39e1fb11e9b6f2ac74bf25"
 NAR_HASH = "sha256-Ni0LBydzaCi8oek12r4mVreuFHqYlM1eTD6SfiENKfw="
+GO_URL = "https://go.dev/dl/go1.27.2.linux-amd64.tar.gz"
+GO_NAR_HASH = "sha256-cfmJqmWWpOFO5rSA0O74Wrw6C0a1mtyTTR3X7/fNbRc="
+PINNED_INPUTS = {
+    "nixpkgs": ({"type": "github", "owner": "NixOS", "repo": "nixpkgs", "rev": REVISION}, NAR_HASH),
+    "go-sdk": ({"type": "tarball", "url": GO_URL}, GO_NAR_HASH),
+}
 FLAKES = {role: ".#devShells.x86_64-linux.ci-" + role for role in ("test", "build")}
 EVALUATION_FLAGS = ["--no-update-lock-file", "--no-allow-import-from-derivation"]
 EXPECTED_VERSIONS = {
-    "system": "x86_64-linux", "go": "1.27.1", "gtk4": "4.22.4",
+    "system": "x86_64-linux", "go": "1.27.2", "gtk4": "4.22.4",
     "glib": "2.88.3", "layerShell": "1.3.0", "sway": "1.12",
     "cairo": "1.18.4", "pango": "1.57.1", "grim": "1.5.0",
     "atspi": "2.60.6", "dbus": "1.16.2",
@@ -32,31 +38,35 @@ def validate_lock(lock):
     if not isinstance(lock, dict) or lock.get("version") != 7 or lock.get("root") != "root":
         raise ValueError("Unexpected flake lock format")
     nodes = lock.get("nodes", {})
-    if not isinstance(nodes, dict) or set(nodes) != {"root", "nixpkgs"} or nodes["root"] != {"inputs": {"nixpkgs": "nixpkgs"}}:
+    root = {"inputs": {name: name for name in PINNED_INPUTS}}
+    if not isinstance(nodes, dict) or set(nodes) != {"root", *PINNED_INPUTS} or nodes["root"] != root:
         raise ValueError("Unexpected extra or redirected flake inputs")
-    node = nodes["nixpkgs"]
-    if not isinstance(node, dict) or set(node) != {"locked", "original"}:
-        raise ValueError("Unexpected nixpkgs input fields")
-    expected = {"type": "github", "owner": "NixOS", "repo": "nixpkgs", "rev": REVISION}
-    for field in ("locked", "original"):
-        source = node.get(field)
-        fields = set(expected) | ({"narHash", "lastModified"} if field == "locked" else set())
-        if not isinstance(source, dict) or set(source) != fields or any(source.get(k) != v for k, v in expected.items()):
-            raise ValueError("Nixpkgs revision or source changed")
-    value = node["locked"].get("narHash", "")
-    if not isinstance(value, str) or not value.startswith("sha256-"):
-        raise ValueError("Missing SHA-256 NAR hash")
-    try:
-        decoded = base64.b64decode(value[7:], validate=True)
-    except ValueError as exc:
-        raise ValueError("Invalid NAR hash") from exc
-    if len(decoded) != 32:
-        raise ValueError("Invalid NAR hash length")
-    if value != NAR_HASH:
-        raise ValueError("Pinned nixpkgs NAR hash changed")
-    # This validates identity/shape, not the hash independently. Nix fetches and
-    # verifies the actual source against this hash during evaluation.
-    return value
+    for name, (expected, nar_hash) in PINNED_INPUTS.items():
+        node = nodes[name]
+        fields = {"locked", "original"} | ({"flake"} if name == "go-sdk" else set())
+        if not isinstance(node, dict) or set(node) != fields:
+            raise ValueError("Unexpected pinned input fields")
+        if name == "go-sdk" and node["flake"] is not False:
+            raise ValueError("Go SDK must remain a non-flake source")
+        for field in ("locked", "original"):
+            source = node.get(field)
+            fields = set(expected) | ({"narHash", "lastModified"} if field == "locked" else set())
+            if not isinstance(source, dict) or set(source) != fields or any(source.get(k) != v for k, v in expected.items()):
+                raise ValueError("Pinned input revision or source changed: " + name)
+        value = node["locked"].get("narHash", "")
+        if not isinstance(value, str) or not value.startswith("sha256-"):
+            raise ValueError("Missing SHA-256 NAR hash")
+        try:
+            decoded = base64.b64decode(value[7:], validate=True)
+        except ValueError as exc:
+            raise ValueError("Invalid NAR hash") from exc
+        if len(decoded) != 32:
+            raise ValueError("Invalid NAR hash length")
+        if value != nar_hash:
+            raise ValueError("Pinned input NAR hash changed: " + name)
+    # This validates identity/shape, not the hashes independently. Nix fetches
+    # and verifies both actual sources against their hashes during evaluation.
+    return NAR_HASH
 
 
 def dependency_installables(graph):

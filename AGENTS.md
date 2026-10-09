@@ -51,7 +51,7 @@ azerlay/
 
 ## CONVENTIONS
 
-- Require Go 1.27.x; CI currently installs 1.27.1.
+- Require Go 1.27.x; CI currently installs 1.27.2.
 - Before implementation, read the assigned GitHub issue's scope, dependencies, blockers, acceptance criteria, and required research; unresolved release-blocking research constrains support.
 - Add packages only when an issue introduces behavior; do not pre-create the planned package tree.
 - Keep the application one Go binary and one process, controlled by CLI/configuration and a same-user Unix socket.
