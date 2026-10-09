@@ -17,7 +17,7 @@ runs:
         test "$GOMODCACHE" = /tmp/azerlay-go-mod
         test "$GOCACHE" = /tmp/azerlay-go-build
         nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command bash scripts/ci-nix-run.sh bash -c '
-          test "$(go env GOVERSION)" = go1.27.1
+          test "$(go env GOVERSION)" = go1.27.2
           test "$(go env GOTOOLCHAIN)" = local
           command -v zstd
         '
@@ -27,7 +27,7 @@ runs:
       uses: actions/cache/restore@v4
       with:
         path: /tmp/azerlay-go-mod/cache/download
-        key: azerlay-mod-v2-${{ runner.os }}-${{ runner.arch }}-go-1.27.1-${{ hashFiles('go.mod', 'go.sum', 'scripts/ci-go-modules.sh') }}
+        key: azerlay-mod-v2-${{ runner.os }}-${{ runner.arch }}-go-1.27.2-${{ hashFiles('go.mod', 'go.sum', 'scripts/ci-go-modules.sh') }}
 
     - name: Restore Nix native Go build cache
       uses: actions/cache@v4
@@ -35,7 +35,7 @@ runs:
         path: /tmp/azerlay-go-build
         # Complete locked shell closure plus toolchain/compiler/font/role inputs.
         # No restore prefix or cross-distro build-cache fallback.
-        key: azerlay-nix-build-v1-${{ runner.os }}-${{ runner.arch }}-go-1.27.1-${{ hashFiles('go.mod', 'go.sum', '.github/ci-tools.env', '.git/ci-native-cache-input') }}
+        key: azerlay-nix-build-v1-${{ runner.os }}-${{ runner.arch }}-go-1.27.2-${{ hashFiles('go.mod', 'go.sum', '.github/ci-tools.env', '.git/ci-native-cache-input') }}
 
     - name: Download and verify application modules
       shell: bash
@@ -54,4 +54,4 @@ runs:
       uses: actions/cache@v4
       with:
         path: /tmp/azerlay-tool-go-mod/cache/download
-        key: azerlay-tool-mod-v2-${{ runner.os }}-${{ runner.arch }}-go-1.27.1-${{ github.job }}-${{ hashFiles('.github/ci-tools.env') }}
+        key: azerlay-tool-mod-v2-${{ runner.os }}-${{ runner.arch }}-go-1.27.2-${{ github.job }}-${{ hashFiles('.github/ci-tools.env') }}

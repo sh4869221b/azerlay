@@ -4,13 +4,17 @@
   # Source archive and NAR hash are committed in flake.lock. CI never updates it.
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/494ce7fd23ff6a5dff39e1fb11e9b6f2ac74bf25";
 
-  outputs = { nixpkgs, ... }:
+  # Only Go comes from this security update; native tools/libraries stay pinned.
+  inputs.nixpkgs-go.url = "github:NixOS/nixpkgs/4b4931b2f5d285574aa1fbdbbf58e6aab595d31c";
+
+  outputs = { nixpkgs, nixpkgs-go, ... }:
     let
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
+      go = (import nixpkgs-go { inherit system; }).go_1_27;
       lib = pkgs.lib;
       baseTools = with pkgs; [
-        go_1_27 pkg-config python3 git bash coreutils findutils gnugrep gnused
+        go pkg-config python3 git bash coreutils findutils gnugrep gnused
         gawk diffutils binutils which zstd cacert fontconfig
       ];
       libraries = with pkgs; [
@@ -50,7 +54,7 @@
       };
       ciVersions = {
         inherit system;
-        go = pkgs.go_1_27.version;
+        go = go.version;
         gtk4 = pkgs.gtk4.version;
         glib = pkgs.glib.version;
         layerShell = pkgs.gtk4-layer-shell.version;

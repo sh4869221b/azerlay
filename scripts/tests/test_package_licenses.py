@@ -53,7 +53,7 @@ class LicensePackagingTests(unittest.TestCase):
                 "uname": '#!/bin/sh\ncase "$1" in -s) echo Linux;; -m) echo x86_64;; *) exit 1;; esac\n',
                 "pkg-config": "#!/bin/sh\nexit 0\n",
                 "go": '''#!/bin/sh
-if [ "$1" = env ] && [ "$2" = GOVERSION ]; then echo go1.27.1; exit 0; fi
+if [ "$1" = env ] && [ "$2" = GOVERSION ]; then echo go1.27.2; exit 0; fi
 if [ "$1" != build ]; then exit 90; fi
 while [ "$#" -gt 0 ]; do
   if [ "$1" = -o ]; then shift; printf 'synthetic packaging test, not an executable\\n' > "$1"; exit 0; fi
