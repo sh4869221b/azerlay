@@ -42,7 +42,8 @@ Nix verifies that hash when fetching the archive. No Go build derivation is
 introduced. Native dependency outputs still require the default signed Nix
 cache with `--max-jobs 0 --builders ''`. The source input is already available
 during evaluation, just as the hash-verified nixpkgs source is. It remains a
-reference in the shell closure and therefore in the compiled-cache fingerprint.
+reference in the shell closure. The Go cache action verifies that SDK root and
+version; the build fingerprint records the effective Go version/settings.
 
 ### Go security update
 
@@ -150,9 +151,13 @@ Do not cache all of `/nix/store` with a generic archive action. A targeted closu
 cache can be a separately measured later change if transfer is the bottleneck.
 
 Go module downloads, tool module downloads, normal compiled results and race
-compiled results need distinct caches. Compile-cache keys must include the
-complete shell closure fingerprint, role, job, Go/tool versions, go.mod/go.sum,
-and the relevant scripts/workflow. Do not restore across Nix/Ubuntu/Arch or ABI
+compiled results need distinct caches. The adopted compile-cache keys include
+native compiler/development/library output identities, effective Go/CGO/link
+settings, resolved Go version and go.mod/go.sum. A semantic normal/race profile
+keeps immutable snapshot contents suitable for the consuming gate. Workflow/job
+names, GUI runtime closure and analyzer versions are excluded; see the current
+[cache boundary and regression policy](ci.md#module-and-native-build-caches).
+Do not restore across Nix/Ubuntu/Arch or ABI
 boundaries. No broad restore prefix should bypass those boundaries. Module
 archives may share only when the existing path/compression/key contract matches.
 

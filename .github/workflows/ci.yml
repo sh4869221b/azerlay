@@ -67,9 +67,7 @@ jobs:
           python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/nix-prepare-time.json" -- \
             python3 scripts/ci_nix_prepare.py --role "$CI_NIX_ROLE" --output "$CI_NIX_OUTPUT"
 
-      - name: Prepare complete Nix Go cache fingerprint
-        env:
-          CI_CACHE_JOB: ${{ github.job }}
+      - name: Prepare Nix build compatibility fingerprint
         run: |
           set -euo pipefail
           nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command \
@@ -78,7 +76,8 @@ jobs:
       - name: Restore isolated Nix Go caches
         uses: ./.github/actions/nix-go-cache
         with:
-          tool-cache: 'true'
+          tool-cache: 'staticcheck'
+          build-profile: 'race'
 
       - name: Check complete package partition and formatting
         run: |
@@ -257,9 +256,7 @@ jobs:
           python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/nix-prepare-time.json" -- \
             python3 scripts/ci_nix_prepare.py --role "$CI_NIX_ROLE" --output "$CI_NIX_OUTPUT"
 
-      - name: Prepare complete Nix Go cache fingerprint
-        env:
-          CI_CACHE_JOB: ${{ github.job }}
+      - name: Prepare Nix build compatibility fingerprint
         run: |
           set -euo pipefail
           nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command \
@@ -352,9 +349,7 @@ jobs:
           python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/nix-prepare-time.json" -- \
             python3 scripts/ci_nix_prepare.py --role "$CI_NIX_ROLE" --output "$CI_NIX_OUTPUT"
 
-      - name: Prepare complete Nix Go cache fingerprint
-        env:
-          CI_CACHE_JOB: ${{ github.job }}
+      - name: Prepare Nix build compatibility fingerprint
         run: |
           set -euo pipefail
           nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command \
@@ -363,7 +358,7 @@ jobs:
       - name: Restore isolated Nix Go caches
         uses: ./.github/actions/nix-go-cache
         with:
-          tool-cache: 'true'
+          tool-cache: 'govulncheck'
 
       - name: Install govulncheck
         env:
@@ -451,9 +446,7 @@ jobs:
           python3 scripts/ci_time_command.py --output "$RUNNER_TEMP/nix-prepare-time.json" -- \
             python3 scripts/ci_nix_prepare.py --role "$CI_NIX_ROLE" --output "$CI_NIX_OUTPUT"
 
-      - name: Prepare complete Nix Go cache fingerprint
-        env:
-          CI_CACHE_JOB: ${{ github.job }}
+      - name: Prepare Nix build compatibility fingerprint
         run: |
           set -euo pipefail
           nix develop --no-update-lock-file ".#ci-$CI_NIX_ROLE" --command \
@@ -462,7 +455,7 @@ jobs:
       - name: Restore isolated Nix Go caches
         uses: ./.github/actions/nix-go-cache
         with:
-          tool-cache: 'true'
+          tool-cache: 'go-licenses'
 
       - name: Install go-licenses
         env:

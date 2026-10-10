@@ -23,9 +23,11 @@ or PR-triggered Actions files. There is no duplicate four-job comparison run.
 `.github/workflows/arch-ci.yml` retains the complete original six-gate suite,
 including scanners, core race/CGO=0, fuzz, native race/Wayland and generated-file
 checks. The four native roles run in Arch containers; the two GUI-free core/fuzz
-gates keep the original non-root Ubuntu hosted environment. Native roles use rolling `archlinux:base` and `pacman -Syu`; the complete
-installed native inventory and actual Arch workflow recipe isolate compiled
-caches. A native update legitimately forces recompilation.
+gates keep the original non-root Ubuntu hosted environment. Native roles use
+rolling `archlinux:base` and `pacman -Syu`; installed native build dependencies
+and their transitive closure, together with effective Go/compiler settings,
+isolate compiled caches. Unrelated package or workflow edits preserve the key.
+A native build dependency update legitimately forces recompilation.
 
 The cron is `17 20 * * *`: 20:17 UTC, or 05:17 JST the following day. This is a
 GitHub Actions schedule, not an assistant reminder. GitHub may delay scheduled

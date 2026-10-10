@@ -32,6 +32,11 @@
           packages = tools;
           buildInputs = libraries ++ fonts;
           AZERLAY_NIX_GO_ROOT = "${go-sdk}";
+          # Output store hashes retain native/transitive build identities.
+          # Exclude shell helpers, fonts and the compositor/test session.
+          AZERLAY_NIX_BUILD_INPUTS = lib.concatMapStringsSep "\n"
+            (p: "${lib.getDev p}\n${lib.getLib p}")
+            ([ pkgs.stdenv.cc pkgs.binutils pkgs.pkg-config ] ++ libraries);
           GOTOOLCHAIN = "local";
           CGO_ENABLED = "1";
           SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";

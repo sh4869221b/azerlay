@@ -5,8 +5,11 @@ inputs:
     description: Only native-build may publish the shared application module snapshot.
     default: 'false'
   tool-cache:
-    description: Keep this job's pinned analyzer modules separate from app modules.
+    description: Analyzer graph (staticcheck, govulncheck, go-licenses), or false.
     default: 'false'
+  build-profile:
+    description: Compiled snapshot contents (normal or race); independent of job names.
+    default: 'normal'
 runs:
   using: composite
   steps:
@@ -28,21 +31,34 @@ runs:
 
     # Save archives and integrity metadata, not both zips and extracted sources.
     # go mod download/go install reconstruct sources through Go's normal checks.
+    - name: Prepare effective cache settings
+      shell: bash
+      run: |
+        set -euo pipefail
+        test -s .git/ci-native-cache-input
+        bash scripts/ci-go-build-settings.sh >> .git/ci-native-cache-input
+
+    - name: Prepare analyzer module identity
+      if: inputs.tool-cache != 'false'
+      shell: bash
+      env:
+        CI_CACHE_TOOL: ${{ inputs.tool-cache }}
+      run: bash scripts/ci-tool-fingerprint.sh "$CI_CACHE_TOOL" > .git/ci-tool-cache-input
+
     - name: Restore shared Go modules
       id: modules
       uses: actions/cache/restore@v6
       with:
         path: /tmp/azerlay-go-mod/cache/download
-        key: azerlay-mod-v2-${{ runner.os }}-${{ runner.arch }}-go-${{ steps.go.outputs.go-version }}-${{ hashFiles('go.mod', 'go.sum', 'scripts/ci-go-modules.sh') }}
+        key: azerlay-mod-v3-${{ runner.os }}-${{ runner.arch }}-go-${{ steps.go.outputs.go-version }}-${{ hashFiles('go.mod', 'go.sum') }}
 
     - name: Restore native Go build cache
       uses: actions/cache@v6
       with:
         path: /tmp/azerlay-go-build
-        # The input includes distro, image/install recipe, native tools, job and
-        # the COMPLETE installed package list. Ubuntu and Arch never share builds.
+        # Arch native build dependency closure and effective Go/compiler settings.
         # No restore prefix may cross that compatibility boundary.
-        key: azerlay-build-v2-${{ runner.os }}-${{ runner.arch }}-go-${{ steps.go.outputs.go-version }}-${{ hashFiles('go.mod', 'go.sum', '.github/ci-tools.env', '.git/ci-native-cache-input') }}
+        key: azerlay-build-v3-${{ runner.os }}-${{ runner.arch }}-go-${{ steps.go.outputs.go-version }}-${{ inputs.build-profile }}-${{ hashFiles('go.mod', 'go.sum', '.git/ci-native-cache-input') }}
 
     - name: Download and verify application modules
       shell: bash
@@ -56,10 +72,9 @@ runs:
         key: ${{ steps.modules.outputs.cache-primary-key }}
 
     - name: Restore pinned tool modules
-      if: inputs.tool-cache == 'true'
+      if: inputs.tool-cache != 'false'
       uses: actions/cache@v6
       with:
         path: /tmp/azerlay-tool-go-mod/cache/download
-        # A single owning job installs and saves its own tool graph. Native
-        # package updates cannot invalidate these downloaded Go modules.
-        key: azerlay-tool-mod-v2-${{ runner.os }}-${{ runner.arch }}-go-${{ steps.go.outputs.go-version }}-${{ github.job }}-${{ hashFiles('.github/ci-tools.env', 'scripts/ci-staticcheck/go.mod', 'scripts/ci-staticcheck/go.sum') }}
+        # Go analyzer graph only; native packages and Syft do not affect downloads.
+        key: azerlay-tool-mod-v3-${{ runner.os }}-${{ runner.arch }}-go-${{ steps.go.outputs.go-version }}-${{ hashFiles('.git/ci-tool-cache-input') }}

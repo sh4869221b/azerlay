@@ -5,8 +5,11 @@ inputs:
     description: Native-build may publish the verified application module snapshot.
     default: 'false'
   tool-cache:
-    description: Restore this Nix role's pinned analyzer download graph.
+    description: Analyzer graph (staticcheck, govulncheck, go-licenses), or false.
     default: 'false'
+  build-profile:
+    description: Compiled snapshot contents (normal or race); independent of job names.
+    default: 'normal'
 runs:
   using: composite
   steps:
@@ -23,20 +26,33 @@ runs:
           command -v zstd
         '
 
+    - name: Prepare effective cache settings
+      shell: bash
+      run: |
+        set -euo pipefail
+        test -s .git/ci-native-cache-input
+
+    - name: Prepare analyzer module identity
+      if: inputs.tool-cache != 'false'
+      shell: bash
+      env:
+        CI_CACHE_TOOL: ${{ inputs.tool-cache }}
+      run: bash scripts/ci-tool-fingerprint.sh "$CI_CACHE_TOOL" > .git/ci-tool-cache-input
+
     - name: Restore shared Go modules
       id: modules
       uses: actions/cache/restore@v6
       with:
         path: /tmp/azerlay-go-mod/cache/download
-        key: azerlay-mod-v2-${{ runner.os }}-${{ runner.arch }}-go-1.27.2-${{ hashFiles('go.mod', 'go.sum', 'scripts/ci-go-modules.sh') }}
+        key: azerlay-mod-v3-${{ runner.os }}-${{ runner.arch }}-go-1.27.2-${{ hashFiles('go.mod', 'go.sum') }}
 
     - name: Restore Nix native Go build cache
       uses: actions/cache@v6
       with:
         path: /tmp/azerlay-go-build
-        # Complete locked shell closure plus toolchain/compiler/font/role inputs.
+        # Native build outputs and effective Go/compiler settings.
         # No restore prefix or cross-distro build-cache fallback.
-        key: azerlay-nix-build-v1-${{ runner.os }}-${{ runner.arch }}-go-1.27.2-${{ hashFiles('go.mod', 'go.sum', '.github/ci-tools.env', '.git/ci-native-cache-input') }}
+        key: azerlay-nix-build-v2-${{ runner.os }}-${{ runner.arch }}-go-1.27.2-${{ inputs.build-profile }}-${{ hashFiles('go.mod', 'go.sum', '.git/ci-native-cache-input') }}
 
     - name: Download and verify application modules
       shell: bash
@@ -49,10 +65,10 @@ runs:
         path: /tmp/azerlay-go-mod/cache/download
         key: ${{ steps.modules.outputs.cache-primary-key }}
 
-    # Tool archives are isolated by job and pinned analyzer versions.
+    # Each analyzer owns its graph; a renamed job can reuse its downloads.
     - name: Restore pinned Nix tool modules
-      if: inputs.tool-cache == 'true'
+      if: inputs.tool-cache != 'false'
       uses: actions/cache@v6
       with:
         path: /tmp/azerlay-tool-go-mod/cache/download
-        key: azerlay-tool-mod-v2-${{ runner.os }}-${{ runner.arch }}-go-1.27.2-${{ github.job }}-${{ hashFiles('.github/ci-tools.env', 'scripts/ci-staticcheck/go.mod', 'scripts/ci-staticcheck/go.sum') }}
+        key: azerlay-tool-mod-v3-${{ runner.os }}-${{ runner.arch }}-go-1.27.2-${{ hashFiles('.git/ci-tool-cache-input') }}
