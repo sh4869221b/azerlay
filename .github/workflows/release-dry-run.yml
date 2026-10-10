@@ -55,7 +55,7 @@ jobs:
           pacman -Syu --noconfirm --needed python python-jsonschema ca-certificates git curl tar gzip base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection
 
       - name: Check out candidate
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
