@@ -26,7 +26,7 @@ This table is maintained separately from the historical review above; see
 | github.com/ulikunitz/xz v0.5.16 | BSD-3-Clause, Ulrich Kunitz; `LICENSES/xz-BSD-3-Clause.txt` | https://github.com/ulikunitz/xz/tree/v0.5.16 |
 | github.com/urfave/cli/v3 v3.11.0 | MIT, urfave/cli maintainers; `LICENSES/urfave-cli-MIT.txt` | https://github.com/urfave/cli/tree/v3.11.0 |
 | golang.org/x/sys v0.44.0 | BSD-3-Clause, The Go Authors; `LICENSES/golang-BSD-3-Clause.txt` | https://github.com/golang/sys/tree/v0.44.0 |
-| github.com/ebitengine/purego v0.10.0 | Apache-2.0; `LICENSES/purego-Apache-2.0.txt` | https://github.com/ebitengine/purego/tree/v0.10.0 |
+| github.com/ebitengine/purego v0.11.1 | Apache-2.0; `LICENSES/purego-Apache-2.0.txt` | https://github.com/ebitengine/purego/tree/v0.11.1 |
 | golang.org/x/sync v0.20.0 | BSD-3-Clause, The Go Authors; `LICENSES/golang-BSD-3-Clause.txt` | https://github.com/golang/sync/tree/v0.20.0 |
 | golang.org/x/text v0.37.0 | BSD-3-Clause, The Go Authors; `LICENSES/golang-BSD-3-Clause.txt` | https://github.com/golang/text/tree/v0.37.0 |
 <!-- END GENERATED GO MODULES -->
