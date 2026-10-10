@@ -65,6 +65,8 @@ def render(root, required, policy, download):
             '| --- | --- | --- |']
     for path, version in required:
         entry = policy['modules'][path]
+        if '+' in version or re.search(r'-[0-9a-f]{12}$', version) and re.search(r'\d{14}-', version):
+            raise ValueError('non-tag Go version requires a corresponding-source review: ' + path)
         for name, expected in entry['local_files'].items():
             if digest(root / name) != expected:
                 raise ValueError('reviewed local license text changed: ' + name)

@@ -56,7 +56,8 @@ to a temporary directory so `go.mod` and `go.sum` remain byte-identical.
 [`scripts/go-notice-policy.json`](../scripts/go-notice-policy.json) records the
 reviewed terms, source templates, local notice hashes and recursive upstream
 LICENSE/COPYING/NOTICE/PATENTS file inventory/hashes. A new/removed requirement,
-replacement/exclusion, changed/missing/added legal file, or changed local notice
+replacement/exclusion, pseudo-version or `+incompatible` source tag,
+changed/missing/added legal file, or changed local notice
 fails closed. gotk4 additionally stays at its reviewed version, with recorded
 source-header exception hashes; any version update needs a fresh nested/file-level
 review. Matching named legal files is not an audit of every copyright header or

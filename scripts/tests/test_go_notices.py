@@ -38,7 +38,7 @@ class GoNoticesTests(unittest.TestCase):
                               self.policy, lambda path, version: self.module)
 
     def test_updates_version_source_and_is_idempotent(self):
-        for version in ('v0.5.17', 'v3.14.0', 'v1.2.4-0.20261010101718-abcdefabcdef'):
+        for version in ('v0.5.17', 'v3.14.0', 'v1.2.4-rc.1'):
             generated = self.render(version)
             self.assertIn('example.invalid/module ' + version, generated)
             self.assertIn('/tree/' + version, generated)
@@ -46,6 +46,11 @@ class GoNoticesTests(unittest.TestCase):
             self.assertTrue(generated.endswith('\nmanual native / nested / provenance notices\n'))
             (self.root / 'THIRD_PARTY_NOTICES.md').write_text(generated)
             self.assertEqual(self.render(version), generated)
+
+    def test_pseudo_and_incompatible_versions_require_source_review(self):
+        for version in ('v1.2.4-0.20261010101718-abcdefabcdef', 'v2.0.0+incompatible'):
+            with self.subTest(version=version), self.assertRaisesRegex(ValueError, 'non-tag Go version'):
+                self.render(version)
 
     def test_changed_upstream_text_fails_without_writing(self):
         (self.module / 'LICENSE').write_text('changed terms\n')
