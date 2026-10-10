@@ -22,6 +22,83 @@ versions, and the Staticcheck installer verifies the Go SDK, compatibility
 source, and importer versions. Update and validate those coupled pins together;
 Renovate excludes them to avoid proposing partial updates that fail these checks.
 
+### Go dependency notices
+
+The application `go.mod` and its generated Go table in
+[`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md) are managed together.
+Renovate's regex manager uses the Go datasource and the same per-module group
+as the root gomod manager. One dependency PR updates the requirement, `go.sum`,
+the table's version and its exact corresponding-source tag. Indirect requirements
+are included. Probe modules, CI tools, native libraries and historical `go.sum`
+provenance are outside that generated table.
+
+This works with the existing Mend-hosted Renovate app: no custom command execution,
+new token, write-enabled Actions workflow or repository permission change is
+needed. [Renovate post-upgrade commands](https://docs.renovatebot.com/configuration-options/#postupgradetasks)
+are blocked by default and require global administrator configuration. The reference
+[go-nico-list](https://github.com/sh4869221b/go-nico-list/tree/090af4a9570bd6c89fcb4c81786cd6441455f2a9)
+generates notices in a GoReleaser before hook, not in its Renovate configuration.
+Azerlay keeps its reviewed gotk4 exceptions and native notices instead of replacing
+those with one scanner label.
+
+Both normal Nix CI and full Arch validation run:
+
+```sh
+python3 scripts/go_notices.py --check
+```
+
+The standard-library Python generator reads requirements with `go mod edit -json`
+and downloads exact module versions using Go's public checksum database. It never
+compiles or executes dependency code and needs no GTK installation. Go and network
+access to `proxy.golang.org` and `sum.golang.org` are required; input files are copied
+to a temporary directory so `go.mod` and `go.sum` remain byte-identical.
+
+[`scripts/go-notice-policy.json`](../scripts/go-notice-policy.json) records the
+reviewed terms, source templates, local notice hashes and recursive upstream
+LICENSE/COPYING/NOTICE/PATENTS file inventory/hashes. A new/removed requirement,
+replacement/exclusion, changed/missing/added legal file, or changed local notice
+fails closed. gotk4 additionally stays at its reviewed version, with recorded
+source-header exception hashes; any version update needs a fresh nested/file-level
+review. Matching named legal files is not an audit of every copyright header or
+bundled asset. Existing license scans, packaging checks and release-specific
+rights/reachability gates remain required.
+
+For a manual dependency update, review any policy failure first, then run:
+
+```sh
+python3 scripts/go_notices.py
+python3 scripts/go_notices.py --check
+python3 -m unittest discover -s scripts/tests -v
+```
+
+Generation changes only the marked table; native/runtime notices, gotk4 prose and
+historical findings remain intact. It does not update the historical review date or
+claim a new legal clearance. Regeneration is deterministic and idempotent. Do not
+accept a new hash merely to make CI pass: inspect upstream license changes and
+exceptions, preserve needed notice text, then explicitly update the reviewed policy.
+
+After this configuration reaches `main`, the next Renovate run will apply the
+per-module groups. Existing PRs #158/#159 need Renovate to recreate/rebase them under
+the new grouping (or a manual regeneration); this change does not edit those open
+branches by itself. New modules and exceptional/license-changing updates remain
+manual review tasks.
+
+The optional integration check uses Renovate 44.134.1, matching the bot that opened
+#158/#159. With Node 24, install into a temporary directory and run:
+
+```sh
+npm install --prefix /tmp/azerlay-renovate-check --ignore-scripts --no-audit --no-fund renovate@44.134.1
+npm rebuild --prefix /tmp/azerlay-renovate-check re2
+node /tmp/azerlay-renovate-check/node_modules/renovate/dist/config-validator.js --strict renovate.json
+RENOVATE_TEST_DIR=/tmp/azerlay-renovate-check/node_modules/renovate node scripts/tests/renovate_go_notices.mjs
+```
+
+This check uses real RE2 extraction, Renovate replacement/re-extraction and package
+rule matching. It asserts xz/cli updates, gotk4's submodule source tag, indirect
+updates, per-module grouping, table-only changes and idempotency without GitHub
+writes. If npm requires install-script approval for `re2`, enable it only for that
+local verification package.
+
 ## Quality gates
 
 | Job | Checks | Job timeout |
@@ -31,7 +108,7 @@ Renovate excludes them to avoid proposing partial updates that fail these checks
 | `native-build` | Verify default CGo, compile the native binary in pinned Nix, run version, and inspect shared libraries | 30 minutes |
 | `vulnerability` | Reachable Go vulnerability scan | 30 minutes |
 | `licenses` | Third-party Go dependency license CSV | 20 minutes |
-| `generated-files` | CI-tool tests, core CGO=0 and race tests, regenerate both LZMA fixtures and reject differences | 15 minutes |
+| `generated-files` | CI-tool tests, exact Go notices/license texts, core CGO=0 and race tests, regenerate both LZMA fixtures and reject differences | 15 minutes |
 
 The `test` job rejects any output from `gofmt -l .`, then runs:
 

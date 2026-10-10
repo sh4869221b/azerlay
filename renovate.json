@@ -1,34 +1,90 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
+  "extends": [
+    "config:recommended"
+  ],
   "timezone": "Asia/Tokyo",
-  "enabledManagers": ["gomod", "github-actions", "custom.regex"],
+  "enabledManagers": [
+    "gomod",
+    "github-actions",
+    "custom.regex"
+  ],
   "automerge": false,
   "customManagers": [
     {
       "customType": "regex",
-      "managerFilePatterns": ["/^\\.github/ci-tools\\.env$/"],
+      "managerFilePatterns": [
+        "/^\\.github/ci-tools\\.env$/"
+      ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)\\s+[A-Z_]+_VERSION=(?<currentValue>[^\\s]+)"
       ]
+    },
+    {
+      "customType": "regex",
+      "description": "Update the Go requirement and exact corresponding-source tag together.",
+      "managerFilePatterns": [
+        "/^THIRD_PARTY_NOTICES\\.md$/"
+      ],
+      "matchStrings": [
+        "<!-- BEGIN GENERATED GO MODULES -->[\\s\\S]*?<!-- END GENERATED GO MODULES -->",
+        "\\| (?<depName>[^\\s]+) (?<currentValue>v[^\\s]+) (?<terms>\\|[^\\n]+?\\| )(?<sourcePrefix>https://[^\\s]+/tree/(?:pkg/)?)(?<sourceVersion>v[^/\\s]+)(?<sourceSuffix>[^\\n]*)"
+      ],
+      "datasourceTemplate": "go",
+      "versioningTemplate": "go",
+      "matchStringsStrategy": "recursive"
     }
   ],
   "packageRules": [
     {
       "description": "Keep the Go SDK aligned with the manually verified Nix environment and Staticcheck installer.",
-      "matchDatasources": ["golang-version"],
+      "matchDatasources": [
+        "golang-version"
+      ],
       "enabled": false
     },
     {
       "description": "Keep setup-go versions aligned with the manually verified Go SDK.",
-      "matchManagers": ["github-actions"],
-      "matchDepNames": ["go"],
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchDepNames": [
+        "go"
+      ],
       "enabled": false
     },
     {
       "description": "Keep the temporary Staticcheck compatibility source and importer pins aligned with ci-tools.env.",
-      "matchFileNames": ["scripts/ci-staticcheck/go.mod"],
+      "matchFileNames": [
+        "scripts/ci-staticcheck/go.mod"
+      ],
       "enabled": false
+    },
+    {
+      "description": "Keep each application module and its notices in the same Renovate PR without postUpgradeTasks.",
+      "matchManagers": [
+        "gomod",
+        "custom.regex"
+      ],
+      "matchFileNames": [
+        "/^(go\\.mod|THIRD_PARTY_NOTICES\\.md)$/"
+      ],
+      "groupName": "Go module {{{depName}}}",
+      "groupSingleUpdates": true,
+      "autoReplaceGlobalMatch": true
+    },
+    {
+      "description": "Keep indirect module versions and notices synchronized.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchFileNames": [
+        "/^go\\.mod$/"
+      ],
+      "matchDepTypes": [
+        "indirect"
+      ],
+      "enabled": true
     }
   ]
 }

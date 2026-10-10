@@ -1,0 +1,114 @@
+{
+  "modules": {
+    "github.com/diamondburned/gotk4/pkg": {
+      "terms": "MPL-2.0, with core/cairo and LGPL C exceptions below; `LICENSES/gotk4-pkg-MPL-2.0.txt`",
+      "source": "https://github.com/diamondburned/gotk4/tree/pkg/{version}/pkg",
+      "upstream_legal_files": {
+        "LICENSE": "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172",
+        "cairo/swizzle/LICENSE": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+        "core/LICENSE": "9ebf610ff3de2517d3545b1d2b9b41250e5d565ede06dc1dfa02453c4d611096"
+      },
+      "local_files": {
+        "LICENSES/gotk4-pkg-MPL-2.0.txt": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04",
+        "LICENSES/gotk4-cairo-ISC.txt": "5cf54f148287b0d5ca937857b03c3debdd721af8218ce014c6b79985b2413269",
+        "LICENSES/gotk4-cairo-swizzle-BSD-3-Clause.txt": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+        "LICENSES/gotk4-core-ISC.txt": "9ebf610ff3de2517d3545b1d2b9b41250e5d565ede06dc1dfa02453c4d611096",
+        "LICENSES/gotk4-gdkarrayimpl-NOTICE.txt": "a67595915aa57f6f579bd0fd1c0d78a3c51e775872d27331d5cd336126e17066",
+        "LICENSES/LGPL-2.1-or-later.txt": "5749785c8bdefafcb5d798270ed0a967036fe2ca63dcedade1627565dfef81d2"
+      },
+      "reviewed_version": "v0.4.1",
+      "exception_files": {
+        "core/glib/glib.go.h": "8b775a5f6da1c4ed18f38574f00682449a232a87c96a85a2dd9e5e62d41ac498",
+        "core/gioutil/gdkarrayimpl.c": "310d9ffe8a4e6bf4cf786aabd547acb75d7125b0f5fd9667d160d10012c5eb52",
+        "core/gioutil/listmodel.c": "a792f472cfec4b5feae544603139f9f4ba62d8ddf33a12e8fc83fe1fadffd8ff",
+        "cairo/cairo.go": "2a934143b8dde06025ee35965379a4dfab60b7ddaa000f40827b4d9b7a5502c4"
+      }
+    },
+    "github.com/fswatcher/fswatcher": {
+      "terms": "MIT, Yasuhiro Matsumoto; `LICENSES/fswatcher-MIT.txt`",
+      "source": "https://github.com/fswatcher/fswatcher/tree/{version}",
+      "upstream_legal_files": {
+        "LICENSE": "f1d430f92af8388ba914dba753855bfd873edd1506ab4a6d3dadd0615fdb9413"
+      },
+      "local_files": {
+        "LICENSES/fswatcher-MIT.txt": "f1d430f92af8388ba914dba753855bfd873edd1506ab4a6d3dadd0615fdb9413"
+      }
+    },
+    "github.com/pelletier/go-toml/v2": {
+      "terms": "MIT, Thomas Pelletier; `LICENSES/go-toml-MIT.txt`",
+      "source": "https://github.com/pelletier/go-toml/tree/{version}",
+      "upstream_legal_files": {
+        "LICENSE": "26844e4b53c5adec04e557fd7dfef281cc0205a7d355626b1c68b778b99e9e7b"
+      },
+      "local_files": {
+        "LICENSES/go-toml-MIT.txt": "26844e4b53c5adec04e557fd7dfef281cc0205a7d355626b1c68b778b99e9e7b"
+      }
+    },
+    "github.com/ulikunitz/xz": {
+      "terms": "BSD-3-Clause, Ulrich Kunitz; `LICENSES/xz-BSD-3-Clause.txt`",
+      "source": "https://github.com/ulikunitz/xz/tree/{version}",
+      "upstream_legal_files": {
+        "LICENSE": "701cbcc144a7c865b072f27547e66ddbf17ac44a3bd21f71149ace02518f107c"
+      },
+      "local_files": {
+        "LICENSES/xz-BSD-3-Clause.txt": "701cbcc144a7c865b072f27547e66ddbf17ac44a3bd21f71149ace02518f107c"
+      }
+    },
+    "github.com/urfave/cli/v3": {
+      "terms": "MIT, urfave/cli maintainers; `LICENSES/urfave-cli-MIT.txt`",
+      "source": "https://github.com/urfave/cli/tree/{version}",
+      "upstream_legal_files": {
+        "LICENSE": "85695dfe027cabaf97c7fea77c45a01a36c0815e52df9219894b1ba031ee72f0"
+      },
+      "local_files": {
+        "LICENSES/urfave-cli-MIT.txt": "85695dfe027cabaf97c7fea77c45a01a36c0815e52df9219894b1ba031ee72f0"
+      }
+    },
+    "golang.org/x/sys": {
+      "terms": "BSD-3-Clause, The Go Authors; `LICENSES/golang-BSD-3-Clause.txt`",
+      "source": "https://github.com/golang/sys/tree/{version}",
+      "upstream_legal_files": {
+        "LICENSE": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+        "PATENTS": "96f408bfae65bf137fc2525d3ecb030271c50c1e90799f87abf8846d8dd505cc"
+      },
+      "local_files": {
+        "LICENSES/golang-BSD-3-Clause.txt": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+        "LICENSES/golang-PATENTS.txt": "96f408bfae65bf137fc2525d3ecb030271c50c1e90799f87abf8846d8dd505cc"
+      }
+    },
+    "github.com/ebitengine/purego": {
+      "terms": "Apache-2.0; `LICENSES/purego-Apache-2.0.txt`",
+      "source": "https://github.com/ebitengine/purego/tree/{version}",
+      "upstream_legal_files": {
+        "LICENSE": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"
+      },
+      "local_files": {
+        "LICENSES/purego-Apache-2.0.txt": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"
+      }
+    },
+    "golang.org/x/sync": {
+      "terms": "BSD-3-Clause, The Go Authors; `LICENSES/golang-BSD-3-Clause.txt`",
+      "source": "https://github.com/golang/sync/tree/{version}",
+      "upstream_legal_files": {
+        "LICENSE": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+        "PATENTS": "96f408bfae65bf137fc2525d3ecb030271c50c1e90799f87abf8846d8dd505cc"
+      },
+      "local_files": {
+        "LICENSES/golang-BSD-3-Clause.txt": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+        "LICENSES/golang-PATENTS.txt": "96f408bfae65bf137fc2525d3ecb030271c50c1e90799f87abf8846d8dd505cc"
+      }
+    },
+    "golang.org/x/text": {
+      "terms": "BSD-3-Clause, The Go Authors; `LICENSES/golang-BSD-3-Clause.txt`",
+      "source": "https://github.com/golang/text/tree/{version}",
+      "upstream_legal_files": {
+        "LICENSE": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+        "PATENTS": "96f408bfae65bf137fc2525d3ecb030271c50c1e90799f87abf8846d8dd505cc"
+      },
+      "local_files": {
+        "LICENSES/golang-BSD-3-Clause.txt": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+        "LICENSES/golang-PATENTS.txt": "96f408bfae65bf137fc2525d3ecb030271c50c1e90799f87abf8846d8dd505cc"
+      }
+    }
+  }
+}

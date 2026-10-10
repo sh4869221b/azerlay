@@ -505,6 +505,9 @@ jobs:
             go.mod
             go.sum
 
+      - name: Verify exact Go notices and reviewed license texts
+        run: python3 scripts/go_notices.py --check
+
       # The exact manifest union is checked by test. Core race tests run here;
       # production GTK/Wayland and process tests remain in the native test job.
       - name: Validate and test core without CGo
