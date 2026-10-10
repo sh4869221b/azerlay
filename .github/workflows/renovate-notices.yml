@@ -45,7 +45,7 @@ jobs:
         run: |
           python3 scripts/go_notices.py --root "$RUNNER_TEMP/notice-input"
           python3 scripts/go_notices.py --root "$RUNNER_TEMP/notice-input" --check
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: steps.prepare.outputs.eligible == 'true'
         with:
           name: renovate-notices-${{ github.run_id }}-${{ github.run_attempt }}
@@ -70,7 +70,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: renovate-notices-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/notice-result
