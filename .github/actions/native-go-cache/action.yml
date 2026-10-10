@@ -30,13 +30,13 @@ runs:
     # go mod download/go install reconstruct sources through Go's normal checks.
     - name: Restore shared Go modules
       id: modules
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v6
       with:
         path: /tmp/azerlay-go-mod/cache/download
         key: azerlay-mod-v2-${{ runner.os }}-${{ runner.arch }}-go-${{ steps.go.outputs.go-version }}-${{ hashFiles('go.mod', 'go.sum', 'scripts/ci-go-modules.sh') }}
 
     - name: Restore native Go build cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: /tmp/azerlay-go-build
         # The input includes distro, image/install recipe, native tools, job and
@@ -50,14 +50,14 @@ runs:
 
     - name: Save shared Go modules
       if: inputs.module-writer == 'true' && steps.modules.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v6
       with:
         path: /tmp/azerlay-go-mod/cache/download
         key: ${{ steps.modules.outputs.cache-primary-key }}
 
     - name: Restore pinned tool modules
       if: inputs.tool-cache == 'true'
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: /tmp/azerlay-tool-go-mod/cache/download
         # A single owning job installs and saves its own tool graph. Native
