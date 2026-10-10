@@ -22,7 +22,7 @@ jobs:
     name: Pre-release checks complete
     needs: [full-arch]
     if: ${{ always() }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 2
     steps:
       - name: Require same-commit full Arch success

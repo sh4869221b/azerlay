@@ -22,7 +22,7 @@ concurrency:
 # and through the explicit pre-release verification entrypoint.
 jobs:
   test:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 60
     defaults:
       run:
@@ -168,7 +168,7 @@ jobs:
 
 
   fuzz:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
       - name: Reject a moved dispatched branch
@@ -212,7 +212,7 @@ jobs:
 
 
   native-build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     defaults:
       run:
@@ -307,7 +307,7 @@ jobs:
 
 
   vulnerability:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     defaults:
       run:
@@ -406,7 +406,7 @@ jobs:
 
 
   licenses:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     defaults:
       run:
@@ -512,7 +512,7 @@ jobs:
           retention-days: 7
 
   generated-files:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
       - name: Reject a moved dispatched branch
