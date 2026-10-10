@@ -71,7 +71,7 @@ class RenovateNoticeBoundaryTests(unittest.TestCase):
             inputs = {'go.mod': b'final direct and indirect requirements', 'go.sum': b'final sums',
                       'THIRD_PARTY_NOTICES.md': notice('PR row')}
             directory = Path(temp) / 'input'
-            with patch.object(sync, 'ROOT', root), patch.object(sync, 'api', side_effect=[pr(), [{'filename': 'go.mod'}], pr()]), \
+            with patch.object(sync, 'ROOT', root), patch.object(sync, 'api', side_effect=[pr(), [{'filename': 'go.mod'}], {'merge_base_commit': {'sha': BASE}}, pr()]), \
                  patch.object(sync, 'fetch', return_value=(HEAD, {})), patch.object(sync, 'git', return_value=(BASE + '\n').encode()), \
                  patch.object(sync, 'blob', side_effect=lambda _, name: inputs[name]):
                 self.assertTrue(sync.prepare(event(), directory))
@@ -79,6 +79,13 @@ class RenovateNoticeBoundaryTests(unittest.TestCase):
             self.assertEqual((directory / 'scripts/go-notice-policy.json').read_text(), '{"trusted": true}')
             self.assertEqual((directory / 'THIRD_PARTY_NOTICES.md').read_bytes(), notice('base'))
             self.assertEqual(json.loads((directory / 'manifest.json').read_text())['head_sha'], HEAD)
+
+    def test_prepare_rejects_a_branch_missing_the_trusted_base(self):
+        with tempfile.TemporaryDirectory() as temp:
+            with patch.object(sync, 'api', side_effect=[pr(), [{'filename': 'go.mod'}],
+                                                      {'merge_base_commit': {'sha': 'c' * 40}}]):
+                with self.assertRaisesRegex(ValueError, 'must be rebased'):
+                    sync.prepare(event(), Path(temp) / 'input')
 
     def test_candidate_rejects_wrong_inputs_and_curated_prose(self):
         current = {'go.mod': b'final modules', 'go.sum': b'sums', 'THIRD_PARTY_NOTICES.md': notice('old')}

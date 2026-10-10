@@ -101,6 +101,9 @@ def prepare(event, directory):
         return False  # GitHub Actions/tool updates need no application notice write.
     if changed - ALLOWED:
         raise ValueError('Go update changes code/policy/workflows; manual review required')
+    comparison = api(repo, '/compare/' + pr['base']['sha'] + '...' + expected_head)
+    if comparison['merge_base_commit']['sha'] != pr['base']['sha']:
+        raise ValueError('Renovate branch must be rebased onto the trusted base before synchronization')
     head, _ = fetch(expected_head)
     validate_pr(api(repo, '/pulls/' + str(number)), repo, expected_head)
     if head != expected_head or git('rev-parse', 'HEAD').decode().strip() != pr['base']['sha']:

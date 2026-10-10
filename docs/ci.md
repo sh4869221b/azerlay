@@ -38,6 +38,8 @@ policy, never scripts or dependency code from the PR. Generation has a read-only
 token; the separate publisher has an explicitly approved ephemeral
 `contents: write` / `actions: write` token. It accepts only open, same-repository
 Renovate PRs targeting `main`, with application module/notice changes only.
+The PR must include the current trusted base; older branches need rebasing first
+so the resulting head also contains the current policy and complete CI workflow.
 SHA-checked inputs and an atomic exact-head git lease prevent a stale result
 from overwriting a changed branch. The commit is always a one-file child of the
 expected head, so the lease cannot authorize a history rewrite. Curated prose
