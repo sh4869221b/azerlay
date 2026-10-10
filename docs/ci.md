@@ -8,6 +8,20 @@ The owner selected pinned Nix for normal CI on 2026-10-07. Latest Arch runs
 independently each day and through manual pre-release verification; see the
 [adopted trigger and release-verification policy](ci-adoption.md).
 
+## Dependency updates
+
+[Renovate](../renovate.json) proposes updates for the application and Layer Shell
+probe Go modules, GitHub Actions (including composite actions), and the
+govulncheck, go-licenses, and Syft versions in `.github/ci-tools.env`. Updates
+require review and are not automatically merged. Enable the Renovate GitHub App
+for this repository to run these updates after the configuration reaches `main`.
+
+The Go SDK, Nix inputs, and isolated Staticcheck module remain manual updates.
+The Nix preparation script verifies exact source pins and native library
+versions, and the Staticcheck installer verifies the Go SDK, compatibility
+source, and importer versions. Update and validate those coupled pins together;
+Renovate excludes them to avoid proposing partial updates that fail these checks.
+
 ## Quality gates
 
 | Job | Checks | Job timeout |
