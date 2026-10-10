@@ -29,7 +29,7 @@ concurrency:
 jobs:
   revision:
     name: Resolve exact validation commit
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 2
     outputs:
       commit: ${{ steps.revision.outputs.commit }}
@@ -50,7 +50,7 @@ jobs:
     name: Arch test
     timeout-minutes: 60
     needs: revision
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     container: archlinux:base
     defaults:
       run:
@@ -180,7 +180,7 @@ jobs:
   fuzz:
     name: Arch fuzz
     needs: revision
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
       - name: Check out repository
@@ -222,7 +222,7 @@ jobs:
   native-build:
     name: Arch native-build
     needs: revision
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     container: archlinux:base
     defaults:
@@ -304,7 +304,7 @@ jobs:
   vulnerability:
     name: Arch vulnerability
     needs: revision
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     container: archlinux:base
     defaults:
@@ -385,7 +385,7 @@ jobs:
   licenses:
     name: Arch licenses
     needs: revision
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     container: archlinux:base
     defaults:
@@ -474,7 +474,7 @@ jobs:
   generated-files:
     name: Arch generated-files
     needs: revision
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
       - name: Check out repository
@@ -559,7 +559,7 @@ jobs:
     name: All full Arch gates passed
     needs: [revision, test, fuzz, native-build, vulnerability, licenses, generated-files]
     if: ${{ always() }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 2
     outputs:
       commit: ${{ steps.validated.outputs.commit }}
