@@ -27,7 +27,7 @@ jobs:
       eligible: ${{ steps.prepare.outputs.eligible }}
     steps:
       # Only trusted base code is executed, never the PR checkout.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
@@ -66,7 +66,7 @@ jobs:
       actions: write
       pull-requests: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
