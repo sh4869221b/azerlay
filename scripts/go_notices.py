@@ -17,7 +17,9 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 BEGIN = '<!-- BEGIN GENERATED GO MODULES -->'
 END = '<!-- END GENERATED GO MODULES -->'
-LEGAL_NAME = re.compile(r'(?:licen[cs]e|copying|notice|patents)(?:\..*)?', re.I)
+# Require a complete stem or delimiter, rather than a prefix such as
+# "licenses.go". Legal notices commonly use SPDX/directory-style suffixes.
+LEGAL_NAME = re.compile(r'(?:licen[cs]e|copying|notice|patents|copyright)(?:[._-].*)?', re.I)
 
 
 def digest(path):

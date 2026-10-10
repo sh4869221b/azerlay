@@ -1,0 +1,95 @@
+name: Synchronize Renovate Go notices
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: renovate-notices-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    if: >-
+      github.event.pull_request.user.login == 'renovate[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.base.ref == 'main' &&
+      startsWith(github.event.pull_request.head.ref, 'renovate/')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      eligible: ${{ steps.prepare.outputs.eligible }}
+    steps:
+      # Only trusted base code is executed, never the PR checkout.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.27.2
+          cache: false
+      - name: Prepare exact final requirements using trusted base policy
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/renovate_notices.py prepare --directory "$RUNNER_TEMP/notice-input"
+      - name: Generate and verify complete table without a GitHub token
+        if: steps.prepare.outputs.eligible == 'true'
+        run: |
+          python3 scripts/go_notices.py --root "$RUNNER_TEMP/notice-input"
+          python3 scripts/go_notices.py --root "$RUNNER_TEMP/notice-input" --check
+      - uses: actions/upload-artifact@v4
+        if: steps.prepare.outputs.eligible == 'true'
+        with:
+          name: renovate-notices-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/notice-input/manifest.json
+            ${{ runner.temp }}/notice-input/THIRD_PARTY_NOTICES.md
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: generate
+    if: needs.generate.outputs.eligible == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    # Explicitly approved, short-lived job token; no PAT/App secret or setting change.
+    permissions:
+      contents: write
+      actions: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: renovate-notices-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/notice-result
+      - name: Publish only the generated table with an exact-head lease
+        id: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/renovate_notices.py publish --directory "$RUNNER_TEMP/notice-result"
+      # GITHUB_TOKEN-induced PR runs require approval. Explicit dispatch avoids
+      # that prompt and validates all existing gates on the resulting head.
+      - name: Dispatch existing normal CI on resulting head
+        if: steps.publish.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+          EXPECTED_HEAD: ${{ steps.publish.outputs.commit }}
+        run: |
+          set -euo pipefail
+          actual=$(gh api "repos/$GH_REPO/git/ref/heads/$BRANCH" --jq .object.sha)
+          test "$actual" = "$EXPECTED_HEAD"
+          gh workflow run ci.yml --repo "$GH_REPO" --ref "$BRANCH" -f expected-head="$EXPECTED_HEAD"

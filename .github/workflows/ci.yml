@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      expected-head:
+        description: Exact synchronized Renovate head; a moved branch is rejected.
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -26,6 +32,11 @@ jobs:
       GOCACHE: /tmp/azerlay-go-build
       GOMODCACHE: /tmp/azerlay-go-mod
     steps:
+      - name: Reject a moved dispatched branch
+        env:
+          EXPECTED_HEAD: ${{ inputs.expected-head || github.sha }}
+          TRIGGER_HEAD: ${{ github.sha }}
+        run: test "$EXPECTED_HEAD" = "$TRIGGER_HEAD"
       - name: Check out repository
         uses: actions/checkout@v4
         with:
@@ -160,6 +171,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
+      - name: Reject a moved dispatched branch
+        env:
+          EXPECTED_HEAD: ${{ inputs.expected-head || github.sha }}
+          TRIGGER_HEAD: ${{ github.sha }}
+        run: test "$EXPECTED_HEAD" = "$TRIGGER_HEAD"
       - name: Check out repository
         uses: actions/checkout@v4
         with:
@@ -206,6 +222,11 @@ jobs:
       GOCACHE: /tmp/azerlay-go-build
       GOMODCACHE: /tmp/azerlay-go-mod
     steps:
+      - name: Reject a moved dispatched branch
+        env:
+          EXPECTED_HEAD: ${{ inputs.expected-head || github.sha }}
+          TRIGGER_HEAD: ${{ github.sha }}
+        run: test "$EXPECTED_HEAD" = "$TRIGGER_HEAD"
       - name: Check out repository
         uses: actions/checkout@v4
         with:
@@ -296,6 +317,11 @@ jobs:
       GOCACHE: /tmp/azerlay-go-build
       GOMODCACHE: /tmp/azerlay-go-mod
     steps:
+      - name: Reject a moved dispatched branch
+        env:
+          EXPECTED_HEAD: ${{ inputs.expected-head || github.sha }}
+          TRIGGER_HEAD: ${{ github.sha }}
+        run: test "$EXPECTED_HEAD" = "$TRIGGER_HEAD"
       - name: Check out repository
         uses: actions/checkout@v4
         with:
@@ -390,6 +416,11 @@ jobs:
       GOCACHE: /tmp/azerlay-go-build
       GOMODCACHE: /tmp/azerlay-go-mod
     steps:
+      - name: Reject a moved dispatched branch
+        env:
+          EXPECTED_HEAD: ${{ inputs.expected-head || github.sha }}
+          TRIGGER_HEAD: ${{ github.sha }}
+        run: test "$EXPECTED_HEAD" = "$TRIGGER_HEAD"
       - name: Check out repository
         uses: actions/checkout@v4
         with:
@@ -484,6 +515,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
+      - name: Reject a moved dispatched branch
+        env:
+          EXPECTED_HEAD: ${{ inputs.expected-head || github.sha }}
+          TRIGGER_HEAD: ${{ github.sha }}
+        run: test "$EXPECTED_HEAD" = "$TRIGGER_HEAD"
       - name: Check out repository
         uses: actions/checkout@v4
         with:

@@ -19,20 +19,6 @@
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)\\s+[A-Z_]+_VERSION=(?<currentValue>[^\\s]+)"
       ]
-    },
-    {
-      "customType": "regex",
-      "description": "Update the Go requirement and exact corresponding-source tag together.",
-      "managerFilePatterns": [
-        "/^THIRD_PARTY_NOTICES\\.md$/"
-      ],
-      "matchStrings": [
-        "<!-- BEGIN GENERATED GO MODULES -->[\\s\\S]*?<!-- END GENERATED GO MODULES -->",
-        "\\| (?<depName>[^\\s]+) (?<currentValue>v[^\\s]+) (?<terms>\\|[^\\n]+?\\| )(?<sourcePrefix>https://[^\\s]+/tree/(?:pkg/)?)(?<sourceVersion>v[^/\\s]+)(?<sourceSuffix>[^\\n]*)"
-      ],
-      "datasourceTemplate": "go",
-      "versioningTemplate": "go",
-      "matchStringsStrategy": "recursive"
     }
   ],
   "packageRules": [
@@ -61,19 +47,6 @@
       "enabled": false
     },
     {
-      "description": "Keep each application module and its notices in the same Renovate PR without postUpgradeTasks.",
-      "matchManagers": [
-        "gomod",
-        "custom.regex"
-      ],
-      "matchFileNames": [
-        "/^(go\\.mod|THIRD_PARTY_NOTICES\\.md)$/"
-      ],
-      "groupName": "Go module {{{depName}}}",
-      "groupSingleUpdates": true,
-      "autoReplaceGlobalMatch": true
-    },
-    {
       "description": "Keep indirect module versions and notices synchronized.",
       "matchManagers": [
         "gomod"
@@ -86,5 +59,8 @@
       ],
       "enabled": true
     }
+  ],
+  "gitIgnoredAuthors": [
+    "azerlay-notices@users.noreply.github.com"
   ]
 }

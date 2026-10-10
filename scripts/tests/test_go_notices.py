@@ -69,6 +69,34 @@ class GoNoticesTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'upstream legal files changed'):
             self.render()
 
+    def test_suffixed_and_copyright_notices_require_review(self):
+        nested = self.module / 'nested'
+        nested.mkdir()
+        for name in ('LICENSE-MIT', 'LICENSE-APACHE', 'NOTICE-THIRD-PARTY',
+                     'COPYRIGHT', 'COPYRIGHT.txt', 'COPYING_LESSER',
+                     'license-mit', 'LiCeNcE_BSD.md', 'PATENTS-grant'):
+            with self.subTest(name=name):
+                added = nested / name
+                added.write_text('synthetic added legal terms\n')
+                with self.assertRaisesRegex(ValueError, 'upstream legal files changed'):
+                    self.render()
+                self.assertEqual((self.root / 'THIRD_PARTY_NOTICES.md').read_text(), self.original)
+                relative = str(added.relative_to(self.module))
+                self.entry['upstream_legal_files'][relative] = notices.digest(added)
+                self.render()  # Only the explicitly reviewed inventory passes.
+                added.write_text('synthetic changed legal terms\n')
+                with self.assertRaisesRegex(ValueError, 'upstream legal files changed'):
+                    self.render()
+                added.unlink()
+                with self.assertRaisesRegex(ValueError, 'upstream legal files changed'):
+                    self.render()
+                del self.entry['upstream_legal_files'][relative]
+
+    def test_legal_names_have_stem_boundaries(self):
+        for name in ('licenses.go', 'noticeboard.go', 'copyrighting.txt', 'copyingTool.go'):
+            with self.subTest(name=name):
+                self.assertIsNone(notices.LEGAL_NAME.fullmatch(name))
+
     def test_changed_local_text_fails(self):
         (self.root / 'LICENSES/example.txt').write_text('changed local license\n')
         with self.assertRaisesRegex(ValueError, 'local license text changed'):

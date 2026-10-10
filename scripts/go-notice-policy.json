@@ -48,7 +48,8 @@
       "terms": "BSD-3-Clause, Ulrich Kunitz; `LICENSES/xz-BSD-3-Clause.txt`",
       "source": "https://github.com/ulikunitz/xz/tree/{version}",
       "upstream_legal_files": {
-        "LICENSE": "701cbcc144a7c865b072f27547e66ddbf17ac44a3bd21f71149ace02518f107c"
+        "LICENSE": "701cbcc144a7c865b072f27547e66ddbf17ac44a3bd21f71149ace02518f107c",
+        "cmd/xb/copyright.go": "0aa75c9c999aa7564c8e4c786b89dbfdba17890b02f9b05cb724ea688da2772c"
       },
       "local_files": {
         "LICENSES/xz-BSD-3-Clause.txt": "701cbcc144a7c865b072f27547e66ddbf17ac44a3bd21f71149ace02518f107c"
