@@ -14,7 +14,10 @@ redistributing. Upstream source files retain their own copyright notices.
 
 These are the exact requirements in `go.mod`, including indirect requirements.
 The links identify corresponding upstream source, not a floating latest release.
+This table is maintained separately from the historical review above; see
+[the dependency-notice update and review policy](docs/ci.md#go-dependency-notices).
 
+<!-- BEGIN GENERATED GO MODULES -->
 | Component and version | Terms / notice file | Corresponding source |
 | --- | --- | --- |
 | github.com/diamondburned/gotk4/pkg v0.4.1 | MPL-2.0, with core/cairo and LGPL C exceptions below; `LICENSES/gotk4-pkg-MPL-2.0.txt` | https://github.com/diamondburned/gotk4/tree/pkg/v0.4.1/pkg |
@@ -26,6 +29,7 @@ The links identify corresponding upstream source, not a floating latest release.
 | github.com/ebitengine/purego v0.10.0 | Apache-2.0; `LICENSES/purego-Apache-2.0.txt` | https://github.com/ebitengine/purego/tree/v0.10.0 |
 | golang.org/x/sync v0.20.0 | BSD-3-Clause, The Go Authors; `LICENSES/golang-BSD-3-Clause.txt` | https://github.com/golang/sync/tree/v0.20.0 |
 | golang.org/x/text v0.37.0 | BSD-3-Clause, The Go Authors; `LICENSES/golang-BSD-3-Clause.txt` | https://github.com/golang/text/tree/v0.37.0 |
+<!-- END GENERATED GO MODULES -->
 
 The Go project additionally provides the patent grant reproduced in
 `LICENSES/golang-PATENTS.txt`. Runtime source and notices for the currently

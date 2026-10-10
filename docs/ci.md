@@ -22,6 +22,99 @@ versions, and the Staticcheck installer verifies the Go SDK, compatibility
 source, and importer versions. Update and validate those coupled pins together;
 Renovate excludes them to avoid proposing partial updates that fail these checks.
 
+### Go dependency notices
+
+Renovate updates the application `go.mod` and `go.sum`. After that final Go
+artifact update, [the notice workflow](../.github/workflows/renovate-notices.yml)
+runs the existing [`scripts/go_notices.py`](../scripts/go_notices.py) generator
+and commits only the generated Go table in `THIRD_PARTY_NOTICES.md` to the same
+Renovate PR. Every requirement comes from the final `go.mod`, including indirect
+versions raised as a side effect of updating a direct dependency. There is no
+second regex-managed copy of module versions. CI tools, probe modules, native
+notices and historical `go.sum` provenance remain outside this table.
+
+The workflow uses `pull_request_target` to execute trusted base-branch code and
+policy, never scripts or dependency code from the PR. Generation has a read-only
+token; the separate publisher has an explicitly approved ephemeral
+`contents: write` / `actions: write` token. It accepts only open, same-repository
+Renovate PRs targeting `main`, with application module/notice changes only.
+The PR must include the current trusted base; older branches need rebasing first
+so the resulting head also contains the current policy and complete CI workflow.
+SHA-checked inputs and an atomic exact-head git lease prevent a stale result
+from overwriting a changed branch. The commit is always a one-file child of the
+expected head, so the lease cannot authorize a history rewrite. Curated prose
+outside the generated block must match the trusted base. No PAT, App secret,
+repository setting or permanent permission change is needed.
+
+An unchanged table produces no commit or dispatch. After a changed table is
+committed, the publisher dispatches the existing six-gate normal CI on that exact
+head. A moved branch fails the dispatch guard; all existing checks remain enabled.
+Explicit dispatch is needed because [GITHUB_TOKEN-induced PR runs require approval](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow).
+The exact `azerlay-notices@users.noreply.github.com` author/committer email is
+[ignored by Renovate](https://docs.renovatebot.com/configuration-options/#gitignoredauthors)
+so this generated commit does not stop its normal rebasing. Other authors remain
+visible to Renovate.
+
+This runs with free Community Cloud and Community OSS Cloud: it does not request
+[arbitrary Renovate post-upgrade commands](https://docs.renovatebot.com/mend-hosted/faq/#how-can-i-run-arbitrary-commands-through-postupgradetasks).
+The reference [go-nico-list](https://github.com/sh4869221b/go-nico-list/tree/090af4a9570bd6c89fcb4c81786cd6441455f2a9)
+uses a GoReleaser generation hook. Azerlay generates during dependency PRs while
+preserving its reviewed gotk4 exceptions and native notices.
+
+Both normal CI and full Arch validation retain the read-only check:
+
+```sh
+python3 scripts/go_notices.py --check
+```
+
+The generator reads requirements with `go mod edit -json` and downloads exact
+versions using Go's public checksum database. It never compiles or executes
+dependency code. Go and access to `proxy.golang.org` / `sum.golang.org` are needed;
+input copies keep `go.mod` and `go.sum` byte-identical.
+
+The existing [reviewed policy](../scripts/go-notice-policy.json) retains terms,
+source templates, local notice hashes and recursive upstream
+LICENSE/COPYING/NOTICE/PATENTS/COPYRIGHT hashes. Names include case variants and
+suffixes separated by `.`, `-` or `_`, such as `LICENSE-MIT` and
+`NOTICE-THIRD-PARTY`. The newly detected xz `cmd/xb/copyright.go` contains its
+existing BSD copyright template; its full source hash is retained conservatively
+without executing that tool or changing the reviewed terms.
+
+New/removed requirements, replacements/exclusions, pseudo-versions,
+`+incompatible` tags, changed legal files or local notices require manual review
+and fail before publication. gotk4 remains pinned to its reviewed version and
+file-level exception hashes. Named-file matching is not an audit of every source
+header or bundled asset; existing release/license checks remain required. Do not
+approve a new hash just to pass CI: inspect and preserve changed terms first.
+
+Manual regeneration and local regression tests:
+
+```sh
+python3 scripts/go_notices.py
+python3 scripts/go_notices.py --check
+python3 -m unittest discover -s scripts/tests -v
+```
+
+Generation changes only the marked table and preserves the historical review
+date and manual notices. Tests include added/changed/removed suffixed legal files,
+a real offline Go artifact update that raises an indirect version, idempotency,
+unchanged module inputs, publisher restrictions and a rejected competing git push.
+The workflow becomes active after merging to `main`; existing #158/#159 branches
+need rebasing onto that configuration. No merge is performed by this workflow.
+
+An optional offline integration uses real Renovate 44.134.1 with Node 24:
+
+```sh
+npm install --prefix /tmp/azerlay-renovate-check --ignore-scripts --no-audit --no-fund renovate@44.134.1
+npm rebuild --prefix /tmp/azerlay-renovate-check re2
+node /tmp/azerlay-renovate-check/node_modules/renovate/dist/config-validator.js --strict renovate.json
+RENOVATE_TEST_DIR=/tmp/azerlay-renovate-check/node_modules/renovate node scripts/tests/renovate_go_notices.mjs
+```
+
+It verifies root gomod extraction, indirect updates, removal of notice regex
+management, and Renovate's treatment of the exact generated-commit author, using
+only a temporary local Git repository.
+
 ## Quality gates
 
 | Job | Checks | Job timeout |
@@ -31,7 +124,7 @@ Renovate excludes them to avoid proposing partial updates that fail these checks
 | `native-build` | Verify default CGo, compile the native binary in pinned Nix, run version, and inspect shared libraries | 30 minutes |
 | `vulnerability` | Reachable Go vulnerability scan | 30 minutes |
 | `licenses` | Third-party Go dependency license CSV | 20 minutes |
-| `generated-files` | CI-tool tests, core CGO=0 and race tests, regenerate both LZMA fixtures and reject differences | 15 minutes |
+| `generated-files` | CI-tool tests, exact Go notices/license texts, core CGO=0 and race tests, regenerate both LZMA fixtures and reject differences | 15 minutes |
 
 The `test` job rejects any output from `gofmt -l .`, then runs:
 

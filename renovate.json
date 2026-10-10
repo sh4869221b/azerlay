@@ -1,13 +1,21 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
+  "extends": [
+    "config:recommended"
+  ],
   "timezone": "Asia/Tokyo",
-  "enabledManagers": ["gomod", "github-actions", "custom.regex"],
+  "enabledManagers": [
+    "gomod",
+    "github-actions",
+    "custom.regex"
+  ],
   "automerge": false,
   "customManagers": [
     {
       "customType": "regex",
-      "managerFilePatterns": ["/^\\.github/ci-tools\\.env$/"],
+      "managerFilePatterns": [
+        "/^\\.github/ci-tools\\.env$/"
+      ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)\\s+[A-Z_]+_VERSION=(?<currentValue>[^\\s]+)"
       ]
@@ -16,19 +24,43 @@
   "packageRules": [
     {
       "description": "Keep the Go SDK aligned with the manually verified Nix environment and Staticcheck installer.",
-      "matchDatasources": ["golang-version"],
+      "matchDatasources": [
+        "golang-version"
+      ],
       "enabled": false
     },
     {
       "description": "Keep setup-go versions aligned with the manually verified Go SDK.",
-      "matchManagers": ["github-actions"],
-      "matchDepNames": ["go"],
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchDepNames": [
+        "go"
+      ],
       "enabled": false
     },
     {
       "description": "Keep the temporary Staticcheck compatibility source and importer pins aligned with ci-tools.env.",
-      "matchFileNames": ["scripts/ci-staticcheck/go.mod"],
+      "matchFileNames": [
+        "scripts/ci-staticcheck/go.mod"
+      ],
       "enabled": false
+    },
+    {
+      "description": "Keep indirect module versions and notices synchronized.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchFileNames": [
+        "/^go\\.mod$/"
+      ],
+      "matchDepTypes": [
+        "indirect"
+      ],
+      "enabled": true
     }
+  ],
+  "gitIgnoredAuthors": [
+    "azerlay-notices@users.noreply.github.com"
   ]
 }

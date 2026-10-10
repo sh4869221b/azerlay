@@ -1,0 +1,57 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import os from 'node:os';
+// Optional offline integration using the real, pinned Renovate implementation.
+const renovateDir = process.env.RENOVATE_TEST_DIR;
+assert(renovateDir, 'Set RENOVATE_TEST_DIR to a renovate package directory');
+const load = (file) => import(pathToFileURL(path.join(renovateDir, 'dist', file)));
+const { GlobalConfig } = await load('config/global.js');
+const { extractPackageFile } = await load('modules/manager/gomod/extract.js');
+const { applyPackageRules } = await load('util/package-rules/index.js');
+const renovateGit = await load('util/git/index.js');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const config = JSON.parse(fs.readFileSync(root + '/renovate.json'));
+const deps = extractPackageFile(fs.readFileSync(root + '/go.mod', 'utf8')).deps.filter(d => d.datasource === 'go');
+assert.equal(deps.length, 9);
+assert.equal(config.customManagers.length, 1);
+assert(!config.customManagers.some(m => m.managerFilePatterns.some(p => p.includes('THIRD_PARTY_NOTICES'))));
+for (const dep of deps) {
+  const applied = await applyPackageRules({...dep, manager:'gomod', packageFile:'go.mod', enabled:false, packageRules:config.packageRules});
+  if (dep.depType === 'indirect') assert.equal(applied.enabled, true);
+  assert.equal(applied.groupName, undefined);
+}
+assert.deepEqual(config.gitIgnoredAuthors, ['azerlay-notices@users.noreply.github.com']);
+console.log('Real gomod extraction: 9 requirements, indirect updates enabled, notice regex/grouping removed PASS');
+
+const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'renovate-notices-'));
+process.on('exit', () => fs.rmSync(temp, {recursive:true, force:true}));
+const remote = temp + '/remote.git';
+const local = temp + '/local';
+fs.mkdirSync(local);
+const git = (...args) => execFileSync('git', args, {cwd:local, stdio:['ignore','pipe','pipe']}).toString().trim();
+git('init', '--bare', remote);
+git('init', '-b', 'main');
+git('config', 'user.name', 'Synthetic fixture');
+git('config', 'user.email', 'fixture@example.invalid');
+fs.writeFileSync(local + '/notice', 'base');
+git('add', '.');
+git('commit', '-m', 'base fixture');
+git('remote', 'add', 'origin', remote);
+git('push', 'origin', 'main');
+git('switch', '-c', 'renovate/fixture');
+fs.writeFileSync(local + '/notice', 'synthetic synchronized table');
+git('add', '.');
+git('-c', 'user.email=' + config.gitIgnoredAuthors[0], 'commit', '-m', 'generated notices');
+git('push', 'origin', 'HEAD');
+git('switch', 'main');
+GlobalConfig.set({localDir:local});
+await renovateGit.initRepo({url:remote, defaultBranch:'main'});
+renovateGit.setUserRepoConfig({gitAuthor:'Renovate <renovate@example.invalid>', gitIgnoredAuthors:config.gitIgnoredAuthors});
+assert.equal(await renovateGit.isBranchModified('renovate/fixture', 'main'), false);
+renovateGit.clearBranchIsModifiedCache();
+renovateGit.setUserRepoConfig({gitAuthor:'Renovate <renovate@example.invalid>', gitIgnoredAuthors:[]});
+assert.equal(await renovateGit.isBranchModified('renovate/fixture', 'main'), true);
+console.log('Real Renovate: exact automation author allows rebasing; removing ignore identifies user modification PASS');
