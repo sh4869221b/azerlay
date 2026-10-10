@@ -102,7 +102,7 @@ jobs:
         run: bash scripts/ci-native-fingerprint.sh > .git/ci-native-cache-input
 
       - name: Upload native environment fingerprint
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: arch-native-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
           path: .git/ci-native-cache-input
@@ -164,7 +164,7 @@ jobs:
 
       - name: Upload native race diagnostics
         if: ${{ always() && (steps.native_race.outcome == 'success' || steps.native_race.outcome == 'failure') }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: arch-native-race-json-attempt-${{ github.run_attempt }}
           path: |
@@ -274,7 +274,7 @@ jobs:
         run: bash scripts/ci-native-fingerprint.sh > .git/ci-native-cache-input
 
       - name: Upload native environment fingerprint
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: arch-native-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
           path: .git/ci-native-cache-input
@@ -356,7 +356,7 @@ jobs:
         run: bash scripts/ci-native-fingerprint.sh > .git/ci-native-cache-input
 
       - name: Upload native environment fingerprint
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: arch-native-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
           path: .git/ci-native-cache-input
@@ -437,7 +437,7 @@ jobs:
         run: bash scripts/ci-native-fingerprint.sh > .git/ci-native-cache-input
 
       - name: Upload native environment fingerprint
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: arch-native-environment-${{ github.job }}-attempt-${{ github.run_attempt }}
           path: .git/ci-native-cache-input
@@ -464,7 +464,7 @@ jobs:
           go-licenses report ./... --include_tests --ignore=github.com/sh4869221b/azerlay > "$RUNNER_TEMP/dependency-licenses.csv"
 
       - name: Upload dependency license report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: arch-dependency-licenses
           path: ${{ runner.temp }}/dependency-licenses.csv
@@ -540,7 +540,7 @@ jobs:
 
       - name: Upload core race diagnostics
         if: ${{ always() && (steps.core_race.outcome == 'success' || steps.core_race.outcome == 'failure') }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: arch-core-race-json-attempt-${{ github.run_attempt }}
           path: |
