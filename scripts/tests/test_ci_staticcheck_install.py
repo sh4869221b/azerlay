@@ -102,4 +102,7 @@ esac
             self.assertNotIn('go install honnef.co/go/tools/cmd/staticcheck@', workflow)
         for name in ('native-go-cache', 'nix-go-cache'):
             cache = (ROOT / '.github/actions' / name / 'action.yml').read_text()
-            self.assertIn("'scripts/ci-staticcheck/go.mod', 'scripts/ci-staticcheck/go.sum'", cache)
+            self.assertIn("hashFiles('.git/ci-tool-cache-input')", cache)
+            self.assertIn('ci-tool-fingerprint.sh "$CI_CACHE_TOOL"', cache)
+        fingerprint = (ROOT / 'scripts/ci-tool-fingerprint.sh').read_text()
+        self.assertIn('sha256sum scripts/ci-staticcheck/go.mod scripts/ci-staticcheck/go.sum', fingerprint)

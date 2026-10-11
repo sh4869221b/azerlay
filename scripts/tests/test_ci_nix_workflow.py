@@ -56,7 +56,7 @@ class NixWorkflowTests(unittest.TestCase):
     def test_build_cache_has_no_cross_environment_fallback(self):
         cache = (ROOT / '.github/actions/nix-go-cache/action.yml').read_text()
         self.assertNotIn('restore-keys:', cache)
-        self.assertIn('azerlay-nix-build-v1-', cache)
+        self.assertIn('azerlay-nix-build-v2-', cache)
         self.assertIn('.git/ci-native-cache-input', cache)
         self.assertIn('GOTOOLCHAIN', cache)
 
