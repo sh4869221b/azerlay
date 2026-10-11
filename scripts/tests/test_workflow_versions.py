@@ -40,6 +40,7 @@ def validate_active_workflows(workflow_dir):
             if "uses" not in job:
                 runners.add(require_hosted_runner(job))
         for step in steps(source):
+            values = inputs(step)
             refs = action_refs(step)
             if any(ref.startswith("actions/checkout@") for ref in refs):
                 require_checkout_boundary(step)
@@ -47,7 +48,6 @@ def validate_active_workflows(workflow_dir):
                 require_artifact_transfer(step)
             if any(ref.startswith("actions/setup-go@") for ref in refs):
                 require_action(step, "actions/setup-go")
-                values = inputs(step)
                 if values.get("go-version") != "1.27.2" or values.get("cache") not in {"true", "false"}:
                     raise AssertionError("Go version and cache ownership must be explicit")
                 if values["cache"] == "true" and values.get("cache-dependency-path", "").splitlines() != ["go.mod", "go.sum"]:
@@ -71,7 +71,8 @@ class WorkflowVersionTests(unittest.TestCase):
                 self.assertEqual(inputs(setup).get("go-version"), "1.27.2")
                 self.assertEqual(inputs(setup).get("cache"), "false")
             self.assertLessEqual(set(action_refs(source)), allowed_actions(*names))
-            self.assertNotIn("restore-keys:", source)
+            for step in steps(source):
+                self.assertNotIn("restore-keys", inputs(step))
             for name in names - {"actions/setup-go"}:
                 self.assertIn(name + "@v6", source)
 
@@ -188,6 +189,50 @@ class WorkflowVersionTests(unittest.TestCase):
                        "steps: [&step {uses: actions/checkout@v7}, *step]"):
             with self.subTest(source=source), self.assertRaises(AssertionError):
                 action_refs(source)
+
+    def test_input_keys_follow_runner_environment_normalization(self):
+        self.assertEqual(inputs("with: {Persist-Credentials: false}"), {"persist-credentials": "false"})
+        require_checkout_boundary("uses: actions/checkout@v7\nwith: {Persist-Credentials: false}\n")
+        require_artifact_transfer("uses: actions/upload-artifact@v7\nwith: {Name: candidate, Path: candidate/*, If-No-Files-Found: error}\n")
+        require_artifact_transfer("uses: actions/download-artifact@v8\nwith: {Name: candidate, Path: /tmp/candidate}\n")
+        self.assertEqual(inputs("with: {cache key: value}"), {"cache_key": "value"})
+
+    def test_mixed_case_inputs_cannot_bypass_checkout_or_artifact_boundaries(self):
+        checkout = "uses: actions/checkout@v7\nwith:\n  persist-credentials: false\n"
+        for name in ("Token", "SSH-Key", "GitHub-Server-Url", "Allow-Unsafe-PR-Checkout"):
+            with self.subTest(input=name), self.assertRaises(AssertionError):
+                require_checkout_boundary(checkout + f"  {name}: unsafe\n")
+        upload = "uses: actions/upload-artifact@v7\nwith: {name: candidate, path: candidate/*, if-no-files-found: error, Archive: false}\n"
+        with self.assertRaises(AssertionError):
+            require_artifact_transfer(upload)
+        for name in ("Skip-Decompress", "Digest-Mismatch", "GitHub-Token", "Repository",
+                     "Run-Id", "Pattern", "Artifact-Ids", "Merge-Multiple"):
+            step = f"uses: actions/download-artifact@v8\nwith: {{name: candidate, path: /tmp/candidate, {name}: unsafe}}\n"
+            with self.subTest(input=name), self.assertRaises(AssertionError):
+                require_artifact_transfer(step)
+
+    def test_input_keys_colliding_at_runtime_fail_closed(self):
+        for source in ("with: {persist-credentials: false, Persist-Credentials: true}",
+                       "with: {token: first, Token: second}",
+                       "with: {name: candidate, NAME: other}",
+                       "with: {script: trusted, Script: bypass}",
+                       "with: {cache key: first, CACHE_KEY: second}",
+                       "with: {toKen: unsafe}"):
+            with self.subTest(source=source), self.assertRaises(AssertionError):
+                inputs(source)
+
+        # Apply the shared normalization to every active action, including
+        # github-script, whose script body must not be shadowed by another key.
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            for name in WORKFLOW_ACTIONS:
+                (target / name).write_text((ROOT / ".github/workflows" / name).read_text())
+            path = target / "release-validation.yml"
+            original = path.read_text()
+            self.assertIn("          script: |", original)
+            path.write_text(original.replace("          script: |", "          Script: bypass\n          script: |"))
+            with self.assertRaisesRegex(AssertionError, "collide"):
+                validate_active_workflows(target)
 
     def test_ci_installs_only_hashed_test_dependencies_in_a_temporary_target(self):
         script = (ROOT / "scripts/ci-python-tests.sh").read_text()

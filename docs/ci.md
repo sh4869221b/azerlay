@@ -92,8 +92,15 @@ Manual regeneration and local regression tests:
 ```sh
 python3 scripts/go_notices.py
 python3 scripts/go_notices.py --check
-python3 -m unittest discover -s scripts/tests -v
+bash scripts/ci-python-tests.sh
 ```
+
+Run these commands from the repository root. The test wrapper needs Bash,
+CPython 3.12–3.14 with `python3 -m pip` available, and an x86-64 Linux host. It
+downloads the test-only PyYAML 6.0.3 wheel from PyPI, verifies a reviewed SHA-256
+hash, installs without dependencies or cache into a temporary target, and removes
+that target on exit. It does not install into system Python. PyPI access is needed
+for setup; the regression tests retain their existing offline fixtures.
 
 Generation changes only the marked table and preserves the historical review
 date and manual notices. Tests include added/changed/removed suffixed legal files,

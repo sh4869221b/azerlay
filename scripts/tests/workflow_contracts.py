@@ -108,7 +108,19 @@ def require_hosted_runner(job):
 
 
 def inputs(step):
-    return require_mapping(mapping(step).get("with", {}))
+    """Use the runner's ASCII INPUT_* identity and reject shadowing inputs."""
+    values = require_mapping(mapping(step).get("with", {}))
+    normalized = {}
+    for key, value in values.items():
+        if not isinstance(key, str) or not key or not key.isascii():
+            raise AssertionError("Action input names must be nonempty ASCII strings")
+        # Runner Handler.AddInputsToEnvironment replaces spaces and uppercases;
+        # lowercasing ASCII gives the same identity for policy comparisons.
+        name = key.replace(" ", "_").lower()
+        if name in normalized:
+            raise AssertionError("Action input names collide after runtime normalization")
+        normalized[name] = value
+    return normalized
 
 
 def require_checkout_boundary(step):
