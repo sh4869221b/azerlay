@@ -359,6 +359,7 @@ jobs:
         uses: ./.github/actions/nix-go-cache
         with:
           tool-cache: 'govulncheck'
+          build-profile: 'govulncheck'
 
       - name: Install govulncheck
         env:
@@ -456,6 +457,7 @@ jobs:
         uses: ./.github/actions/nix-go-cache
         with:
           tool-cache: 'go-licenses'
+          build-profile: 'go-licenses'
 
       - name: Install go-licenses
         env:

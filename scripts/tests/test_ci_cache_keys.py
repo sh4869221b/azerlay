@@ -182,7 +182,7 @@ class CacheKeyTests(unittest.TestCase):
             self.assertIn('test -s .git/ci-native-cache-input', action)
             self.assertIn('ci-tool-fingerprint.sh "$CI_CACHE_TOOL" > .git/ci-tool-cache-input', action)
             self.assertIn('${{ inputs.build-profile }}-', action)
-            self.assertIn("default: 'normal'", action)
+            self.assertIn("default: 'build'", action)
         for workflow in ('ci.yml', 'arch-ci.yml'):
             source = (ROOT / '.github/workflows' / workflow).read_text()
             test = source.split('  test:\n', 1)[1].split('\n  fuzz:', 1)[0]
@@ -199,6 +199,20 @@ class CacheKeyTests(unittest.TestCase):
         self.assertIn('++ libraries', identity)
         for irrelevant in ('fonts', 'tools', 'withGUI'):
             self.assertNotIn(irrelevant, identity)
+
+    def test_snapshot_workloads_have_independent_first_writers(self):
+        expected = {'test': 'race', 'native-build': 'build',
+                    'vulnerability': 'govulncheck', 'licenses': 'go-licenses'}
+        for workflow in ('ci.yml', 'arch-ci.yml'):
+            source = (ROOT / '.github/workflows' / workflow).read_text()
+            jobs = dict(re.findall(r'^  ([a-z][a-z-]*):\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)',
+                                   source.split('jobs:\n', 1)[1], re.M | re.S))
+            profiles = {}
+            for name in expected:
+                match = re.search(r"build-profile: '([^']+)'", jobs[name])
+                profiles[name] = match[1] if match else 'build'
+            self.assertEqual(profiles, expected)
+            self.assertEqual(len(set(profiles.values())), len(expected))
 
     @unittest.skipUnless(shutil.which('go'), 'Go SDK unavailable')
     def test_go_reuses_normal_and_race_entries_and_rebuilds_changed_source(self):

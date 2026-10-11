@@ -153,8 +153,9 @@ cache can be a separately measured later change if transfer is the bottleneck.
 Go module downloads, tool module downloads, normal compiled results and race
 compiled results need distinct caches. The adopted compile-cache keys include
 native compiler/development/library output identities, effective Go/CGO/link
-settings, resolved Go version and go.mod/go.sum. A semantic normal/race profile
-keeps immutable snapshot contents suitable for the consuming gate. Workflow/job
+settings, resolved Go version and go.mod/go.sum. Stable workload profiles
+(build, race, govulncheck and go-licenses) keep immutable snapshot contents
+suitable for the consuming gate and preserve independent first writers. Workflow/job
 names, GUI runtime closure and analyzer versions are excluded; see the current
 [cache boundary and regression policy](ci.md#module-and-native-build-caches).
 Do not restore across Nix/Ubuntu/Arch or ABI

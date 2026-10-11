@@ -8,8 +8,8 @@ inputs:
     description: Analyzer graph (staticcheck, govulncheck, go-licenses), or false.
     default: 'false'
   build-profile:
-    description: Compiled snapshot contents (normal or race); independent of job names.
-    default: 'normal'
+    description: Snapshot workload (build, race, govulncheck, go-licenses); independent of job names.
+    default: 'build'
 runs:
   using: composite
   steps:

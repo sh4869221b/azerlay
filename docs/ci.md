@@ -339,7 +339,7 @@ setup-go caches; core CGo/race still uses a fresh step-local GOCACHE.
   cannot publish an incomplete snapshot for a different analyzer.
 - **Build results:** `/tmp/azerlay-go-build` is keyed by OS, architecture,
   resolved Go version, application dependency files and the native compatibility
-  fingerprint, plus a semantic `normal`/`race` snapshot profile. The Nix
+  fingerprint, plus a stable workload snapshot profile. The Nix
   fingerprint selects compiler, binutils, pkg-config and
   native development/library output store paths, which identify their build
   inputs; the GUI shell closure, fonts, compositor, role name and Nix installer
@@ -371,13 +371,17 @@ build inputs/settings, rather than because the recipe text changed. All tests
 still use `-count=1`; this shares compiled results, not successful test results.
 
 The `test` gate uses the `race` snapshot profile and saves both normal and race
-build entries in its GOCACHE. Other native gates use `normal`. This is a snapshot
-ownership decision, not a claim that Go conflates race and normal entries. Go
-checks `-race` internally. GitHub cache archives are immutable: allowing a
-normal-only first writer to occupy the race job's exact key could leave every
-subsequent race run restoring a snapshot without race builds and unable to save
-its new entries. Profile names remain stable when jobs/workflows are renamed;
-no restore fallback crosses profiles. Equivalent normal builds may still share.
+build entries in its GOCACHE. Native-build uses `build`; vulnerability and
+licenses use `govulncheck` and `go-licenses`. These stable workload names express
+snapshot contents, not GitHub job names or a claim that Go conflates race and
+normal entries. Go checks `-race` internally. GitHub cache archives are immutable:
+a normal-only first writer could leave race runs restoring a snapshot without
+race builds and unable to save their new entries. Similarly, a fast license
+report can save a snapshot before the normal native binary finishes compiling,
+then prevent that complete build snapshot from being saved. Each workload keeps
+its own first writer so these incomplete snapshots cannot occupy another
+workload's exact key. Renaming jobs/workflows preserves profile names; no restore
+fallback crosses profiles. App/analyzer download archives still share by graph.
 After a compatible warm race snapshot exists, unrelated workflow or analyzer
 changes retain both normal and race entries for vet/build/test. The retained
 cold/warm behavior has offline regression coverage; the reported long hosted
@@ -457,8 +461,9 @@ section inspection. All commands fail the job on a nonzero exit; no cache-hit
 condition skips a build or runs a previously saved executable. The final `test`
 job build and the CLI tests' current-checkout build remain independent and unchanged.
 
-Jobs with equivalent native build inputs can reuse the same build snapshot.
-Different compiler settings or native dependency identities remain isolated.
+Jobs with the same workload profile and native build inputs can reuse the same
+build snapshot. Different workloads, compiler settings or native dependency
+identities remain isolated.
 Old cache schemas expire under GitHub's normal retention policy.
 
 ### Required-check migration

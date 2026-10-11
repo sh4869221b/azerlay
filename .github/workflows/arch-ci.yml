@@ -351,6 +351,7 @@ jobs:
         uses: ./.github/actions/native-go-cache
         with:
           tool-cache: 'govulncheck'
+          build-profile: 'govulncheck'
 
       - name: Upload native environment fingerprint
         uses: actions/upload-artifact@v4
@@ -429,6 +430,7 @@ jobs:
         uses: ./.github/actions/native-go-cache
         with:
           tool-cache: 'go-licenses'
+          build-profile: 'go-licenses'
 
       - name: Upload native environment fingerprint
         uses: actions/upload-artifact@v4
