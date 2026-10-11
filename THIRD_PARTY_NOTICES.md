@@ -23,7 +23,7 @@ This table is maintained separately from the historical review above; see
 | github.com/diamondburned/gotk4/pkg v0.4.1 | MPL-2.0, with core/cairo and LGPL C exceptions below; `LICENSES/gotk4-pkg-MPL-2.0.txt` | https://github.com/diamondburned/gotk4/tree/pkg/v0.4.1/pkg |
 | github.com/fswatcher/fswatcher v0.1.0 | MIT, Yasuhiro Matsumoto; `LICENSES/fswatcher-MIT.txt` | https://github.com/fswatcher/fswatcher/tree/v0.1.0 |
 | github.com/pelletier/go-toml/v2 v2.4.3 | MIT, Thomas Pelletier; `LICENSES/go-toml-MIT.txt` | https://github.com/pelletier/go-toml/tree/v2.4.3 |
-| github.com/ulikunitz/xz v0.5.16 | BSD-3-Clause, Ulrich Kunitz; `LICENSES/xz-BSD-3-Clause.txt` | https://github.com/ulikunitz/xz/tree/v0.5.16 |
+| github.com/ulikunitz/xz v0.5.17 | BSD-3-Clause, Ulrich Kunitz; `LICENSES/xz-BSD-3-Clause.txt` | https://github.com/ulikunitz/xz/tree/v0.5.17 |
 | github.com/urfave/cli/v3 v3.11.0 | MIT, urfave/cli maintainers; `LICENSES/urfave-cli-MIT.txt` | https://github.com/urfave/cli/tree/v3.11.0 |
 | golang.org/x/sys v0.44.0 | BSD-3-Clause, The Go Authors; `LICENSES/golang-BSD-3-Clause.txt` | https://github.com/golang/sys/tree/v0.44.0 |
 | github.com/ebitengine/purego v0.11.1 | Apache-2.0; `LICENSES/purego-Apache-2.0.txt` | https://github.com/ebitengine/purego/tree/v0.11.1 |
