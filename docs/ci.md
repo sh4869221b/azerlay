@@ -302,7 +302,7 @@ Tests execute all four actual workflow bootstrap bodies with stubbed commands,
 covering immediate success, recovery, exhaustion and the subsequent Sway setup.
 Builds, scans and other gates retain their existing failure behavior.
 
-All hosts and GUI-free `fuzz`/`generated-files` jobs use standard `ubuntu-24.04`.
+All hosts and GUI-free `fuzz`/`generated-files` jobs use standard `ubuntu-26.04`.
 Hosted images are maintained by GitHub, not immutable. The fresh core race cache
 remains outside setup-go's cache. Nix as a CI substrate does not qualify a new
 product distribution target; Ubuntu support remains tracked in Issue #98.

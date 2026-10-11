@@ -22,7 +22,7 @@ concurrency:
 # and through the explicit pre-release verification entrypoint.
 jobs:
   test:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 60
     defaults:
       run:
@@ -38,7 +38,7 @@ jobs:
           TRIGGER_HEAD: ${{ github.sha }}
         run: test "$EXPECTED_HEAD" = "$TRIGGER_HEAD"
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -167,7 +167,7 @@ jobs:
 
 
   fuzz:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
       - name: Reject a moved dispatched branch
@@ -176,7 +176,7 @@ jobs:
           TRIGGER_HEAD: ${{ github.sha }}
         run: test "$EXPECTED_HEAD" = "$TRIGGER_HEAD"
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -190,7 +190,7 @@ jobs:
           grep '^MemTotal:' /proc/meminfo
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: 1.27.2
           cache: true
@@ -211,7 +211,7 @@ jobs:
 
 
   native-build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     defaults:
       run:
@@ -227,7 +227,7 @@ jobs:
           TRIGGER_HEAD: ${{ github.sha }}
         run: test "$EXPECTED_HEAD" = "$TRIGGER_HEAD"
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -304,7 +304,7 @@ jobs:
 
 
   vulnerability:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     defaults:
       run:
@@ -320,7 +320,7 @@ jobs:
           TRIGGER_HEAD: ${{ github.sha }}
         run: test "$EXPECTED_HEAD" = "$TRIGGER_HEAD"
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -402,7 +402,7 @@ jobs:
 
 
   licenses:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     defaults:
       run:
@@ -418,7 +418,7 @@ jobs:
           TRIGGER_HEAD: ${{ github.sha }}
         run: test "$EXPECTED_HEAD" = "$TRIGGER_HEAD"
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -507,7 +507,7 @@ jobs:
           retention-days: 7
 
   generated-files:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
       - name: Reject a moved dispatched branch
@@ -516,7 +516,7 @@ jobs:
           TRIGGER_HEAD: ${{ github.sha }}
         run: test "$EXPECTED_HEAD" = "$TRIGGER_HEAD"
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -533,7 +533,7 @@ jobs:
         run: bash scripts/ci-python-tests.sh
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: 1.27.2
           cache: true

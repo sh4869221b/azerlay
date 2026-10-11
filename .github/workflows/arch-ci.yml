@@ -29,7 +29,7 @@ concurrency:
 jobs:
   revision:
     name: Resolve exact validation commit
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 2
     outputs:
       commit: ${{ steps.revision.outputs.commit }}
@@ -50,7 +50,7 @@ jobs:
     name: Arch test
     timeout-minutes: 60
     needs: revision
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     container: archlinux:base
     defaults:
       run:
@@ -80,7 +80,7 @@ jobs:
           setcap -r /usr/bin/sway
 
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
@@ -178,11 +178,11 @@ jobs:
   fuzz:
     name: Arch fuzz
     needs: revision
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
@@ -198,7 +198,7 @@ jobs:
           printf 'checked_out_commit=%s\n' "$actual"
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: 1.27.2
           cache: true
@@ -220,7 +220,7 @@ jobs:
   native-build:
     name: Arch native-build
     needs: revision
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     container: archlinux:base
     defaults:
@@ -250,7 +250,7 @@ jobs:
           done
 
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
@@ -299,7 +299,7 @@ jobs:
   vulnerability:
     name: Arch vulnerability
     needs: revision
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     container: archlinux:base
     defaults:
@@ -329,7 +329,7 @@ jobs:
           done
 
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
@@ -378,7 +378,7 @@ jobs:
   licenses:
     name: Arch licenses
     needs: revision
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     container: archlinux:base
     defaults:
@@ -408,7 +408,7 @@ jobs:
           done
 
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
@@ -465,11 +465,11 @@ jobs:
   generated-files:
     name: Arch generated-files
     needs: revision
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
@@ -488,7 +488,7 @@ jobs:
         run: bash scripts/ci-python-tests.sh
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: 1.27.2
           cache: true
@@ -550,7 +550,7 @@ jobs:
     name: All full Arch gates passed
     needs: [revision, test, fuzz, native-build, vulnerability, licenses, generated-files]
     if: ${{ always() }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 2
     outputs:
       commit: ${{ steps.validated.outputs.commit }}
