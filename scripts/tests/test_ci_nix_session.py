@@ -89,7 +89,7 @@ class NixSessionTests(unittest.TestCase):
         self.assertIn('export GTK_A11Y=atspi ATSPI_DBUS_IMPLEMENTATION=dbus-daemon', source)
         self.assertIn('AT_SPI_BUS_ADDRESS NO_AT_BRIDGE', source)
         self.assertNotIn('GTK_A11Y=none', source)
-        self.assertIn('ci-nix-session.py', (ROOT / 'scripts/ci-nix-fingerprint.sh').read_text())
+        self.assertNotIn('ci-nix-session.py', (ROOT / 'scripts/ci-nix-fingerprint.sh').read_text())
 
     @unittest.skipUnless(shutil.which('dbus-run-session') and shutil.which('dbus-send'), 'Host D-Bus tools unavailable')
     def test_generated_config_starts_a_real_private_session(self):

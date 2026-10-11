@@ -143,8 +143,8 @@ class ArchWorkflowContracts(unittest.TestCase):
         for name in ("test", "native-build", "vulnerability", "licenses"):
             with self.subTest(job=name):
                 job = ARCH_JOBS[name]
-                self.assertIn("CI_CACHE_JOB: ${{ github.job }}", job)
-                self.assertIn("CI_NATIVE_WORKFLOW: .github/workflows/arch-ci.yml", job)
+                self.assertNotIn("CI_CACHE_JOB:", job)
+                self.assertNotIn("CI_NATIVE_WORKFLOW:", job)
                 self.assertIn("bash scripts/ci-native-fingerprint.sh > .git/ci-native-cache-input", job)
                 self.assertIn("uses: ./.github/actions/native-go-cache", job)
                 self.assertIn("include-hidden-files: true", job)

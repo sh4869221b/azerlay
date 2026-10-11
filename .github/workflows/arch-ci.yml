@@ -96,10 +96,13 @@ jobs:
           printf 'checked_out_commit=%s\n' "$actual"
 
       - name: Prepare native Go cache input
-        env:
-          CI_CACHE_JOB: ${{ github.job }}
-          CI_NATIVE_WORKFLOW: .github/workflows/arch-ci.yml
         run: bash scripts/ci-native-fingerprint.sh > .git/ci-native-cache-input
+
+      - name: Set up Go and native caches
+        uses: ./.github/actions/native-go-cache
+        with:
+          tool-cache: 'staticcheck'
+          build-profile: 'race'
 
       - name: Upload native environment fingerprint
         uses: actions/upload-artifact@v4
@@ -109,11 +112,6 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
-
-      - name: Set up Go and native caches
-        uses: ./.github/actions/native-go-cache
-        with:
-          tool-cache: 'true'
 
       - name: Check complete package partition and core dependencies
         env:
@@ -268,10 +266,12 @@ jobs:
           printf 'checked_out_commit=%s\n' "$actual"
 
       - name: Prepare native Go cache input
-        env:
-          CI_CACHE_JOB: ${{ github.job }}
-          CI_NATIVE_WORKFLOW: .github/workflows/arch-ci.yml
         run: bash scripts/ci-native-fingerprint.sh > .git/ci-native-cache-input
+
+      - name: Set up Go and native caches
+        uses: ./.github/actions/native-go-cache
+        with:
+          module-writer: 'true'
 
       - name: Upload native environment fingerprint
         uses: actions/upload-artifact@v4
@@ -281,11 +281,6 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
-
-      - name: Set up Go and native caches
-        uses: ./.github/actions/native-go-cache
-        with:
-          module-writer: 'true'
 
       - name: Build, run, and inspect native binary
         run: |
@@ -350,10 +345,13 @@ jobs:
           printf 'checked_out_commit=%s\n' "$actual"
 
       - name: Prepare native Go cache input
-        env:
-          CI_CACHE_JOB: ${{ github.job }}
-          CI_NATIVE_WORKFLOW: .github/workflows/arch-ci.yml
         run: bash scripts/ci-native-fingerprint.sh > .git/ci-native-cache-input
+
+      - name: Set up Go and native caches
+        uses: ./.github/actions/native-go-cache
+        with:
+          tool-cache: 'govulncheck'
+          build-profile: 'govulncheck'
 
       - name: Upload native environment fingerprint
         uses: actions/upload-artifact@v4
@@ -363,11 +361,6 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
-
-      - name: Set up Go and native caches
-        uses: ./.github/actions/native-go-cache
-        with:
-          tool-cache: 'true'
 
       - name: Install govulncheck
         env:
@@ -431,10 +424,13 @@ jobs:
           printf 'checked_out_commit=%s\n' "$actual"
 
       - name: Prepare native Go cache input
-        env:
-          CI_CACHE_JOB: ${{ github.job }}
-          CI_NATIVE_WORKFLOW: .github/workflows/arch-ci.yml
         run: bash scripts/ci-native-fingerprint.sh > .git/ci-native-cache-input
+
+      - name: Set up Go and native caches
+        uses: ./.github/actions/native-go-cache
+        with:
+          tool-cache: 'go-licenses'
+          build-profile: 'go-licenses'
 
       - name: Upload native environment fingerprint
         uses: actions/upload-artifact@v4
@@ -444,11 +440,6 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
-
-      - name: Set up Go and native caches
-        uses: ./.github/actions/native-go-cache
-        with:
-          tool-cache: 'true'
 
       - name: Install go-licenses
         env:

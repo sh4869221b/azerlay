@@ -1,31 +1,14 @@
 #!/usr/bin/env bash
-# Complete native compatibility boundary; never use a partial package allowlist.
+# Rolling Arch: retain the native build dependency closure, not all packages.
+# Go is installed later; the cache action adds its effective build settings.
 set -euo pipefail
-: "${CI_CACHE_JOB:?CI_CACHE_JOB is required}"
-: "${CI_NATIVE_WORKFLOW:?CI_NATIVE_WORKFLOW must identify the actual native workflow}"
-case "$CI_NATIVE_WORKFLOW" in
-  .github/workflows/arch-ci.yml) ;;
-  *) printf 'Unexpected native workflow recipe\n' >&2; exit 2;;
-esac
-test -f "$CI_NATIVE_WORKFLOW"
-printf 'fingerprint_schema=2\njob=%s\n' "$CI_CACHE_JOB"
+export LC_ALL=C
+printf 'fingerprint_schema=arch-3\n'
 cat /etc/os-release
 uname -m
-if command -v dpkg-query >/dev/null; then
-  printf 'package_manager=dpkg\n'
-  LC_ALL=C dpkg-query -W -f='${binary:Package}\t${Version}\t${Architecture}\n' | LC_ALL=C sort
-  # Also pin the archive source and base-image/install recipe, including fonts.
-  cat /etc/apt/sources.list.d/azerlay.sources /etc/apt/apt.conf.d/00azerlay-snapshot
-elif command -v pacman >/dev/null; then
-  printf 'package_manager=pacman\n'
-  LC_ALL=C pacman -Q | LC_ALL=C sort
-else
-  printf 'Unsupported native package inventory\n' >&2
-  exit 1
-fi
+python3 scripts/ci_native_packages.py
 cc --version
 ld --version
 pkg-config --version
-pkg-config --modversion gtk4 gtk4-layer-shell-0 glib-2.0 pango
-pkg-config --cflags --libs gtk4 gtk4-layer-shell-0
-sha256sum "$CI_NATIVE_WORKFLOW" scripts/ci-native-fingerprint.sh scripts/test-wayland.sh
+pkg-config --modversion gtk4 gtk4-layer-shell-0 glib-2.0 pango gobject-introspection-1.0 cairo
+pkg-config --cflags --libs gtk4 gtk4-layer-shell-0 glib-2.0 pango gobject-introspection-1.0 cairo

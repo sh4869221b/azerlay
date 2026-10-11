@@ -325,28 +325,74 @@ with setup-go's implicit caching disabled. The two GUI-free jobs retain their
 setup-go caches; core CGo/race still uses a fresh step-local GOCACHE.
 
 - **Application modules:** all four jobs restore
-  `/tmp/azerlay-go-mod/cache/download`, keyed
-  by OS, architecture, resolved Go toolchain, `go.mod`, `go.sum`, and the module
-  preparation script. The key excludes the job, native packages and analyzer
-  versions. All four install `zstd` before restore, so cache paths and compression
-  agree. Only the existing `native-build` job saves this snapshot, after a
-  successful `go mod download` and `go mod verify`. No job waits for it;
-  concurrent cold consumers may miss and download normally.
-- **Analyzer modules:** Staticcheck, govulncheck and go-licenses install with
-  `GOMODCACHE=/tmp/azerlay-tool-go-mod`, with its `cache/download` directory
-  separately cached by owning job, OS,
-  architecture, resolved Go version and `.github/ci-tools.env`. That manifest
-  drives the unchanged pinned tool versions. This prevents an incomplete
-  first-writer snapshot and avoids transferring all three tools' dependency
-  graphs to every consumer. Native package updates do not invalidate tool
-  downloads. Each tool installs normally on a cache miss; no priming build or
-  cross-job dependency is introduced.
-- **Build results:** each job restores and saves only `/tmp/azerlay-go-build`.
-  Its key includes the job ID, complete locked Nix closure or full installed Arch
-  inventory, actual workflow/install recipe, compiler/linker/pkg-config metadata,
-  plus OS, architecture, resolved Go toolchain, application dependency files,
-  and CI-tool versions. No restore prefix crosses the native compatibility
-  boundary. Native updates still produce a cold build cache.
+  `/tmp/azerlay-go-mod/cache/download`, keyed by OS, architecture, resolved Go
+  version, `go.mod` and `go.sum`. The module preparation script still downloads
+  and verifies the current graph on every run. Job names, script edits, native
+  packages and analyzer versions do not invalidate download archives. Only
+  `native-build` saves the verified snapshot; cold consumers download normally.
+- **Analyzer modules:** each analyzer's `/tmp/azerlay-tool-go-mod/cache/download`
+  uses its semantic graph name (`staticcheck`, `govulncheck` or `go-licenses`), OS,
+  architecture, resolved Go version and selected Go tool pins. Staticcheck also
+  includes its isolated module lock files. Renaming a job, changing another
+  analyzer, editing manifest comments or updating Syft preserves that graph's
+  key. Purpose-specific graphs retain separate first writers so one analyzer
+  cannot publish an incomplete snapshot for a different analyzer.
+- **Build results:** `/tmp/azerlay-go-build` is keyed by OS, architecture,
+  resolved Go version, application dependency files and the native compatibility
+  fingerprint, plus a stable workload snapshot profile. The Nix
+  fingerprint selects compiler, binutils, pkg-config and
+  native development/library output store paths, which identify their build
+  inputs; the GUI shell closure, fonts, compositor, role name and Nix installer
+  version are excluded. Arch uses the installed versions and architectures of
+  gcc, binutils, glibc, Linux API headers, pkgconf and actual installed owners of
+  the GTK, Layer Shell, GLib, Pango, Cairo and GObject introspection pkg-config files,
+  plus their complete dependency closure (including virtual providers), rather
+  than all installed packages. This follows header/library package splits and
+  avoids selecting an unrelated introspection generator merely by name.
+  Missing or ambiguous build
+  dependencies fail before restore. Package-level transitive identities are
+  deliberately conservative; dependencies of a selected native package still
+  invalidate, even if a particular compilation does not use every file.
+  Both retain compiler/linker/pkg-config metadata and effective Go target,
+  CGO, compiler and link settings. Nix compiler-wrapper settings are retained.
+  Arch captures Go settings after setup-go, before restore; its uploaded
+  fingerprint includes those settings. Workflow text, job names, scripts and
+  unrelated installed packages do not themselves change the build key.
+  There are no restore prefixes or cross-environment fallbacks.
+
+Go validates source contents, compiler options and per-command flags such as
+`-race` within GOCACHE. A source-only change can reuse the outer snapshot and Go
+rebuilds affected entries; application module changes rotate the outer snapshot
+so its immutable archive can be refreshed. External C libraries are the crucial
+additional boundary: `go help cache` states that Go does not detect their changes.
+The native fingerprint retains that boundary instead of forcing every CI edit
+through a new key. Updating a recipe affects the key when it changes effective
+build inputs/settings, rather than because the recipe text changed. All tests
+still use `-count=1`; this shares compiled results, not successful test results.
+
+The `test` gate uses the `race` snapshot profile and saves both normal and race
+build entries in its GOCACHE. Native-build uses `build`; vulnerability and
+licenses use `govulncheck` and `go-licenses`. These stable workload names express
+snapshot contents, not GitHub job names or a claim that Go conflates race and
+normal entries. Go checks `-race` internally. GitHub cache archives are immutable:
+a normal-only first writer could leave race runs restoring a snapshot without
+race builds and unable to save their new entries. Similarly, a fast license
+report can save a snapshot before the normal native binary finishes compiling,
+then prevent that complete build snapshot from being saved. Each workload keeps
+its own first writer so these incomplete snapshots cannot occupy another
+workload's exact key. Renaming jobs/workflows preserves profile names; no restore
+fallback crosses profiles. App/analyzer download archives still share by graph.
+After a compatible warm race snapshot exists, unrelated workflow or analyzer
+changes retain both normal and race entries for vet/build/test. The retained
+cold/warm behavior has offline regression coverage; the reported long hosted
+vet and race durations have not been remeasured with this patch.
+
+The regression suite exercises unrelated workflow/job/session/documentation edits,
+selected and unrelated package updates, transitive/virtual dependencies, missing
+identities, effective Go/CGO/target/compiler/link settings, analyzer pins and module
+lock changes. These are offline key/behavior checks, not measured Actions hits.
+The new key schemas incur one initial migration miss. Hosted hit-rate and
+wall-time improvements have not been measured for this change.
 
 The module snapshots contain Go's download archives and metadata (`.info`,
 `.mod`, `.zip`, `.ziphash`, and cached sumdb data), not duplicate extracted source
@@ -357,8 +403,8 @@ still contacts its database. No checksum service is disabled.
 
 App download, checksum verification and an unchanged `go.mod`/`go.sum` check run
 on every cache hit or miss. Application and analyzer cache paths do not overlap.
-Each analyzer retains its own native-keyed build results while sharing the
-job's GOCACHE with the application's other checks.
+Go keeps individual analyzer build entries within the same native-compatible
+GOCACHE used by the application's other checks.
 
 Cache hits never skip formatting, vet, analyzers, tests, compilation, or binary
 execution. No credentials, HOME directory, binaries, or user profiles are included
@@ -415,9 +461,10 @@ section inspection. All commands fail the job on a nonzero exit; no cache-hit
 condition skips a build or runs a previously saved executable. The final `test`
 job build and the CLI tests' current-checkout build remain independent and unchanged.
 
-The job ID remains part of the native cache input, so `native-build` has one
-isolated build cache rather than the two equivalent caches it replaced. Old
-combined cache entries expire under GitHub's normal retention policy.
+Jobs with the same workload profile and native build inputs can reuse the same
+build snapshot. Different workloads, compiler settings or native dependency
+identities remain isolated.
+Old cache schemas expire under GitHub's normal retention policy.
 
 ### Required-check migration
 
@@ -591,9 +638,9 @@ those historical measurements do not become six-gate normal-CI observations.
 The owner subsequently selected normal Nix CI with daily/pre-release full Arch.
 The comparison workflows are archived under docs, not active parallel workflows.
 
-The exact adopted head must pass all six normal gates before merge. Workflow
-and cache-recipe changes invalidate compiled caches conservatively; a cold
-validation does not establish warm p50/p95. Scheduled workflows begin only after
+The exact adopted head must pass all six normal gates before merge. Changes to
+effective build settings or native dependencies invalidate compiled caches; a
+cold validation does not establish warm p50/p95. Scheduled workflows begin only after
 this configuration reaches the default branch. There is no release publisher;
 manual pre-release verification and its enforcement boundary are documented in
 [the adoption policy](ci-adoption.md).
