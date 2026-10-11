@@ -3,6 +3,8 @@ import re
 import unittest
 from pathlib import Path
 
+from workflow_contracts import require_hosted_runner
+
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = (ROOT / '.github/workflows/ci.yml').read_text()
 JOBS = dict(re.findall(r'^  ([a-z][a-z-]*):\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)', WORKFLOW.split('jobs:\n', 1)[1], re.M | re.S))
@@ -21,7 +23,7 @@ class NixWorkflowTests(unittest.TestCase):
         for name in ('test', 'native-build', 'vulnerability', 'licenses'):
             job = JOBS[name]
             role = 'test' if name == 'test' else 'build'
-            self.assertIn('runs-on: ubuntu-24.04', job)
+            require_hosted_runner(job)
             self.assertIn('CI_NIX_ROLE: ' + role, job)
             self.assertNotIn('CI_NIX_test', job)
             self.assertNotIn('CI_NIX_build', job)
