@@ -7,7 +7,7 @@ require (
 	github.com/fswatcher/fswatcher v0.1.0
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/ulikunitz/xz v0.5.16
-	github.com/urfave/cli/v3 v3.11.0
+	github.com/urfave/cli/v3 v3.14.0
 	golang.org/x/sys v0.44.0
 )
 
