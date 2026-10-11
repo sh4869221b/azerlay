@@ -508,7 +508,8 @@ physical hotplug, Niri behavior, or game input/rendering acceptance.
 The vulnerability job runs:
 
 ```sh
-go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
+source .github/ci-tools.env
+go install golang.org/x/vuln/cmd/govulncheck@"$GOVULNCHECK_VERSION"
 govulncheck ./...
 ```
 
