@@ -38,7 +38,7 @@ jobs:
           TRIGGER_HEAD: ${{ github.sha }}
         run: test "$EXPECTED_HEAD" = "$TRIGGER_HEAD"
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -176,7 +176,7 @@ jobs:
           TRIGGER_HEAD: ${{ github.sha }}
         run: test "$EXPECTED_HEAD" = "$TRIGGER_HEAD"
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -227,7 +227,7 @@ jobs:
           TRIGGER_HEAD: ${{ github.sha }}
         run: test "$EXPECTED_HEAD" = "$TRIGGER_HEAD"
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -320,7 +320,7 @@ jobs:
           TRIGGER_HEAD: ${{ github.sha }}
         run: test "$EXPECTED_HEAD" = "$TRIGGER_HEAD"
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -418,7 +418,7 @@ jobs:
           TRIGGER_HEAD: ${{ github.sha }}
         run: test "$EXPECTED_HEAD" = "$TRIGGER_HEAD"
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -516,7 +516,7 @@ jobs:
           TRIGGER_HEAD: ${{ github.sha }}
         run: test "$EXPECTED_HEAD" = "$TRIGGER_HEAD"
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
