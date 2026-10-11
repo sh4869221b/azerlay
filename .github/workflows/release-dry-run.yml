@@ -20,7 +20,7 @@ jobs:
   build:
     name: Build release candidate
     needs: [full-arch]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     container: archlinux:base
     defaults:
@@ -55,7 +55,7 @@ jobs:
           pacman -Syu --noconfirm --needed python python-jsonschema ca-certificates git curl tar gzip base-devel pkgconf gtk4 gtk4-layer-shell gobject-introspection
 
       - name: Check out candidate
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
@@ -70,7 +70,7 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Set up candidate Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: 1.27.2
           cache: false
@@ -107,7 +107,7 @@ jobs:
           printf 'directory=%s/release-candidate\n' "$RUNNER_TEMP" >> "$GITHUB_OUTPUT"
 
       - name: Upload candidate outputs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-candidate
           path: |
@@ -123,7 +123,7 @@ jobs:
           retention-days: 7
 
       - name: Upload runtime smoke helper
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-smoke-helper
           path: scripts/release-smoke.sh
@@ -133,7 +133,7 @@ jobs:
   runtime:
     name: Clean Arch runtime smoke
     needs: [build]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     container: archlinux:base
     defaults:
@@ -146,13 +146,13 @@ jobs:
           pacman -Syu --noconfirm --needed gtk4 gtk4-layer-shell libgirepository glib2 pango harfbuzz gdk-pixbuf2 cairo vulkan-icd-loader graphene glibc binutils
 
       - name: Download candidate outputs
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-candidate
           path: ${{ runner.temp }}/release-candidate
 
       - name: Download runtime smoke helper
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-smoke-helper
           path: ${{ runner.temp }}/release-smoke-helper
@@ -179,7 +179,7 @@ jobs:
     name: Require complete candidate dry-run
     needs: [full-arch, build, runtime]
     if: ${{ always() }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 2
     steps:
       - name: Require every candidate job at the same commit

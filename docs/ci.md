@@ -302,7 +302,7 @@ Tests execute all four actual workflow bootstrap bodies with stubbed commands,
 covering immediate success, recovery, exhaustion and the subsequent Sway setup.
 Builds, scans and other gates retain their existing failure behavior.
 
-All hosts and GUI-free `fuzz`/`generated-files` jobs use standard `ubuntu-24.04`.
+All hosts and GUI-free `fuzz`/`generated-files` jobs use standard `ubuntu-26.04`.
 Hosted images are maintained by GitHub, not immutable. The fresh core race cache
 remains outside setup-go's cache. Nix as a CI substrate does not qualify a new
 product distribution target; Ubuntu support remains tracked in Issue #98.
@@ -524,7 +524,7 @@ go install github.com/google/go-licenses/v2@v2.0.1
 go-licenses report ./... --include_tests --ignore=github.com/sh4869221b/azerlay > "$RUNNER_TEMP/nix-dependency-licenses.csv"
 ```
 
-After successful report generation, `actions/upload-artifact@v4` publishes
+After successful report generation, `actions/upload-artifact` publishes
 `nix-dependency-licenses` for seven days in normal CI (the separate Arch
 workflow uses an `arch-` artifact name) and fails if the file is absent. The
 report includes test dependencies and excludes only the project's own

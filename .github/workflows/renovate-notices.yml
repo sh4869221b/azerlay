@@ -18,7 +18,7 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.base.ref == 'main' &&
       startsWith(github.event.pull_request.head.ref, 'renovate/')
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -27,11 +27,11 @@ jobs:
       eligible: ${{ steps.prepare.outputs.eligible }}
     steps:
       # Only trusted base code is executed, never the PR checkout.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: 1.27.2
           cache: false
@@ -45,7 +45,7 @@ jobs:
         run: |
           python3 scripts/go_notices.py --root "$RUNNER_TEMP/notice-input"
           python3 scripts/go_notices.py --root "$RUNNER_TEMP/notice-input" --check
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: steps.prepare.outputs.eligible == 'true'
         with:
           name: renovate-notices-${{ github.run_id }}-${{ github.run_attempt }}
@@ -58,7 +58,7 @@ jobs:
   publish:
     needs: generate
     if: needs.generate.outputs.eligible == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     # Explicitly approved, short-lived job token; no PAT/App secret or setting change.
     permissions:
@@ -66,11 +66,11 @@ jobs:
       actions: write
       pull-requests: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: renovate-notices-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/notice-result
