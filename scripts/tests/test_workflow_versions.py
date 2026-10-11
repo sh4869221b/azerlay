@@ -85,8 +85,9 @@ class WorkflowVersionTests(unittest.TestCase):
             self.assertLessEqual(set(action_refs(source)), allowed_actions(*names))
             for step in steps(source):
                 self.assertNotIn("restore-keys", inputs(step))
-            for name in names - {"actions/setup-go"}:
-                self.assertIn(name + "@v6", source)
+            refs = action_refs(source)
+            for name, count in (("actions/cache", 2), ("actions/cache/restore", 1), ("actions/cache/save", 1)):
+                self.assertEqual(refs.count(name + "@v6"), count)
 
     def test_action_admission_rejects_unreviewed_versions_owners_and_paths(self):
         for name, versions in ACTION_VERSIONS.items():
@@ -282,6 +283,26 @@ class WorkflowVersionTests(unittest.TestCase):
                 with self.subTest(version=version, cache=cache), patch(f"{__name__}.ROOT", target):
                     with self.assertRaises(AssertionError):
                         self.test_composite_actions_keep_cache_v6_and_explicit_go_cache_ownership()
+
+    def test_composite_cache_actions_cannot_be_commented_out_or_duplicated(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            for kind in ("native", "nix"):
+                path = target / f".github/actions/{kind}-go-cache/action.yml"
+                path.parent.mkdir(parents=True)
+                path.write_text((ROOT / f".github/actions/{kind}-go-cache/action.yml").read_text())
+            for kind in ("native", "nix"):
+                path = target / f".github/actions/{kind}-go-cache/action.yml"
+                original = path.read_text()
+                for name in ("actions/cache", "actions/cache/restore", "actions/cache/save"):
+                    ref = name + "@v6"
+                    for source in (original.replace("uses: " + ref, "# uses: " + ref, 1),
+                                   original + f"\n    - uses: {ref}\n"):
+                        path.write_text(source)
+                        with self.subTest(kind=kind, action=name, source=source), patch(f"{__name__}.ROOT", target):
+                            with self.assertRaises(AssertionError):
+                                self.test_composite_actions_keep_cache_v6_and_explicit_go_cache_ownership()
+                        path.write_text(original)
 
     def test_ci_installs_only_hashed_test_dependencies_in_a_temporary_target(self):
         script = (ROOT / "scripts/ci-python-tests.sh").read_text()
