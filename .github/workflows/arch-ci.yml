@@ -198,7 +198,7 @@ jobs:
           printf 'checked_out_commit=%s\n' "$actual"
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: 1.27.2
           cache: true
@@ -488,7 +488,7 @@ jobs:
         run: bash scripts/ci-python-tests.sh
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: 1.27.2
           cache: true
