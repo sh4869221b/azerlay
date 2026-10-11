@@ -28,7 +28,7 @@ This table is maintained separately from the historical review above; see
 | golang.org/x/sys v0.44.0 | BSD-3-Clause, The Go Authors; `LICENSES/golang-BSD-3-Clause.txt` | https://github.com/golang/sys/tree/v0.44.0 |
 | github.com/ebitengine/purego v0.11.1 | Apache-2.0; `LICENSES/purego-Apache-2.0.txt` | https://github.com/ebitengine/purego/tree/v0.11.1 |
 | golang.org/x/sync v0.24.0 | BSD-3-Clause, The Go Authors; `LICENSES/golang-BSD-3-Clause.txt` | https://github.com/golang/sync/tree/v0.24.0 |
-| golang.org/x/text v0.37.0 | BSD-3-Clause, The Go Authors; `LICENSES/golang-BSD-3-Clause.txt` | https://github.com/golang/text/tree/v0.37.0 |
+| golang.org/x/text v0.43.0 | BSD-3-Clause, The Go Authors; `LICENSES/golang-BSD-3-Clause.txt` | https://github.com/golang/text/tree/v0.43.0 |
 <!-- END GENERATED GO MODULES -->
 
 The Go project additionally provides the patent grant reproduced in
