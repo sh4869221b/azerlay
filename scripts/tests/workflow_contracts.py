@@ -6,6 +6,9 @@ Archived measurement workflows keep their original version contracts.
 """
 
 import re
+import textwrap
+
+import yaml
 
 
 ACTION_VERSIONS = {
@@ -25,9 +28,69 @@ def allowed_actions(*names):
     return {f"{name}@{version}" for name in names for version in ACTION_VERSIONS[name]}
 
 
+class WorkflowLoader(yaml.BaseLoader):
+    """Keep GitHub scalar spellings; reject ambiguous mappings and aliases."""
+
+    def compose_node(self, parent, index):
+        if self.check_event(yaml.AliasEvent):
+            raise AssertionError("Workflow aliases require explicit policy review")
+        return super().compose_node(parent, index)
+
+    def construct_mapping(self, node, deep=False):
+        result = {}
+        for key_node, value_node in node.value:
+            key = self.construct_object(key_node, deep=deep)
+            if not isinstance(key, str) or key == "<<" or key in result:
+                raise AssertionError("Workflow mapping keys must be unique scalar keys without merges")
+            result[key] = self.construct_object(value_node, deep=deep)
+        return result
+
+
+def mapping(source):
+    if isinstance(source, str):
+        try:
+            source = yaml.load(textwrap.dedent(source), Loader=WorkflowLoader)
+        except yaml.YAMLError as error:
+            raise AssertionError("Workflow must be valid YAML") from error
+    return require_mapping(source)
+
+
+def require_mapping(source):
+    if not isinstance(source, dict):
+        raise AssertionError("Expected a workflow mapping")
+    return source
+
+
+def workflow_jobs(source):
+    jobs = require_mapping(mapping(source).get("jobs"))
+    if not jobs or any(not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_-]*", key) for key in jobs):
+        raise AssertionError("Expected valid workflow job IDs")
+    return {key: require_mapping(value) for key, value in jobs.items()}
+
+
+def steps(source):
+    source = mapping(source)
+    if "jobs" in source:
+        return [step for job in workflow_jobs(source).values() for step in steps(job)]
+    if "runs" in source:
+        return steps(require_mapping(source["runs"]))
+    values = source.get("steps", [])
+    if not isinstance(values, list) or any(not isinstance(step, dict) for step in values):
+        raise AssertionError("Steps must be a sequence of mappings")
+    return values
+
+
 def action_refs(source):
-    values = re.findall(r"(?m)^ +(?:- )?uses:[ \t]*(.*)$", source)
-    return [re.split(r"[ \t]+#", value, maxsplit=1)[0].strip() for value in values]
+    source = mapping(source)
+    if "jobs" in source:
+        return [ref for job in workflow_jobs(source).values() for ref in action_refs(job)]
+    if "runs" in source:
+        return action_refs(require_mapping(source["runs"]))
+    refs = [source["uses"]] if "uses" in source else []
+    refs += [ref for step in steps(source) for ref in action_refs(step)]
+    if any(not isinstance(ref, str) or not ref for ref in refs):
+        raise AssertionError("Action references must be nonempty scalar strings")
+    return refs
 
 
 def require_action(source, name, count=1):
@@ -38,34 +101,41 @@ def require_action(source, name, count=1):
 
 
 def require_hosted_runner(job):
-    runners = re.findall(r"(?m)^    runs-on: (.+)$", job)
-    if len(runners) != 1 or runners[0] not in HOSTED_RUNNERS:
-        raise AssertionError(f"Expected one approved fixed Ubuntu runner, got {runners}")
-    return runners[0]
+    runner = mapping(job).get("runs-on")
+    if not isinstance(runner, str) or runner not in HOSTED_RUNNERS:
+        raise AssertionError(f"Expected one approved fixed Ubuntu runner, got {runner}")
+    return runner
+
+
+def inputs(step):
+    return require_mapping(mapping(step).get("with", {}))
 
 
 def require_checkout_boundary(step):
     require_action(step, "actions/checkout")
-    if not re.search(r"(?m)^ +persist-credentials: false$", step):
+    values = inputs(step)
+    if values.get("persist-credentials") != "false":
         raise AssertionError("Checkout must not persist credentials")
-    if re.search(r"(?m)^ +(?:allow-unsafe-pr-checkout|token|ssh-key):", step):
-        raise AssertionError("Checkout must not opt into unsafe PR code or extra credentials")
+    if {"allow-unsafe-pr-checkout", "token", "ssh-key", "github-server-url"} & values.keys():
+        raise AssertionError("Checkout must keep the trusted origin and credential boundary")
 
 
 def require_artifact_transfer(step):
+    values = inputs(step)
     if any(ref.startswith("actions/upload-artifact@") for ref in action_refs(step)):
         require_action(step, "actions/upload-artifact")
         # v7 archive:false changes artifact names and accepts only a single file.
-        if re.search(r"(?m)^ +archive:", step):
+        if "archive" in values:
             raise AssertionError("Keep the default ZIP artifact contract")
-        if not re.search(r"(?m)^ +if-no-files-found: error$", step):
+        if values.get("if-no-files-found") != "error":
             raise AssertionError("Missing artifact files must fail")
     else:
         require_action(step, "actions/download-artifact")
-        # Named, current-run artifacts must be extracted. v8 defaults to a
-        # blocking digest mismatch; do not override that safety improvement.
-        if re.search(r"(?m)^ +(?:skip-decompress|digest-mismatch|github-token|repository|run-id|pattern|artifact-ids|merge-multiple):", step):
+        # v8 defaults to a blocking digest mismatch for current-run artifacts.
+        forbidden = {"skip-decompress", "digest-mismatch", "github-token", "repository",
+                     "run-id", "pattern", "artifact-ids", "merge-multiple"}
+        if forbidden & values.keys():
             raise AssertionError("Keep named, extracted, current-run artifacts and digest verification")
     for key in ("name", "path"):
-        if not re.search(rf"(?m)^ +{key}: \S", step):
+        if not isinstance(values.get(key), str) or not values[key].strip():
             raise AssertionError(f"Artifact transfer needs an explicit {key}")

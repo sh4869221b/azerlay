@@ -1,8 +1,7 @@
 """Offline, fail-closed guards for daily and pre-release Arch validation.
 
-These tests use Python's standard library plus the hosted runner's Node runtime;
-they do not need an unpinned YAML dependency. Gate tests execute the exact
-workflow shell and github-script bodies without network access.
+These tests use the pinned test-only YAML parser and the runner's Node runtime.
+Gate tests execute the exact workflow shell and github-script bodies without network access.
 """
 
 import os
@@ -131,7 +130,7 @@ class ArchWorkflowContracts(unittest.TestCase):
     def test_core_race_and_generated_files_remain(self):
         job = ARCH_JOBS["generated-files"]
         for command in (
-            "python3 -m unittest discover -s scripts/tests -v",
+            "bash scripts/ci-python-tests.sh",
             "CGO_ENABLED: '0'", "scripts/ci-core-packages.txt",
             "python3 scripts/ci_check_packages.py --core-only",
             "go test -shuffle=on -count=1", "go test -race -json -shuffle=on -count=1",
@@ -315,7 +314,7 @@ class ReleaseWorkflowContracts(unittest.TestCase):
                 for step in step_blocks(job):
                     if re.search(r"(?m)^        if:", step):
                         self.assertRegex(step.splitlines()[0], r"^Upload .* diagnostics$")
-                        require_action(step, "actions/upload-artifact")
+                        require_action("        name: " + step, "actions/upload-artifact")
 
     def test_no_publishing_credentials_or_write_permissions(self):
         approved_actions = allowed_actions(

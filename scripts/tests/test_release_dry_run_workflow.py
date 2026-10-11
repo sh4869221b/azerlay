@@ -92,10 +92,10 @@ class ReleaseDryRunWorkflowTests(unittest.TestCase):
             "-linux-x86_64.spdx.json", "-source.licenses.json", "-linux-x86_64.licenses.json",
         )] + [prefix + "release-notes.md", prefix + "SHA256SUMS"])
         uploads = [step for step in steps
-                   if any(ref.startswith("actions/upload-artifact@") for ref in action_refs(step))]
+                   if any(ref.startswith("actions/upload-artifact@") for ref in action_refs("        name: " + step))]
         self.assertEqual(len(uploads), 2)
         for step in uploads:
-            require_action(step, "actions/upload-artifact")
+            require_action("        name: " + step, "actions/upload-artifact")
             self.assertIn("if-no-files-found: error", step)
             self.assertIn("retention-days: 7", step)
         self.assertIn('"$RUNNER_TEMP/release-candidate"', JOBS["build"])
