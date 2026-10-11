@@ -20,7 +20,7 @@ jobs:
   build:
     name: Build release candidate
     needs: [full-arch]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     container: archlinux:base
     defaults:
@@ -133,7 +133,7 @@ jobs:
   runtime:
     name: Clean Arch runtime smoke
     needs: [build]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     container: archlinux:base
     defaults:
@@ -179,7 +179,7 @@ jobs:
     name: Require complete candidate dry-run
     needs: [full-arch, build, runtime]
     if: ${{ always() }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 2
     steps:
       - name: Require every candidate job at the same commit

@@ -18,7 +18,7 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.base.ref == 'main' &&
       startsWith(github.event.pull_request.head.ref, 'renovate/')
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -58,7 +58,7 @@ jobs:
   publish:
     needs: generate
     if: needs.generate.outputs.eligible == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     # Explicitly approved, short-lived job token; no PAT/App secret or setting change.
     permissions:
