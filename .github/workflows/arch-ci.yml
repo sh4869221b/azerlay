@@ -485,7 +485,7 @@ jobs:
           printf 'checked_out_commit=%s\n' "$actual"
 
       - name: Test CI measurement tools
-        run: python3 -m unittest discover -s scripts/tests -v
+        run: bash scripts/ci-python-tests.sh
 
       - name: Set up Go
         uses: actions/setup-go@v5

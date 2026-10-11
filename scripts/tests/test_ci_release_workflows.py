@@ -1,8 +1,7 @@
 """Offline, fail-closed guards for daily and pre-release Arch validation.
 
-These tests use Python's standard library plus the hosted runner's Node runtime;
-they do not need an unpinned YAML dependency. Gate tests execute the exact
-workflow shell and github-script bodies without network access.
+These tests use the pinned test-only YAML parser and the runner's Node runtime.
+Gate tests execute the exact workflow shell and github-script bodies without network access.
 """
 
 import os
@@ -13,6 +12,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
+
+from workflow_contracts import allowed_actions, require_action, require_hosted_runner
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -69,13 +70,13 @@ class ArchWorkflowContracts(unittest.TestCase):
                 job = ARCH_JOBS[name]
                 self.assertIn("name: Arch " + name, job)
                 self.assertIn("needs: revision", job)
-                self.assertIn("runs-on: ubuntu-24.04", job)
-                self.assertEqual(job.count("uses: actions/checkout@v4"), 1)
+                require_hosted_runner(job)
+                checkout = require_action(job, "actions/checkout")
                 self.assertIn("ref: ${{ github.sha }}", job)
                 self.assertIn("persist-credentials: false", job)
                 self.assertIn('git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD', job)
                 self.assertIn('test "$actual" = "$EXPECTED_COMMIT"', job)
-                self.assertLess(job.index("actions/checkout@v4"), job.index("Verify exact checked-out commit"))
+                self.assertLess(job.index(checkout), job.index("Verify exact checked-out commit"))
                 if name in {"fuzz", "generated-files"}:
                     # These tests rely on the non-root hosted-runner identity;
                     # moving them into a default-root container breaks fixtures.
@@ -85,7 +86,7 @@ class ArchWorkflowContracts(unittest.TestCase):
                     self.assertIn("container: archlinux:base", job)
                     self.assertEqual(job.count("pacman -Syu --noconfirm --needed"), 1)
                     self.assertNotIn("snapshot", job)
-                    self.assertLess(job.index("pacman -Syu"), job.index("actions/checkout@v4"))
+                    self.assertLess(job.index("pacman -Syu"), job.index(checkout))
 
     def test_native_gate_is_complete_and_runs_wayland_nonroot(self):
         job = ARCH_JOBS["test"]
@@ -129,7 +130,7 @@ class ArchWorkflowContracts(unittest.TestCase):
     def test_core_race_and_generated_files_remain(self):
         job = ARCH_JOBS["generated-files"]
         for command in (
-            "python3 -m unittest discover -s scripts/tests -v",
+            "bash scripts/ci-python-tests.sh",
             "CGO_ENABLED: '0'", "scripts/ci-core-packages.txt",
             "python3 scripts/ci_check_packages.py --core-only",
             "go test -shuffle=on -count=1", "go test -race -json -shuffle=on -count=1",
@@ -296,6 +297,7 @@ class ReleaseWorkflowContracts(unittest.TestCase):
         self.assertIn("issue.state !== 'closed'", job)
         self.assertIn("issue.state_reason !== 'completed'", job)
         self.assertIn("core.setFailed", job)
+        self.assertNotRegex(job, r"require\s*\(\s*['\"]@actions/github['\"]")
         self.assertLess(job.index("Require same-commit full Arch success"),
                         job.index("Require resolved publication blockers"))
 
@@ -312,12 +314,13 @@ class ReleaseWorkflowContracts(unittest.TestCase):
                 for step in step_blocks(job):
                     if re.search(r"(?m)^        if:", step):
                         self.assertRegex(step.splitlines()[0], r"^Upload .* diagnostics$")
-                        self.assertIn("uses: actions/upload-artifact@v4", step)
+                        require_action("        name: " + step, "actions/upload-artifact")
 
     def test_no_publishing_credentials_or_write_permissions(self):
-        allowed_actions = {
-            "actions/checkout@v4", "actions/setup-go@v5", "actions/upload-artifact@v4",
-            "actions/github-script@v7",
+        approved_actions = allowed_actions(
+            "actions/checkout", "actions/setup-go", "actions/upload-artifact",
+            "actions/github-script",
+        ) | {
             "./.github/actions/native-go-cache", "./.github/workflows/arch-ci.yml",
         }
         for workflow in (ARCH, RELEASE):
@@ -330,7 +333,7 @@ class ReleaseWorkflowContracts(unittest.TestCase):
             self.assertNotRegex(workflow, r"(?i)\b(?:gh\s+release|git\s+(?:push|tag)|cosign|gpg\s+--sign)\b")
             self.assertNotIn("scripts/package.sh", workflow)
             self.assertNotRegex(workflow, r"github\.rest\.(?!issues\.get\b)")
-            self.assertLessEqual(set(re.findall(r"\buses: (\S+)", workflow)), allowed_actions)
+            self.assertLessEqual(set(re.findall(r"\buses: (\S+)", workflow)), approved_actions)
 
 
 class WorkflowGateExecution(unittest.TestCase):
@@ -427,7 +430,8 @@ const core = {
   setFailed: (message) => { process.exitCode = 1; console.error(message); },
   summary: {addRaw: (text) => { summary.push(text); return {write: async () => {}}; }},
 };
-new AsyncFunction('github', 'context', 'core', process.env.SCRIPT)(github, context, core)
+const getOctokit = () => { throw new Error('extra client forbidden'); };
+new AsyncFunction('github', 'context', 'core', 'getOctokit', process.env.SCRIPT)(github, context, core, getOctokit)
   .then(() => console.log(JSON.stringify({requested, summary})))
   .catch((error) => { console.error(error.message); process.exitCode = 1; });
 """

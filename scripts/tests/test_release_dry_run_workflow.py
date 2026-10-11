@@ -6,6 +6,7 @@ import tempfile
 import unittest
 
 from test_ci_release_workflows import SHA, jobs, shell_body, step_blocks
+from workflow_contracts import action_refs, allowed_actions, require_action
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = (ROOT / ".github/workflows/release-dry-run.yml").read_text()
@@ -90,10 +91,13 @@ class ReleaseDryRunWorkflowTests(unittest.TestCase):
             "-source.tar.gz", "-linux-x86_64.tar.gz", "-source.spdx.json",
             "-linux-x86_64.spdx.json", "-source.licenses.json", "-linux-x86_64.licenses.json",
         )] + [prefix + "release-notes.md", prefix + "SHA256SUMS"])
-        for step in steps:
-            if "uses: actions/upload-artifact@v4" in step:
-                self.assertIn("if-no-files-found: error", step)
-                self.assertIn("retention-days: 7", step)
+        uploads = [step for step in steps
+                   if any(ref.startswith("actions/upload-artifact@") for ref in action_refs("        name: " + step))]
+        self.assertEqual(len(uploads), 2)
+        for step in uploads:
+            require_action("        name: " + step, "actions/upload-artifact")
+            self.assertIn("if-no-files-found: error", step)
+            self.assertIn("retention-days: 7", step)
         self.assertIn('"$RUNNER_TEMP/release-candidate"', JOBS["build"])
         self.assertIn("path: scripts/release-smoke.sh", JOBS["build"])
 
@@ -145,10 +149,11 @@ class ReleaseDryRunWorkflowTests(unittest.TestCase):
         self.assertNotRegex(WORKFLOW, r"secrets[.:]|secrets:\s*inherit|persist-credentials:\s*true")
         self.assertNotRegex(WORKFLOW, r"(?i)\b(?:gh\s+release|git\s+(?:push|tag)|cosign|id-token|continue-on-error)\b")
         self.assertNotIn("issues.get", WORKFLOW)
-        self.assertLessEqual(set(re.findall(r"\buses: (\S+)", WORKFLOW)), {
-            "./.github/workflows/arch-ci.yml", "actions/checkout@v4", "actions/setup-go@v5",
-            "actions/upload-artifact@v4", "actions/download-artifact@v4",
-        })
+        self.assertLessEqual(set(re.findall(r"\buses: (\S+)", WORKFLOW)),
+                             {"./.github/workflows/arch-ci.yml"} | allowed_actions(
+                                 "actions/checkout", "actions/setup-go",
+                                 "actions/upload-artifact", "actions/download-artifact",
+                             ))
 
 
 if __name__ == "__main__":

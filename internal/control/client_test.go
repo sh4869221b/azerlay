@@ -51,16 +51,36 @@ func TestControlTimeoutNonReadingPeer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	finished := make(chan struct{})
+	startupDeadline := time.Now().Add(3 * time.Second)
+	if err := clientConn.SetDeadline(startupDeadline); err != nil {
+		t.Fatal(err)
+	}
+	finished := make(chan time.Time, 1)
 	go func() {
-		defer close(finished)
-		server.serve(ctx, controller, serverConn, time.Now().Add(60*time.Millisecond))
+		server.serve(ctx, controller, serverConn, startupDeadline)
+		finished <- time.Now()
 	}()
 	if _, err := clientConn.Write(data); err != nil {
 		t.Fatal(err)
 	}
+	// Observe the response starting before timing the blocked write. The
+	// exchange deadline also covers parsing and encoding, which may consume
+	// a short timeout before any bytes are written under race-test load.
+	var firstByte [1]byte
+	if _, err := io.ReadFull(clientConn, firstByte[:]); err != nil {
+		t.Fatalf("response did not start: %v", err)
+	}
+	if ctx.Err() != nil {
+		t.Fatal("quit canceled before the blocked write finished")
+	}
+	if err := serverConn.SetWriteDeadline(time.Now().Add(60 * time.Millisecond)); err != nil {
+		t.Fatal(err)
+	}
 	select {
-	case <-finished:
+	case completed := <-finished:
+		if !completed.Before(startupDeadline) {
+			t.Fatal("blocked write reached the startup deadline instead of its write deadline")
+		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("nonreading peer blocked shutdown")
 	}
@@ -71,8 +91,49 @@ func TestControlTimeoutNonReadingPeer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(response) == 0 || len(response) >= len(request.ID) {
-		t.Fatalf("expected partial write from bounded nonreading connection, got %d", len(response))
+	if received := len(firstByte) + len(response); received >= len(request.ID) {
+		t.Fatalf("expected partial write from bounded nonreading connection, got %d", received)
+	}
+}
+
+func TestControlTimeoutNonReadingExchange(t *testing.T) {
+	t.Parallel()
+	serverConn, clientConn, _ := socketPair(t)
+	if err := serverConn.SetWriteBuffer(1024); err != nil {
+		t.Fatal(err)
+	}
+	if err := clientConn.SetDeadline(time.Now().Add(3 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	request := controllerRequest(MethodShow, "")
+	request.ID = strings.Repeat("s", MaxLineBytes-128)
+	data, err := EncodeRequest(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := clientConn.Write(data); err != nil {
+		t.Fatal(err)
+	}
+	controller := socketController(t)
+	finished := make(chan struct{})
+	go func() {
+		defer close(finished)
+		server := &Server{}
+		server.serve(t.Context(), controller, serverConn, time.Now().Add(60*time.Millisecond))
+	}()
+	select {
+	case <-finished:
+	case <-time.After(3 * time.Second):
+		t.Fatal("server exchange deadline did not stop the nonreading peer")
+	}
+	response, err := io.ReadAll(clientConn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Expiry before writing may yield no bytes; a completed response is
+	// impossible while the peer leaves the bounded write buffer undrained.
+	if len(response) >= len(request.ID) {
+		t.Fatalf("expected incomplete response after exchange timeout, got %d bytes", len(response))
 	}
 }
 
