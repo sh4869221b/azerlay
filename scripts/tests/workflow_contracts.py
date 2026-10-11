@@ -128,8 +128,8 @@ def require_checkout_boundary(step):
     values = inputs(step)
     if values.get("persist-credentials") != "false":
         raise AssertionError("Checkout must not persist credentials")
-    if {"allow-unsafe-pr-checkout", "token", "ssh-key", "github-server-url"} & values.keys():
-        raise AssertionError("Checkout must keep the trusted origin and credential boundary")
+    if values.keys() - {"persist-credentials", "ref"}:
+        raise AssertionError("Checkout must keep reviewed origin, repository and credential inputs")
 
 
 def require_artifact_transfer(step):

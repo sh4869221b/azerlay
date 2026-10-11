@@ -3,6 +3,7 @@
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from workflow_contracts import (
     ACTION_VERSIONS, action_refs, allowed_actions, require_action,
@@ -25,6 +26,14 @@ WORKFLOW_ACTIONS = {
 }
 
 
+CHECKOUT_REFS = {
+    "ci.yml": None,
+    "arch-ci.yml": "${{ github.sha }}",
+    "release-dry-run.yml": "${{ github.sha }}",
+    "renovate-notices.yml": "${{ github.event.pull_request.base.sha }}",
+}
+
+
 def validate_active_workflows(workflow_dir):
     files = {path.name for path in workflow_dir.iterdir() if path.suffix in {".yml", ".yaml"}}
     if files != set(WORKFLOW_ACTIONS):
@@ -44,6 +53,9 @@ def validate_active_workflows(workflow_dir):
             refs = action_refs(step)
             if any(ref.startswith("actions/checkout@") for ref in refs):
                 require_checkout_boundary(step)
+                expected = CHECKOUT_REFS[filename]
+                if (expected is None and "ref" in values) or (expected is not None and values.get("ref") != expected):
+                    raise AssertionError("Checkout must keep the reviewed ref for its workflow")
             if any(ref.startswith(("actions/upload-artifact@", "actions/download-artifact@")) for ref in refs):
                 require_artifact_transfer(step)
             if any(ref.startswith("actions/setup-go@") for ref in refs):
@@ -66,8 +78,8 @@ class WorkflowVersionTests(unittest.TestCase):
             names = {"actions/cache", "actions/cache/restore", "actions/cache/save"}
             if kind == "native":
                 names.add("actions/setup-go")
+                require_action(source, "actions/setup-go")
                 setup = next(step for step in steps(source) if any(ref.startswith("actions/setup-go@") for ref in action_refs(step)))
-                require_action(setup, "actions/setup-go")
                 self.assertEqual(inputs(setup).get("go-version"), "1.27.2")
                 self.assertEqual(inputs(setup).get("cache"), "false")
             self.assertLessEqual(set(action_refs(source)), allowed_actions(*names))
@@ -233,6 +245,43 @@ class WorkflowVersionTests(unittest.TestCase):
             path.write_text(original.replace("          script: |", "          Script: bypass\n          script: |"))
             with self.assertRaisesRegex(AssertionError, "collide"):
                 validate_active_workflows(target)
+
+    def test_checkout_cannot_replace_the_repository(self):
+        for key in ("repository", "Repository"):
+            step = f"uses: actions/checkout@v7\nwith: {{persist-credentials: false, {key}: attacker/repo}}\n"
+            with self.subTest(input=key), self.assertRaises(AssertionError):
+                require_checkout_boundary(step)
+
+    def test_checkout_settings_and_refs_require_workflow_review(self):
+        for key, value in (("path", "other-tree"), ("clean", "false"), ("sparse-checkout", "scripts")):
+            with self.subTest(input=key), self.assertRaises(AssertionError):
+                require_checkout_boundary(f"uses: actions/checkout@v7\nwith: {{persist-credentials: false, {key}: {value}}}\n")
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            for name in WORKFLOW_ACTIONS:
+                (target / name).write_text((ROOT / ".github/workflows" / name).read_text())
+            for filename in CHECKOUT_REFS:
+                path = target / filename
+                original = path.read_text()
+                path.write_text("jobs:\n  checkout:\n    runs-on: ubuntu-24.04\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          persist-credentials: false\n          ref: unreviewed-branch\n")
+                with self.subTest(workflow=filename), self.assertRaisesRegex(AssertionError, "reviewed ref"):
+                    validate_active_workflows(target)
+                path.write_text(original)
+
+    def test_native_composite_cannot_add_another_setup_go(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            for kind in ("native", "nix"):
+                path = target / f".github/actions/{kind}-go-cache/action.yml"
+                path.parent.mkdir(parents=True)
+                path.write_text((ROOT / f".github/actions/{kind}-go-cache/action.yml").read_text())
+            path = target / ".github/actions/native-go-cache/action.yml"
+            original = path.read_text()
+            for version, cache in (("1.28.1", "false"), ("1.27.2", "true"), ("1.27.2", "false")):
+                path.write_text(original + f"\n    - uses: actions/setup-go@v7\n      with:\n        go-version: {version}\n        cache: {cache}\n")
+                with self.subTest(version=version, cache=cache), patch(f"{__name__}.ROOT", target):
+                    with self.assertRaises(AssertionError):
+                        self.test_composite_actions_keep_cache_v6_and_explicit_go_cache_ownership()
 
     def test_ci_installs_only_hashed_test_dependencies_in_a_temporary_target(self):
         script = (ROOT / "scripts/ci-python-tests.sh").read_text()
