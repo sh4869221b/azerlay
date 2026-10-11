@@ -523,7 +523,7 @@ go install github.com/google/go-licenses/v2@v2.0.1
 go-licenses report ./... --include_tests --ignore=github.com/sh4869221b/azerlay > "$RUNNER_TEMP/nix-dependency-licenses.csv"
 ```
 
-After successful report generation, `actions/upload-artifact@v4` publishes
+After successful report generation, `actions/upload-artifact` publishes
 `nix-dependency-licenses` for seven days in normal CI (the separate Arch
 workflow uses an `arch-` artifact name) and fails if the file is absent. The
 report includes test dependencies and excludes only the project's own
