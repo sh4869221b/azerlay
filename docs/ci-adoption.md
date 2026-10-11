@@ -12,7 +12,7 @@ push: `test`, `fuzz`, `native-build`, `vulnerability`, `licenses`, and
 `generated-files`. Four native roles use the [locked Nix environment](ci-nix.md).
 Core CGO=0 plus fresh race validation and all seven 10-second fuzz targets remain.
 Every check still builds/scans/tests the current checkout. No cache hit skips a
-quality command. All runners use the standard `ubuntu-24.04` hosted class.
+quality command. All runners use the standard `ubuntu-26.04` hosted class.
 
 The old Ubuntu/Nix comparison workflows are archived under
 `docs/measurements/ci-136-comparison/workflows/`. They are evidence, not scheduled
