@@ -21,14 +21,20 @@ LIBRARY_MODULES = ("gtk4", "gtk4-layer-shell-0", "glib-2.0", "pango",
 def native_roots():
     # Select the actual development-file owners, not generator packages with
     # similar names. Arch may split headers/libraries from introspection tools.
-    paths = subprocess.run(["pkg-config", "--path", *LIBRARY_MODULES],
-                           check=True, capture_output=True, text=True).stdout.splitlines()
-    if len(paths) != len(LIBRARY_MODULES) or any(not path.startswith("/") for path in paths):
-        raise ValueError("Missing native pkg-config file identity")
-    owners = subprocess.run(["pacman", "-Qoq", "--", *paths],
-                            check=True, capture_output=True, text=True).stdout.splitlines()
-    if len(owners) != len(paths) or any(not name for name in owners):
-        raise ValueError("Missing installed native development-file owner")
+    # Query separately: pkgconf 3.0.7's multi-module --path query does not
+    # return a record for every requested module. File ownership can also
+    # repeat when several development files belong to one package.
+    owners = []
+    for module in LIBRARY_MODULES:
+        paths = subprocess.run(["pkg-config", "--path", module],
+                               check=True, capture_output=True, text=True).stdout.splitlines()
+        if len(paths) != 1 or not paths[0].startswith("/"):
+            raise ValueError("Missing native pkg-config file identity: " + module)
+        names = subprocess.run(["pacman", "-Qoq", "--", paths[0]],
+                               check=True, capture_output=True, text=True).stdout.splitlines()
+        if len(names) != 1 or not names[0]:
+            raise ValueError("Missing installed native development-file owner: " + module)
+        owners.extend(names)
     return (*ROOTS, *owners)
 
 

@@ -13,6 +13,6 @@ require (
 
 require (
 	github.com/ebitengine/purego v0.11.1 // indirect
-	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
 )

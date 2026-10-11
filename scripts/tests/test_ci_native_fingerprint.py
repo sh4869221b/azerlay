@@ -70,15 +70,29 @@ class NativeFingerprintTests(unittest.TestCase):
     def test_library_roots_follow_pkg_config_file_owners(self):
         paths = [f'/usr/lib/pkgconfig/{name}.pc' for name in packages.LIBRARY_MODULES]
         owners = ['gtk4', 'gtk4-layer-shell', 'glib2', 'pango', 'girepository', 'cairo']
-        with mock.patch.object(packages.subprocess, 'run', side_effect=[
-                subprocess.CompletedProcess([], 0, '\n'.join(paths) + '\n'),
-                subprocess.CompletedProcess([], 0, '\n'.join(owners) + '\n')]) as run:
+        results = [subprocess.CompletedProcess([], 0, value + '\n')
+                   for pair in zip(paths, owners) for value in pair]
+        with mock.patch.object(packages.subprocess, 'run', side_effect=results) as run:
             self.assertEqual(packages.native_roots(), (*packages.ROOTS, *owners))
-        self.assertEqual(run.call_args_list[0].args[0], ['pkg-config', '--path', *packages.LIBRARY_MODULES])
-        self.assertEqual(run.call_args_list[1].args[0], ['pacman', '-Qoq', '--', *paths])
+        for index, (module, path) in enumerate(zip(packages.LIBRARY_MODULES, paths)):
+            self.assertEqual(run.call_args_list[2 * index].args[0], ['pkg-config', '--path', module])
+            self.assertEqual(run.call_args_list[2 * index + 1].args[0], ['pacman', '-Qoq', '--', path])
+
+    def test_root_queries_handle_single_result_batch_queries_and_shared_owners(self):
+        def query(args, **kwargs):
+            if args[0] == 'pkg-config':
+                # pkgconf 3.0.7 returns only the first path in a batch.
+                # Individual queries retain every requested identity.
+                output = '/usr/lib/pkgconfig/' + args[2] + '.pc\n'
+            else:
+                output = 'shared-development-package\n'
+            return subprocess.CompletedProcess(args, 0, output)
+        with mock.patch.object(packages.subprocess, 'run', side_effect=query):
+            self.assertEqual(packages.native_roots(),
+                             (*packages.ROOTS, *(['shared-development-package'] * len(packages.LIBRARY_MODULES))))
 
     def test_root_discovery_fails_on_missing_files_owners_or_command_failure(self):
-        paths = '\n'.join('/usr/lib/pkgconfig/' + name + '.pc' for name in packages.LIBRARY_MODULES)
+        paths = '/usr/lib/pkgconfig/gtk4.pc'
         for results in ([subprocess.CompletedProcess([], 0, '')],
                         [subprocess.CompletedProcess([], 0, paths), subprocess.CompletedProcess([], 0, '')]):
             with mock.patch.object(packages.subprocess, 'run', side_effect=results):
