@@ -107,7 +107,7 @@ jobs:
           printf 'directory=%s/release-candidate\n' "$RUNNER_TEMP" >> "$GITHUB_OUTPUT"
 
       - name: Upload candidate outputs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-candidate
           path: |
@@ -123,7 +123,7 @@ jobs:
           retention-days: 7
 
       - name: Upload runtime smoke helper
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-smoke-helper
           path: scripts/release-smoke.sh
@@ -146,13 +146,13 @@ jobs:
           pacman -Syu --noconfirm --needed gtk4 gtk4-layer-shell libgirepository glib2 pango harfbuzz gdk-pixbuf2 cairo vulkan-icd-loader graphene glibc binutils
 
       - name: Download candidate outputs
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-candidate
           path: ${{ runner.temp }}/release-candidate
 
       - name: Download runtime smoke helper
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-smoke-helper
           path: ${{ runner.temp }}/release-smoke-helper
