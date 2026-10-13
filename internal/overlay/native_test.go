@@ -58,10 +58,7 @@ func runNativeChild(mode string) int {
 		return 1
 	}
 	attachTestContent(w.widget)
-	if err := w.SetVisible(true); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
-	}
+	w.SetVisible(true)
 	loop := glib.NewMainLoop(nil, false)
 	commands := make(chan string)
 	go func() {
@@ -120,11 +117,7 @@ func runNativeChild(mode string) int {
 			switch {
 			case phase == 1 && command == "continue":
 				previous = w.widget
-				if err := w.SetVisible(false); err != nil {
-					failure = err
-					loop.Quit()
-					return false
-				}
+				w.SetVisible(false)
 				phase = 2
 			case phase == 3 && command == "continue":
 				config.Monitor = "azerlay-missing-monitor"
@@ -133,11 +126,7 @@ func runNativeChild(mode string) int {
 					loop.Quit()
 					return false
 				}
-				if err := w.SetVisible(true); err != nil {
-					failure = err
-					loop.Quit()
-					return false
-				}
+				w.SetVisible(true)
 				if w.widget != nil || w.surface != nil || w.State() != (State{Diagnostic: "OVERLAY_MONITOR_UNAVAILABLE"}) {
 					failure = errors.New("missing selector mapped")
 					loop.Quit()
@@ -184,11 +173,7 @@ func runNativeChild(mode string) int {
 				attachTestContent(w.widget)
 				phase = 10
 			case phase == 11 && command == "continue":
-				if err := w.SetVisible(false); err != nil {
-					failure = err
-					loop.Quit()
-					return false
-				}
+				w.SetVisible(false)
 				config.Monitor = "azerlay-missing-monitor"
 				if err := w.ApplyConfig(config); err != nil {
 					failure = err
@@ -211,7 +196,7 @@ func runNativeChild(mode string) int {
 			case phase == 12 && command == "quit":
 				w.Close()
 				before := len(observed)
-				w.selectionChanged()
+				w.reconcile()
 				if len(observed) != before {
 					failure = errors.New("closed observer received an update")
 				}
@@ -261,8 +246,9 @@ func runRegionFailureChild() int {
 	var observed State
 	w.SetObserver(func(state State) { observed = state })
 	w.newRegion = func() (*cairo.Region, error) { return nil, errors.New("injected region failure") }
-	if err := w.SetVisible(true); err != nil || !w.requested || w.State() != (State{Diagnostic: "ERR_OVERLAY_INPUT_REGION"}) || observed != w.State() || w.widget.Visible() {
-		fmt.Fprintln(os.Stderr, "region failure did not preserve hidden request", err, w.State())
+	w.SetVisible(true)
+	if !w.requested || w.State() != (State{Diagnostic: "ERR_OVERLAY_INPUT_REGION"}) || observed != w.State() || w.widget.Visible() {
+		fmt.Fprintln(os.Stderr, "region failure did not preserve hidden request", w.State())
 		return 1
 	}
 	fmt.Println("failed")
@@ -271,10 +257,7 @@ func runRegionFailureChild() int {
 		return 1
 	}
 	w.newRegion = cairo.RegionCreate
-	if err := w.SetVisible(true); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
-	}
+	w.SetVisible(true)
 	loop := glib.NewMainLoop(nil, false)
 	commands := make(chan string)
 	go func() {

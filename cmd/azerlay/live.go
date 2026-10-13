@@ -41,11 +41,7 @@ func watchLive(coordinator *live.Coordinator, server *control.Server, window *ov
 		}
 		settings := view.Config.Config
 		if !view.Visible && appliedVisible {
-			if err := window.SetVisible(false); err != nil {
-				applyError = err
-				loop.Quit()
-				return
-			}
+			window.SetVisible(false)
 		}
 		if appliedOverlay != settings.Overlay {
 			if err := window.ApplyPlacement(settings.Overlay); err != nil {
@@ -59,11 +55,7 @@ func watchLive(coordinator *live.Coordinator, server *control.Server, window *ov
 		dirty := appliedRender != view.Render || appliedOptions != options
 		if !view.Visible || view.Visible != appliedVisible {
 			window.SetRenderContent(view.Render, settings.Overlay, settings.Appearance, settings.Input.ShowAmbiguous)
-			if err := window.SetVisible(view.Visible); err != nil {
-				applyError = err
-				loop.Quit()
-				return
-			}
+			window.SetVisible(view.Visible)
 			appliedRender = view.Render
 			appliedVisible = view.Visible
 			appliedOptions = options

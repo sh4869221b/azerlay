@@ -17,6 +17,16 @@ type candidate struct {
 	err      error
 }
 
+func newManager(ctx context.Context, load configLoader, events chan managerEvent) (*Manager, <-chan error) {
+	m := &Manager{ctx: ctx, events: events, changes: make(chan struct{}, 1), done: make(chan struct{})}
+	ready := make(chan error, 1)
+	go func() {
+		m.run(ctx, load, events, ready)
+		close(m.done)
+	}()
+	return m, ready
+}
+
 func configNamed(name string) Config {
 	c := defaults()
 	c.SchemaVersion = 1

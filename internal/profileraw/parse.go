@@ -87,13 +87,9 @@ func parseBundle(fields map[string]json.RawMessage) (RawBundle, error) {
 		profiles[index] = profile
 	}
 
-	unknown := make(map[string]json.RawMessage)
-	for key, value := range fields {
-		if key != "version" && key != "profiles" {
-			unknown[key] = value
-		}
-	}
-	return RawBundle{Version: version, Profiles: profiles, Unknown: unknown}, nil
+	delete(fields, "version")
+	delete(fields, "profiles")
+	return RawBundle{Version: version, Profiles: profiles, Unknown: fields}, nil
 }
 
 func parseProfile(fields map[string]json.RawMessage) (RawProfile, error) {
@@ -128,13 +124,11 @@ func parseProfile(fields map[string]json.RawMessage) (RawProfile, error) {
 		inputs[index] = input
 	}
 
-	unknown := make(map[string]json.RawMessage)
-	for key, value := range fields {
-		if key != "id" && key != "name" && key != "version" && key != "inputs" {
-			unknown[key] = value
-		}
-	}
-	return RawProfile{ID: id, Name: name, Version: version, Inputs: inputs, Unknown: unknown}, nil
+	delete(fields, "id")
+	delete(fields, "name")
+	delete(fields, "version")
+	delete(fields, "inputs")
+	return RawProfile{ID: id, Name: name, Version: version, Inputs: inputs, Unknown: fields}, nil
 }
 
 func parseArray(raw json.RawMessage, limit int) ([]json.RawMessage, error) {
@@ -167,9 +161,6 @@ func parseArray(raw json.RawMessage, limit int) ([]json.RawMessage, error) {
 }
 
 func parseVersion(raw json.RawMessage) (*RawScalar, error) {
-	if raw == nil {
-		return nil, nil
-	}
 	token := bytes.TrimSpace(raw)
 	if len(token) > 0 && (token[0] == '{' || token[0] == '[') {
 		return nil, &ParseError{Code: ERR_IMPORT_UNSUPPORTED_VERSION}

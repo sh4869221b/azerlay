@@ -1,6 +1,7 @@
 package profilesource
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"os"
@@ -130,5 +131,5 @@ func readIndex(root *os.Root) (diskIndex, error) {
 	if err != nil {
 		return diskIndex{}, err
 	}
-	return decodeIndex(strings.NewReader(string(data)))
+	return decodeIndex(bytes.NewReader(data))
 }

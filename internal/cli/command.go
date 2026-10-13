@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/urfave/cli/v3"
@@ -14,6 +15,37 @@ type helpFlag struct{ cli.BoolFlag }
 
 func (f *helpFlag) Get() any {
 	return helpRequested(f.BoolFlag.Get().(bool))
+}
+
+// Doctor and run share strict --config parsing, with command-specific boolean
+// flags. Keep values literal so whitespace and flag-like paths survive.
+func normalizeConfigArgs(args []string, booleanFlags ...string) (normalized []string, valid bool) {
+	seen := make(map[string]bool)
+	for i := 0; i < len(args); i++ {
+		name, value, equals := strings.Cut(args[i], "=")
+		if seen[name] {
+			return nil, false
+		}
+		seen[name] = true
+		if name == "--config" {
+			if !equals {
+				if i+1 == len(args) {
+					return nil, false
+				}
+				i++
+				value = args[i]
+			}
+			if value == "" {
+				return nil, false
+			}
+			normalized = append(normalized, name, value)
+		} else if !equals && slices.Contains(booleanFlags, name) {
+			normalized = append(normalized, name)
+		} else {
+			return nil, false
+		}
+	}
+	return normalized, true
 }
 
 // Keep the original token grammar and JSON error mode before urfave parses

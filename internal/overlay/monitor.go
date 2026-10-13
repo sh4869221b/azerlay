@@ -25,9 +25,9 @@ func (w *Window) watchMonitorList() {
 		}
 		monitor := &gdk.Monitor{Object: object}
 		w.monitorWatches = append(w.monitorWatches, monitorWatch{monitor, []glib.SignalHandle{
-			monitor.Connect("notify::connector", w.selectionChanged),
-			monitor.Connect("notify::description", w.selectionChanged),
-			monitor.Connect("notify::valid", w.selectionChanged),
+			monitor.Connect("notify::connector", w.reconcile),
+			monitor.Connect("notify::description", w.reconcile),
+			monitor.Connect("notify::valid", w.reconcile),
 		}})
 	}
 }
@@ -39,12 +39,6 @@ func (w *Window) disconnectMonitorList() {
 		}
 	}
 	w.monitorWatches = nil
-}
-
-func (w *Window) selectionChanged() {
-	if err := w.reconcile(); err != nil {
-		w.fail("ERR_OVERLAY_PLACEMENT")
-	}
 }
 
 func selectMonitor(selector string, labels []monitorLabel) (int, bool) {
@@ -126,9 +120,7 @@ func (w *Window) observeMonitor(monitor *gdk.Monitor) {
 			if w.pending == 0 {
 				w.pending = glib.IdleAdd(func() {
 					w.pending = 0
-					if err := w.reconcile(); err != nil {
-						w.fail("ERR_OVERLAY_PLACEMENT")
-					}
+					w.reconcile()
 				})
 			}
 		}),

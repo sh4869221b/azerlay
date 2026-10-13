@@ -70,24 +70,17 @@ func NewReport(checks []Check, details *ProfileDetails) Report {
 	})
 	exitCode := 0
 	for _, check := range ordered {
-		exitCode = max(exitCode, severityExitCode(check.Severity))
+		switch check.Severity {
+		case SeverityOK:
+		case SeverityWarning:
+			exitCode = max(exitCode, 1)
+		case SeverityError:
+			exitCode = max(exitCode, 2)
+		default:
+			exitCode = 3
+		}
 	}
 	return Report{SchemaVersion: 2, Command: "doctor", ExitCode: exitCode, Checks: ordered, ProfileDetails: details}
-}
-
-func severityExitCode(severity Severity) int {
-	switch severity {
-	case SeverityOK:
-		return 0
-	case SeverityWarning:
-		return 1
-	case SeverityError:
-		return 2
-	case SeverityInternalError:
-		return 3
-	default:
-		return 3
-	}
 }
 
 // The caller must require this invocation's explicit disclosure option.

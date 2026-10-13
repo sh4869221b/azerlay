@@ -37,5 +37,5 @@ func normalizeOuterText(text string) (string, error) {
 		}
 	}
 
-	return strings.TrimSpace(normalized), nil
+	return normalized, nil
 }

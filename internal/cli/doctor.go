@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"slices"
-	"strings"
 
 	"github.com/sh4869221b/azerlay/internal/diagnostics"
 	"github.com/urfave/cli/v3"
@@ -26,40 +24,6 @@ Options:
   --help              Print this help without performing checks
 
 Exit codes: 0 no findings; 1 warnings; 2 errors; 3 internal or output failure.`
-
-func normalizeDoctorArgs(args []string) (normalized []string, jsonMode, valid bool) {
-	jsonMode = slices.Contains(args, "--json")
-	seen := make(map[string]bool)
-	for i := 0; i < len(args); i++ {
-		name, value, equals := strings.Cut(args[i], "=")
-		if seen[name] {
-			return nil, jsonMode, false
-		}
-		seen[name] = true
-		switch name {
-		case "--help", "--json", "--include-bindings":
-			if equals {
-				return nil, jsonMode, false
-			}
-			normalized = append(normalized, name)
-		case "--config":
-			if !equals {
-				if i+1 == len(args) {
-					return nil, jsonMode, false
-				}
-				i++
-				value = args[i]
-			}
-			if value == "" {
-				return nil, jsonMode, false
-			}
-			normalized = append(normalized, name, value)
-		default:
-			return nil, jsonMode, false
-		}
-	}
-	return normalized, jsonMode, true
-}
 
 func runDoctor(cmd *cli.Command, stdout io.Writer) int {
 	if cmd.IsSet("help") {

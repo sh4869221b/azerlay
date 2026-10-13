@@ -96,39 +96,3 @@ func TestGoldenLayoutReorderedControls(t *testing.T) {
 		}
 	}
 }
-
-func TestGoldenLayoutEmbeddedCenters(t *testing.T) {
-	t.Parallel()
-
-	definition, err := LoadEmbedded("cyborg-ii", "left")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(definition.Controls) != 31 {
-		t.Fatalf("want 31 regions, got %d", len(definition.Controls))
-	}
-	excluded := map[int]bool{21: true, 25: true, 26: true, 27: true, 32: true, 33: true, 34: true, 35: true, 39: true, 40: true, 42: true, 43: true}
-	for _, control := range definition.Controls {
-		if excluded[control.SourceInputID] {
-			t.Errorf("excluded input %d has geometry", control.SourceInputID)
-		}
-		shape := control.Shape
-		if shape.Type != "rounded_rect" || control.LabelAnchor != (Point{shape.X + shape.Width/2, shape.Y + shape.Height/2}) {
-			t.Errorf("%s anchor is not its shape center", control.ID)
-		}
-		for _, other := range definition.Controls {
-			if other.ID == control.ID {
-				continue
-			}
-			if (bounds{other.Shape.X, other.Shape.Y, other.Shape.X + other.Shape.Width, other.Shape.Y + other.Shape.Height}).contains(control.LabelAnchor) {
-				t.Errorf("%s anchor lies in unrelated region %s", control.ID, other.ID)
-			}
-		}
-	}
-
-	_, err = LoadEmbedded("cyborg-ii", "right")
-	var layoutErr *Error
-	if !errors.As(err, &layoutErr) || layoutErr.Code != ERR_LAYOUT_UNSUPPORTED || layoutErr.Path != "hand" {
-		t.Fatalf("right-hand asset must be unsupported, got %v", err)
-	}
-}

@@ -17,7 +17,7 @@ var (
 	zeroModifiers      = []string{"0", "0", "0"}
 )
 
-func normalizeKeyboard(raw profileraw.RawInput, bindings []profile.TriggerBinding) []profile.TriggerBinding {
+func normalizeKeyboard(raw profileraw.RawInput, bindings []profile.TriggerBinding) {
 	switch {
 	case matchesStringArray(raw, "types", allTriggerTypes):
 		if matchesOriginalLong(raw) {
@@ -68,7 +68,6 @@ func normalizeKeyboard(raw profileraw.RawInput, bindings []profile.TriggerBindin
 			}
 		}
 	}
-	return bindings
 }
 
 func matchesOriginalLong(raw profileraw.RawInput) bool {
@@ -134,8 +133,7 @@ func matchesRawStringArray(raw json.RawMessage, expected []string) bool {
 }
 
 func matchesFalse(raw profileraw.RawInput, field string) bool {
-	var value bool
-	return json.Unmarshal(raw[field], &value) == nil && !value && bytes.Equal(bytes.TrimSpace(raw[field]), []byte("false"))
+	return bytes.Equal(bytes.Trim(raw[field], " \t\r\n"), []byte("false"))
 }
 
 func matchesNumberToken(raw profileraw.RawInput, field, expected string) bool {

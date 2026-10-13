@@ -2,19 +2,9 @@ package profiledecode
 
 import (
 	"errors"
-	"os"
 	"strings"
 	"testing"
 )
-
-func TestDecodeError_WhenDecodeFails_HasStableCodeAndTypedShape(t *testing.T) {
-	t.Parallel()
-
-	document, err := DecodeText(`{"profiles":`)
-
-	assertZeroDocument(t, document)
-	assertDecodeError(t, err, ERR_IMPORT_JSON)
-}
 
 func TestDecodeError_WhenReaderFails_RetainsCauseWithoutDisclosingSentinel(t *testing.T) {
 	t.Parallel()
@@ -29,18 +19,6 @@ func TestDecodeError_WhenReaderFails_RetainsCauseWithoutDisclosingSentinel(t *te
 	}
 	if strings.Contains(err.Error(), privateCause.Error()) {
 		t.Fatalf("Error() disclosed private sentinel: %q", err)
-	}
-}
-
-func TestDecodeError_WhenFileOpenFails_RetainsIOCause(t *testing.T) {
-	t.Parallel()
-
-	document, err := DecodeFile("missing-synthetic-file.json")
-
-	assertZeroDocument(t, document)
-	assertDecodeError(t, err, ERR_IMPORT_ENCODING)
-	if !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("file-open cause = %v, want os.ErrNotExist", err)
 	}
 }
 

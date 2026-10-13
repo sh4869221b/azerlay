@@ -81,15 +81,12 @@ func runNativeRendererChild() int {
 	definition := layout.Definition{ViewBox: layout.Rect{Width: 160, Height: 100}, Controls: []layout.Control{{ID: "button", Shape: layout.Shape{Type: "rounded_rect", X: 15, Y: 15, Width: 130, Height: 70}, LabelAnchor: layout.Point{X: 80, Y: 50}}}}
 	snapshot := renderer.NewSnapshot(definition, renderer.Content{ProfileName: "Synthetic", Status: renderer.StatusDisconnected, Controls: map[string]renderer.Control{"button": {Known: true, Down: true, Assignments: []renderer.Assignment{{Kind: profile.BindingKeyboard, Label: "日本語 action", BindingDisplay: "K"}}}}})
 	appearance := config.Appearance{Theme: "dark", FontScale: 1}
-	w.SetRenderState(snapshot, appearance, true)
+	w.SetRenderContent(snapshot, settings, appearance, true)
 	if w.area != nil || w.frame != nil {
 		fmt.Fprintln(os.Stderr, "hidden render state prepared a frame or attached an area")
 		return 1
 	}
-	if err := w.SetVisible(true); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
-	}
+	w.SetVisible(true)
 	loop := glib.NewMainLoop(nil, false)
 	deadline := time.Now().Add(10 * time.Second)
 	phase := 0
@@ -124,7 +121,7 @@ func runNativeRendererChild() int {
 				return false
 			}
 			priorFrame = w.frame
-			w.SetRenderState(snapshot, appearance, true)
+			w.SetRenderContent(snapshot, settings, appearance, true)
 			if !check(w.frame == priorFrame, "unchanged render state was prepared twice") {
 				return false
 			}
@@ -137,7 +134,7 @@ func runNativeRendererChild() int {
 			priorFrame = w.frame
 			appearance.Theme = "light"
 			appearance.FontScale = 1.5
-			w.SetRenderState(snapshot, appearance, false)
+			w.SetRenderContent(snapshot, settings, appearance, false)
 			if !check(w.frame != priorFrame, "appearance update reused stale frame") {
 				return false
 			}
@@ -152,17 +149,13 @@ func runNativeRendererChild() int {
 			if !check(w.ApplyConfig(settings) == nil && w.frame != priorFrame && w.area.ContentWidth() > oldContentWidth, "overlay drawing options and requested size were not reapplied") {
 				return false
 			}
-			if !check(w.SetVisible(false) == nil, "hide failed") {
-				return false
-			}
+			w.SetVisible(false)
 			phase = 2
 		case 2:
 			if w.State().Mapped {
 				break
 			}
-			if !check(w.SetVisible(true) == nil, "show failed") {
-				return false
-			}
+			w.SetVisible(true)
 			phase = 3
 		case 3:
 			if !mappedLayer(w) {
@@ -192,11 +185,11 @@ func runNativeRendererChild() int {
 			if !check(drawErr == nil && recreated[3] > 0, "recreated child did not render snapshot") {
 				return false
 			}
-			w.SetRenderState(nil, appearance, false)
+			w.SetRenderContent(nil, settings, appearance, false)
 			if !check(w.area == nil && w.frame == nil, "nil snapshot retained renderer") {
 				return false
 			}
-			w.SetRenderState(snapshot, appearance, false)
+			w.SetRenderContent(snapshot, settings, appearance, false)
 			if !check(w.area != nil, "reattach failed") {
 				return false
 			}
@@ -276,7 +269,7 @@ func runRenderQAChild() int {
 		return 1
 	}
 	defer w.Close()
-	w.SetRenderState(snapshot, appearance, true)
+	w.SetRenderContent(snapshot, settings, appearance, true)
 	loop := glib.NewMainLoop(nil, false)
 	commands := make(chan string)
 	go func() {
@@ -318,18 +311,18 @@ func runRenderQAChild() int {
 			readyForAck = false
 			switch command {
 			case "show":
-				err = w.SetVisible(true)
+				w.SetVisible(true)
 				pending = "shown"
 			case "sync":
 				w.prepareRender(true)
 				pending = "synced"
 			case "theme-light":
 				appearance.Theme = "light"
-				w.SetRenderState(snapshot, appearance, true)
+				w.SetRenderContent(snapshot, settings, appearance, true)
 				pending = "theme-light"
 			case "theme-dark":
 				appearance.Theme = "dark"
-				w.SetRenderState(snapshot, appearance, true)
+				w.SetRenderContent(snapshot, settings, appearance, true)
 				pending = "theme-dark"
 			case "normal", "compact", "detailed":
 				settings.Mode = command
@@ -346,18 +339,18 @@ func runRenderQAChild() int {
 					}
 				}
 				err = w.ApplyConfig(settings)
-				w.SetRenderState(snapshot, appearance, true)
+				w.SetRenderContent(snapshot, settings, appearance, true)
 				pending = command
 			case "status-disconnected", "status-profile-missing", "status-reload-failed":
 				status := map[string]renderer.Status{"status-disconnected": renderer.StatusDisconnected, "status-profile-missing": renderer.StatusProfileMissing, "status-reload-failed": renderer.StatusReloadFailed}[command]
 				snapshot, err = qaRenderSnapshot(status)
 				if err == nil {
-					w.SetRenderState(snapshot, appearance, true)
+					w.SetRenderContent(snapshot, settings, appearance, true)
 				}
 				pending = command
 			case "font-large":
 				appearance.FontScale = 4
-				w.SetRenderState(snapshot, appearance, true)
+				w.SetRenderContent(snapshot, settings, appearance, true)
 				pending = command
 			case "narrow":
 				w.area.SetContentWidth(360)
@@ -376,7 +369,7 @@ func runRenderQAChild() int {
 				}
 				pending = command
 			case "hide":
-				err = w.SetVisible(false)
+				w.SetVisible(false)
 				pending = "hidden"
 			case "quit":
 				w.Close()

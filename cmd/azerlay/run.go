@@ -20,7 +20,7 @@ import (
 
 func runApplication(configPath string, stdout, stderr io.Writer) int {
 	if os.Getenv("WAYLAND_DISPLAY") == "" {
-		return cli.WriteRunFailure(&cli.ReportError{Code: "ERR_RUNTIME_WAYLAND", Stage: "runtime", Summary: "Wayland display is unavailable.", Remediation: "Run in a Wayland session with WAYLAND_DISPLAY set."}, stdout, stderr)
+		return writeRunError(overlay.ErrDisplayUnavailable, stdout, stderr)
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

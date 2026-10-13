@@ -13,16 +13,12 @@ func (w *Window) SetDrawObserver(observer func(*renderer.OverlaySnapshot)) { w.d
 
 func (w *Window) SetRenderRequestObserver(observer func()) { w.renderRequestObserver = observer }
 
+// SetRenderContent updates the drawing area on the GTK owner thread.
 func (w *Window) SetRenderContent(snapshot *renderer.OverlaySnapshot, overlay config.Overlay, appearance config.Appearance, showAmbiguous bool) {
-	w.overlay = overlay
-	w.SetRenderState(snapshot, appearance, showAmbiguous)
-}
-
-// SetRenderState updates the drawing area on the GTK owner thread.
-func (w *Window) SetRenderState(snapshot *renderer.OverlaySnapshot, appearance config.Appearance, showAmbiguous bool) {
 	if w.closed {
 		return
 	}
+	w.overlay = overlay
 	w.snapshot, w.appearance, w.showAmbiguous = snapshot, appearance, showAmbiguous
 	if !w.requested {
 		return

@@ -2,7 +2,6 @@ package live
 
 import (
 	"reflect"
-	"slices"
 
 	"github.com/sh4869221b/azerlay/internal/control"
 	"github.com/sh4869221b/azerlay/internal/gameprofile"
@@ -34,7 +33,7 @@ type AssemblyState struct {
 
 func (a *Assembly) Build(state AssemblyState) *renderer.OverlaySnapshot {
 	layoutChanged := a.layoutGeneration != state.LayoutGeneration
-	staticChanged := a.profile != state.Profile || a.layoutGeneration != state.LayoutGeneration || a.labelsGeneration != state.LabelsGeneration
+	staticChanged := a.profile != state.Profile || layoutChanged || a.labelsGeneration != state.LabelsGeneration
 	if staticChanged {
 		a.profile, a.layoutGeneration, a.labelsGeneration = state.Profile, state.LayoutGeneration, state.LabelsGeneration
 		a.assignments = make(map[string]renderer.Control)
@@ -66,7 +65,6 @@ func (a *Assembly) Build(state AssemblyState) *renderer.OverlaySnapshot {
 	}
 	content := renderer.Content{Controls: make(map[string]renderer.Control, len(state.Definition.Controls))}
 	for region, assignment := range a.assignments {
-		assignment.Assignments = slices.Clone(assignment.Assignments)
 		content.Controls[region] = assignment
 	}
 	physical := input.ProjectMatching(state.Input, a.index, state.Definition)

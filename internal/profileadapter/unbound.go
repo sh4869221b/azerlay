@@ -53,9 +53,9 @@ const emptySettingJSON = `{
 
 var emptySetting = decodeSemanticJSON(json.RawMessage(emptySettingJSON))
 
-func normalizeUnbound(raw profileraw.RawInput, bindings []profile.TriggerBinding) []profile.TriggerBinding {
+func normalizeUnbound(raw profileraw.RawInput, bindings []profile.TriggerBinding) {
 	if len(bindings) != 3 || bindings[0].Trigger != profile.TriggerSingle {
-		return bindings
+		return
 	}
 	semanticCount := 0
 	expected := emptySetting.(map[string]any)
@@ -66,14 +66,13 @@ func normalizeUnbound(raw profileraw.RawInput, bindings []profile.TriggerBinding
 		}
 		wanted, present := expected[field]
 		if !present || !matchesEmptySettingValue(value, wanted) {
-			return bindings
+			return
 		}
 		semanticCount++
 	}
 	if semanticCount == len(expected) {
 		bindings[0] = profile.TriggerBinding{Trigger: profile.TriggerSingle, Kind: profile.BindingUnbound}
 	}
-	return bindings
 }
 
 // Compare only the fixed empty-setting shape. An opaque extra array or object

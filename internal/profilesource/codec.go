@@ -742,8 +742,6 @@ func validTrigger(binding profile.TriggerBinding) bool {
 			return binding.TriggerDelayMS != nil && *binding.TriggerDelayMS >= 0 && binding.TriggerIntervalMS == nil && binding.ReleaseBehavior != nil && *binding.ReleaseBehavior == "regular"
 		case profile.TriggerDouble:
 			return binding.TriggerDelayMS == nil && binding.TriggerIntervalMS != nil && *binding.TriggerIntervalMS >= 0 && binding.ReleaseBehavior == nil
-		case profile.TriggerUnknown:
-			return false
 		default:
 			return false
 		}

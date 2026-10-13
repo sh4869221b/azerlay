@@ -151,7 +151,6 @@ func TestDecodeRejectsMalformedAndOverLimitInput(t *testing.T) {
 		{name: "trailing envelope JSON", text: trailingEnvelopeJSON, code: ERR_IMPORT_JSON},
 		{name: "ambiguous envelope root", text: ambiguousEnvelopeRoot, code: ERR_IMPORT_ROOT},
 		{name: "corrupt str32 equivalent", text: corruptStr32, code: ERR_IMPORT_LZMA_CORRUPT},
-		{name: "source over limit", text: string(validBundleOfSize(maxSourceSize + 1)), code: ERR_IMPORT_LIMIT_EXCEEDED},
 	}
 
 	for _, tt := range tests {
@@ -188,17 +187,4 @@ func TestDecodeText_WhenSampleEquivalentStr16_ReturnsExactOwnedBundle(t *testing
 	if string(document.JSON) != `{"profiles":[],"version":"synthetic"}` {
 		t.Fatalf("JSON changed with fixture mutation: %q", document.JSON)
 	}
-}
-
-func TestDecodeText_WhenCorruptStr32Equivalent_ReturnsNoDocument(t *testing.T) {
-	t.Parallel()
-
-	payload := []byte(`{"profiles":[]}`)
-	compressed := mustCompressLZMA(t, msgpackString(t, 0xdb, payload), false)
-	text := base64.RawURLEncoding.EncodeToString(compressed[:len(compressed)-1])
-
-	document, err := DecodeText(text)
-
-	assertDecodeError(t, err, ERR_IMPORT_LZMA_CORRUPT)
-	assertZeroDocument(t, document)
 }

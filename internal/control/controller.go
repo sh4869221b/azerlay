@@ -123,9 +123,9 @@ func (c *Controller) selectProfile(ctx context.Context, request Request) Respons
 	if !c.imported {
 		return FailureResponse(&request.ID, NewError(ERR_PROFILE_SOURCE_UNAVAILABLE))
 	}
-	candidate, failure := c.resolve(ctx, request.Params.Selector, false)
-	if failure != nil {
-		return FailureResponse(&request.ID, failure)
+	candidate, err := resolveProfile(ctx, c.source, request.Params.Selector, false)
+	if err != nil {
+		return FailureResponse(&request.ID, selectionError(err))
 	}
 	c.selectionMu.Lock()
 	defer c.selectionMu.Unlock()

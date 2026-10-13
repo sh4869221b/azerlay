@@ -72,7 +72,6 @@ type measurementCollector struct {
 	excluded map[string]*atomic.Uint64
 }
 
-func NewMetrics() *Metrics { return newMetrics(time.Now) }
 func newMetrics(now func() time.Time) *Metrics {
 	return &Metrics{now: now, rates: rates{start: now()}}
 }

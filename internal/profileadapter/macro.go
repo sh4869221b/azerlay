@@ -10,26 +10,26 @@ import (
 
 const maxRecognizedMacroSteps = 1000
 
-func normalizeMacro(raw profileraw.RawInput, bindings []profile.TriggerBinding) []profile.TriggerBinding {
+func normalizeMacro(raw profileraw.RawInput, bindings []profile.TriggerBinding) {
 	if !matchesStringArray(raw, "types", []string{"16", "11", "11"}) ||
 		!matchesStringArray(raw, "keyValues", zeroKeys) ||
 		!matchesStringArray(raw, "metaValues", zeroModifiers) ||
 		!matchesFalse(raw, "isHold") || !matchesFalse(raw, "isTurbo") ||
 		!matchesNumberToken(raw, "turboInterval", "0") ||
 		raw["isToggleOnHold"] != nil || !matchesInactiveSlots(raw) {
-		return bindings
+		return
 	}
 
 	var macro map[string]json.RawMessage
 	if json.Unmarshal(raw["macro"], &macro) != nil || len(macro) != 3 ||
 		!matchesNumberToken(macro, "v", "1") || !isJSONBoolean(macro["repeat"]) {
-		return bindings
+		return
 	}
 	steps := newRawArray(macro["steps"])
 	buttonToken, buttonOK := steps.next()
 	delayToken, delayOK := steps.next()
 	if !buttonOK || !delayOK || !steps.ended() {
-		return bindings
+		return
 	}
 	var button, delay map[string]json.RawMessage
 	if json.Unmarshal(buttonToken, &button) != nil || len(button) != 4 ||
@@ -38,7 +38,7 @@ func normalizeMacro(raw profileraw.RawInput, bindings []profile.TriggerBinding) 
 		json.Unmarshal(delayToken, &delay) != nil || len(delay) != 3 ||
 		!matchesJSONString(delay["type"], "Delay") || !matchesJSONString(delay["direction"], "Full") ||
 		!matchesNumberToken(delay, "duration", "100") {
-		return bindings
+		return
 	}
 
 	bindings[0] = profile.TriggerBinding{
@@ -52,7 +52,6 @@ func normalizeMacro(raw profileraw.RawInput, bindings []profile.TriggerBinding) 
 			},
 		},
 	}
-	return bindings
 }
 
 func recognizedMacroExceedsLimit(raw profileraw.RawInput) bool {
