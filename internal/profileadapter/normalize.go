@@ -50,13 +50,14 @@ func normalizeProfile(raw profileraw.RawProfile, rootKind profile.RootKind, prof
 		if recognizedMacroExceedsLimit(input) {
 			return profile.Profile{}, &NormalizeError{Code: ERR_IMPORT_LIMIT_EXCEEDED}
 		}
-		normalized.Controls[inputIndex].Bindings = normalizeKeyboard(input, normalized.Controls[inputIndex].Bindings)
-		normalized.Controls[inputIndex].Bindings = normalizeTurbo(input, normalized.Controls[inputIndex].Bindings)
-		normalized.Controls[inputIndex].Bindings = normalizeMacro(input, normalized.Controls[inputIndex].Bindings)
-		normalized.Controls[inputIndex].Bindings = normalizeStick(input, normalized.Controls[inputIndex].Bindings)
-		normalized.Controls[inputIndex].Bindings = normalizeUnbound(input, normalized.Controls[inputIndex].Bindings)
-		for bindingIndex := range normalized.Controls[inputIndex].Bindings {
-			binding := &normalized.Controls[inputIndex].Bindings[bindingIndex]
+		bindings := normalized.Controls[inputIndex].Bindings
+		normalizeKeyboard(input, bindings)
+		normalizeTurbo(input, bindings)
+		normalizeMacro(input, bindings)
+		normalizeStick(input, bindings)
+		normalizeUnbound(input, bindings)
+		for bindingIndex := range bindings {
+			binding := &bindings[bindingIndex]
 			if binding.Kind == profile.BindingUnknown {
 				binding.Unknown.RawDisplay = unknownDisplay(input, binding.Trigger)
 			}

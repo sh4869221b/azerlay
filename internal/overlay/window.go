@@ -121,7 +121,7 @@ func New(overlay config.Overlay) (*Window, error) {
 	w.watchMonitorList()
 	w.listHandler = w.monitors.ConnectItemsChanged(func(_, _, _ uint) {
 		w.watchMonitorList()
-		w.selectionChanged()
+		w.reconcile()
 	})
 	return w, nil
 }
@@ -143,18 +143,16 @@ func (w *Window) ApplyPlacement(overlay config.Overlay) error {
 	w.invalidated = w.invalidated || w.selector != overlay.Monitor
 	w.selector, w.anchor = overlay.Monitor, overlay.Anchor
 	w.marginX, w.marginY = overlay.MarginX, overlay.MarginY
-	if err := w.reconcile(); err != nil {
-		return err
-	}
+	w.reconcile()
 	return nil
 }
 
-func (w *Window) SetVisible(visible bool) error {
+func (w *Window) SetVisible(visible bool) {
 	w.requested = visible
 	if !visible && w.diagnostic == "OVERLAY_MONITOR_UNAVAILABLE" {
 		w.diagnostic = ""
 	}
-	return w.reconcile()
+	w.reconcile()
 }
 
 func (w *Window) Close() {
@@ -179,9 +177,9 @@ func (w *Window) Close() {
 	w.destroyWindow()
 }
 
-func (w *Window) reconcile() error {
+func (w *Window) reconcile() {
 	if w.closed || w.reconciling {
-		return nil
+		return
 	}
 	w.reconciling = true
 	defer func() { w.reconciling = false }()
@@ -195,7 +193,7 @@ func (w *Window) reconcile() error {
 			w.diagnostic = ""
 		}
 		w.publish()
-		return nil
+		return
 	}
 	if w.diagnostic == "OVERLAY_MONITOR_UNAVAILABLE" {
 		w.diagnostic = ""
@@ -206,7 +204,7 @@ func (w *Window) reconcile() error {
 		w.invalidated = false
 		if err := w.createWindow(); err != nil {
 			w.fail("ERR_OVERLAY_PLACEMENT")
-			return nil
+			return
 		}
 	}
 	if w.selector != "" {
@@ -216,7 +214,7 @@ func (w *Window) reconcile() error {
 		w.schedulePlace()
 	} else if err := w.place(); err != nil {
 		w.fail("ERR_OVERLAY_PLACEMENT")
-		return nil
+		return
 	}
 	if w.requested {
 		w.attachRender()
@@ -228,7 +226,7 @@ func (w *Window) reconcile() error {
 			region, err := w.newRegion()
 			if err != nil || region == nil {
 				w.fail("ERR_OVERLAY_INPUT_REGION")
-				return nil
+				return
 			}
 			w.region = region
 		}
@@ -239,7 +237,6 @@ func (w *Window) reconcile() error {
 		w.widget.SetVisible(false)
 	}
 	w.publish()
-	return nil
 }
 
 func (w *Window) fail(code string) {

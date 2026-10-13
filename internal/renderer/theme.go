@@ -38,16 +38,14 @@ func themeFor(options Options) palette {
 		if options.Theme == "light" {
 			colors.background = rgb(0xffffff)
 			colors.primary = rgb(0x000000)
-			colors.secondary = colors.primary
-			colors.outline = colors.primary
 			colors.pressed = rgb(0xbae6fd)
 		} else {
 			colors.background = rgb(0x000000)
 			colors.primary = rgb(0xffffff)
-			colors.secondary = colors.primary
-			colors.outline = colors.primary
 			colors.pressed = rgb(0x005a9c)
 		}
+		colors.secondary = colors.primary
+		colors.outline = colors.primary
 	}
 	return colors
 }

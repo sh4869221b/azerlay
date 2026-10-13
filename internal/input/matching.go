@@ -44,7 +44,7 @@ func ProjectMatching(snapshot *Snapshot, index matching.Index, definition layout
 			continue
 		}
 		physical := PhysicalControl{RegionID: control.ID, SourceID: control.SourceInputID}
-		if state.ScopeSupported && snapshot.Connected {
+		if snapshot.Connected {
 			observed := snapshot.Physical(control.ID)
 			physical.Down, physical.Known = observed.Down, observed.Known
 		}

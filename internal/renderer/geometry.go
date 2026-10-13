@@ -1,6 +1,7 @@
 package renderer
 
 import (
+	"cmp"
 	"math"
 	"slices"
 
@@ -38,19 +39,10 @@ func fitGeometry(view layout.Rect, options Options, width, height, titleBand, st
 func orderedControls(definition layout.Definition) []layout.Control {
 	controls := slices.Clone(definition.Controls)
 	slices.SortFunc(controls, func(a, b layout.Control) int {
-		if a.ZIndex < b.ZIndex {
-			return -1
+		if order := cmp.Compare(a.ZIndex, b.ZIndex); order != 0 {
+			return order
 		}
-		if a.ZIndex > b.ZIndex {
-			return 1
-		}
-		if a.ID < b.ID {
-			return -1
-		}
-		if a.ID > b.ID {
-			return 1
-		}
-		return 0
+		return cmp.Compare(a.ID, b.ID)
 	})
 	return controls
 }

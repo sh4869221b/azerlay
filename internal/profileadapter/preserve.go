@@ -94,7 +94,7 @@ func cloneScalarRaw(raw *profileraw.RawScalar) json.RawMessage {
 	if raw == nil {
 		return nil
 	}
-	return cloneRaw(raw.Raw)
+	return append(json.RawMessage(nil), raw.Raw...)
 }
 
 func cloneRawMap(raw map[string]json.RawMessage) map[string]json.RawMessage {
@@ -103,14 +103,7 @@ func cloneRawMap(raw map[string]json.RawMessage) map[string]json.RawMessage {
 	}
 	cloned := make(map[string]json.RawMessage, len(raw))
 	for key, value := range raw {
-		cloned[key] = cloneRaw(value)
+		cloned[key] = append(json.RawMessage(nil), value...)
 	}
 	return cloned
-}
-
-func cloneRaw(raw json.RawMessage) json.RawMessage {
-	if raw == nil {
-		return nil
-	}
-	return append(json.RawMessage(nil), raw...)
 }

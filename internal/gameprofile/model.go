@@ -1,6 +1,10 @@
 package gameprofile
 
-import "github.com/sh4869221b/azerlay/internal/profile"
+import (
+	"maps"
+
+	"github.com/sh4869221b/azerlay/internal/profile"
+)
 
 type ControlKey struct {
 	InputID int
@@ -24,17 +28,6 @@ func (c Catalog) Lookup(id string) (Definition, bool) {
 	if !ok {
 		return Definition{}, false
 	}
-	d.Controls = cloneMap(d.Controls)
+	d.Controls = maps.Clone(d.Controls)
 	return d, true
-}
-
-func cloneMap[K comparable](src map[K]string) map[K]string {
-	if src == nil {
-		return nil
-	}
-	dst := make(map[K]string, len(src))
-	for key, value := range src {
-		dst[key] = value
-	}
-	return dst
 }

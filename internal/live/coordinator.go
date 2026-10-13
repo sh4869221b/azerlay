@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/sh4869221b/azerlay/internal/config"
 	"github.com/sh4869221b/azerlay/internal/control"
@@ -59,7 +60,7 @@ type Coordinator struct {
 
 func Start(ctx context.Context, sources Sources) *Coordinator {
 	ctx, cancel := context.WithCancel(ctx)
-	c := &Coordinator{metrics: NewMetrics(), sources: sources, changes: make(chan struct{}, 1), done: make(chan struct{}), cancel: cancel}
+	c := &Coordinator{metrics: newMetrics(time.Now), sources: sources, changes: make(chan struct{}, 1), done: make(chan struct{}), cancel: cancel}
 	go c.run(ctx)
 	return c
 }

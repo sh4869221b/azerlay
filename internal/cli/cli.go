@@ -12,6 +12,16 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
+const runHelp = `Usage: azerlay run [--config PATH] [--foreground]
+
+Run in foreground until quit, SIGINT or SIGTERM. Requires a Wayland session.
+Configuration must exist; a saved profile is optional. Show selected profile assignments and last-observed raw input.
+
+Options:
+  --config PATH  Read this configuration instead of the default XDG path
+  --foreground   Stay in foreground (the default)
+  --help         Print this help without starting the application`
+
 // Run executes a CLI request. startForeground is required for a valid run
 // request; help and invalid arguments never invoke it. The callback owns native
 // admission, signal handling and shutdown, and its exit status is returned intact.
@@ -69,9 +79,9 @@ func Run(args []string, version string, stdin io.Reader, stdout, stderr io.Write
 		&helpFlag{BoolFlag: cli.BoolFlag{Name: "help", Local: true}},
 	}
 	prepareArgs[doctor] = func(original []string) ([]string, bool) {
-		normalized, jsonMode, valid := normalizeDoctorArgs(original)
+		jsonMode := slices.Contains(original, "--json")
 		usage = func() int { return writeDoctorUsage(jsonMode, stdout, stderr) }
-		return normalized, valid
+		return normalizeConfigArgs(original, "--help", "--json", "--include-bindings")
 	}
 	root.Commands = append(root.Commands, doctor)
 	var deviceOptions devicesOptions
@@ -96,7 +106,13 @@ func Run(args []string, version string, stdin io.Reader, stdout, stderr io.Write
 	}
 	root.Commands = append(root.Commands, devices)
 	foreground := command("run", func(cmd *cli.Command) int {
-		return runApplication(cmd, stdout, stderr, startForeground)
+		if cmd.IsSet("help") {
+			if _, err := fmt.Fprintln(stdout, runHelp); err != nil {
+				return 1
+			}
+			return 0
+		}
+		return startForeground(cmd.String("config"), stdout, stderr)
 	})
 	foreground.Flags = []cli.Flag{
 		&cli.StringFlag{Name: "config", Local: true},
@@ -107,7 +123,7 @@ func Run(args []string, version string, stdin io.Reader, stdout, stderr io.Write
 		usage = func() int {
 			return WriteRunFailure(&ReportError{"ERR_CLI_USAGE", "usage", "Invalid command arguments.", "Use run --help for usage."}, stdout, stderr)
 		}
-		return normalizeRunArgs(original)
+		return normalizeConfigArgs(original, "--help", "--foreground")
 	}
 	root.Commands = append(root.Commands, foreground)
 	for _, name := range []string{"validate", "import"} {

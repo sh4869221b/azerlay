@@ -113,11 +113,7 @@ func (d *Device) publish(state input.ManagedSnapshot) {
 }
 func (d *Device) run(ctx context.Context, settings config.Device, baseline *input.Snapshot) {
 	generations := baseline.Generations
-	if generations.Device > 0 {
-		generations.Device++
-	} else {
-		generations.Device = 1
-	}
+	generations.Device++
 	unknown := &input.Snapshot{Generations: baseline.Generations, Availability: input.Unavailable, EventCount: baseline.EventCount, InvalidationCount: baseline.InvalidationCount}
 	failure := func(err error) {
 		d.publish(input.ManagedSnapshot{Snapshot: unknown, State: input.ManagedDegraded, Diagnostic: deviceFailure(err)})
@@ -198,10 +194,6 @@ func (d *Device) run(ctx context.Context, settings config.Device, baseline *inpu
 						case <-ctx.Done():
 							return
 						case <-session.Done():
-							snapshot = session.Latest()
-							snapshot.EventCount += baseline.EventCount
-							snapshot.InvalidationCount += baseline.InvalidationCount
-							d.publish(input.ManagedSnapshot{Snapshot: snapshot, State: input.ManagedDegraded, Diagnostic: deviceFailure(session.Err())})
 							return
 						case <-session.Changes():
 						}

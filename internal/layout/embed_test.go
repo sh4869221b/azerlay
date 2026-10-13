@@ -85,6 +85,14 @@ func TestLoadEmbeddedLeft(t *testing.T) {
 		if shape.X < got.ViewBox.X || shape.Y < got.ViewBox.Y || shape.X+shape.Width > got.ViewBox.X+got.ViewBox.Width || shape.Y+shape.Height > got.ViewBox.Y+got.ViewBox.Height {
 			t.Errorf("%s rectangle outside view box", expected.id)
 		}
+		for _, other := range got.Controls {
+			if other.ID == control.ID {
+				continue
+			}
+			if (bounds{other.Shape.X, other.Shape.Y, other.Shape.X + other.Shape.Width, other.Shape.Y + other.Shape.Height}).contains(control.LabelAnchor) {
+				t.Errorf("%s anchor lies in unrelated region %s", control.ID, other.ID)
+			}
+		}
 	}
 	for _, source := range []int{21, 25, 26, 27, 32, 33, 34, 35, 39, 40, 42, 43} {
 		if sources[source] {

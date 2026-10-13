@@ -42,7 +42,7 @@ func prepareControlStyle(region layout.Control, control Control, colors palette,
 			style.dashed = true
 		case control.Down:
 			style.physical = physicalPressed
-		case !control.Down:
+		default:
 			style.physical = physicalReleased
 		}
 	}

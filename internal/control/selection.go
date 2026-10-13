@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path"
+	"slices"
 	"sort"
 
 	"github.com/sh4869221b/azerlay/internal/config"
@@ -28,14 +29,6 @@ func (a *activeSelection) status() ProfileStatus {
 		result.Name = &name
 	}
 	return result
-}
-
-func (c *Controller) resolve(ctx context.Context, selector string, idOnly bool) (*activeSelection, *Error) {
-	selected, err := resolveProfile(ctx, c.source, selector, idOnly)
-	if err != nil {
-		return nil, selectionError(err)
-	}
-	return selected, nil
 }
 
 // ResolveConfiguredProfile does not watch or persist. A valid retained local
@@ -102,9 +95,7 @@ func resolveSavedImported(ctx context.Context, source *profilesource.ImportedSou
 		return nil, discoverErr
 	}
 	// Preserve catalog order for equal timestamps, preferring the later entry.
-	for left, right := 0, len(sources)-1; left < right; left, right = left+1, right-1 {
-		sources[left], sources[right] = sources[right], sources[left]
-	}
+	slices.Reverse(sources)
 	sort.SliceStable(sources, func(i, j int) bool { return sources[i].ImportedAt.After(sources[j].ImportedAt) })
 	for _, descriptor := range sources {
 		if descriptor.ProfileCount != 1 {

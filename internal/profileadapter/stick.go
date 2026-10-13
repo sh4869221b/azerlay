@@ -8,14 +8,14 @@ import (
 	"github.com/sh4869221b/azerlay/internal/profileraw"
 )
 
-func normalizeStick(raw profileraw.RawInput, bindings []profile.TriggerBinding) []profile.TriggerBinding {
+func normalizeStick(raw profileraw.RawInput, bindings []profile.TriggerBinding) {
 	if angle, ok := matchesObservedXbox(raw); ok {
 		bindings[0] = profile.TriggerBinding{
 			Trigger: profile.TriggerSingle,
 			Kind:    profile.BindingStick,
 			Stick:   &profile.StickBinding{Mode: profile.StickModeXbox, AngleDegrees: angle},
 		}
-		return bindings
+		return
 	}
 
 	var mode profile.StickMode
@@ -25,26 +25,26 @@ func normalizeStick(raw profileraw.RawInput, bindings []profile.TriggerBinding) 
 	case matchesStringArray(raw, "types", []string{"21", "11", "11"}):
 		mode = profile.StickModeXbox
 	default:
-		return bindings
+		return
 	}
 	var subType string
 	if json.Unmarshal(raw["subType"], &subType) != nil || subType != "11" ||
 		!matchesFalse(raw, "isHold") || !matchesFalse(raw, "isTurbo") || !matchesFalse(raw, "isToggleOnHold") ||
 		!matchesStringArray(raw, "keyValues", zeroKeys) || !matchesStringArray(raw, "metaValues", zeroModifiers) {
-		return bindings
+		return
 	}
 	var settings profileraw.RawInput
 	if json.Unmarshal(raw["analogSettings"], &settings) != nil {
-		return bindings
+		return
 	}
 	for _, field := range []string{"angle", "lowerLimit", "upperLimit"} {
 		if !matchesNumberToken(settings, field, "0") {
-			return bindings
+			return
 		}
 	}
 	for _, field := range []string{"isRightAnalog", "invertXAxis", "invertYAxis", "isCombinedAnalog", "isEightDirectionalTrigger", "isHoldTrigger", "isAnalogSmoothing", "isAngleLock"} {
 		if !matchesFalse(settings, field) {
-			return bindings
+			return
 		}
 	}
 	stick := &profile.StickBinding{Mode: mode}
@@ -53,7 +53,7 @@ func normalizeStick(raw profileraw.RawInput, bindings []profile.TriggerBinding) 
 			Left map[string]json.RawMessage `json:"left"`
 		}
 		if json.Unmarshal(settings["analogKeys"], &keys) != nil {
-			return bindings
+			return
 		}
 		for _, direction := range []struct {
 			name string
@@ -63,17 +63,16 @@ func normalizeStick(raw profileraw.RawInput, bindings []profile.TriggerBinding) 
 			for _, expected := range []string{direction.key, "0", "0"} {
 				value, ok := tuple.next()
 				if !ok || !bytes.Equal(value, []byte(expected)) {
-					return bindings
+					return
 				}
 			}
 			if !tuple.ended() {
-				return bindings
+				return
 			}
 		}
 		stick.KeyboardDirections = profile.KeyboardDirections{Up: profile.KEY_W, Right: profile.KEY_D, Down: profile.KEY_S, Left: profile.KEY_A}
 	}
 	bindings[0] = profile.TriggerBinding{Trigger: profile.TriggerSingle, Kind: profile.BindingStick, Stick: stick}
-	return bindings
 }
 
 func matchesObservedXbox(raw profileraw.RawInput) (int, bool) {

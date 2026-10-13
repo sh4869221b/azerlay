@@ -3,7 +3,6 @@ package device
 import (
 	"errors"
 	"os"
-	"path/filepath"
 	"syscall"
 )
 
@@ -26,71 +25,44 @@ func (c collector) openGroup(group Group, ops probeOps) (opened []OpenedNode, er
 		d := diagnostic(ERR_DEVICE_METADATA, "selection", nil)
 		return nil, &d
 	}
-	paths := make(map[string]bool, len(group.HIDPaths))
-	for _, path := range group.HIDPaths {
-		clean := filepath.Clean(path)
-		if path == "" || paths[clean] {
-			d := diagnostic(ERR_DEVICE_METADATA, "selection", &path)
-			return nil, &d
-		}
-		paths[clean] = true
+	path := group.HIDPaths[0]
+	if path == "" {
+		d := diagnostic(ERR_DEVICE_METADATA, "selection", &path)
+		return nil, &d
 	}
-	var pending []struct {
-		node Node
-		fd   int
+	n, err := c.selectedNode(path, group.USBParent)
+	if err != nil {
+		return nil, err
+	}
+	fd, err := ops.open(path, syscall.O_RDONLY|syscall.O_NONBLOCK|syscall.O_CLOEXEC, 0)
+	if err != nil {
+		d := boundaryDiagnostic(err, "open", &path)
+		return nil, &d
 	}
 	defer func() {
 		if err != nil {
-			for _, p := range pending {
-				if closeErr := ops.close(p.fd); closeErr != nil {
-					d := boundaryDiagnostic(closeErr, "close", &p.node.Path)
-					err = errors.Join(err, &d)
-				}
+			if closeErr := ops.close(fd); closeErr != nil {
+				d := boundaryDiagnostic(closeErr, "close", &path)
+				err = errors.Join(err, &d)
 			}
 		}
 	}()
-	devices := make(map[uint64]bool, len(group.HIDPaths))
-	for _, path := range group.HIDPaths {
-		n, err := c.selectedNode(path, group.USBParent)
-		if err != nil {
-			return nil, err
-		}
-		if devices[n.deviceNumber] {
-			d := diagnostic(ERR_DEVICE_METADATA, "selection", &path)
-			return nil, &d
-		}
-		devices[n.deviceNumber] = true
-		fd, err := ops.open(path, syscall.O_RDONLY|syscall.O_NONBLOCK|syscall.O_CLOEXEC, 0)
-		if err != nil {
-			d := boundaryDiagnostic(err, "open", &path)
-			return nil, &d
-		}
-		pending = append(pending, struct {
-			node Node
-			fd   int
-		}{n, fd})
-		if _, err := ops.validate(fd, n); err != nil {
-			d := boundaryDiagnostic(err, "open", &path)
-			return nil, &d
-		}
-		// Opening can race with unplug/replacement. Recollect the current mapping
-		// and admission, then compare that identity to the descriptor we retain.
-		n, err = c.selectedNode(path, group.USBParent)
-		if err != nil {
-			return nil, err
-		}
-		if _, err := ops.validate(fd, n); err != nil {
-			d := boundaryDiagnostic(err, "open", &path)
-			return nil, &d
-		}
-		n.Access = "readable"
-		pending[len(pending)-1].node = n
+	if _, err := ops.validate(fd, n); err != nil {
+		d := boundaryDiagnostic(err, "open", &path)
+		return nil, &d
 	}
-	opened = make([]OpenedNode, 0, len(pending))
-	for _, p := range pending {
-		opened = append(opened, OpenedNode{Node: p.node, File: os.NewFile(uintptr(p.fd), p.node.Path)})
+	// Opening can race with unplug/replacement. Recollect the current mapping
+	// and admission, then compare that identity to the descriptor we retain.
+	n, err = c.selectedNode(path, group.USBParent)
+	if err != nil {
+		return nil, err
 	}
-	return opened, nil
+	if _, err := ops.validate(fd, n); err != nil {
+		d := boundaryDiagnostic(err, "open", &path)
+		return nil, &d
+	}
+	n.Access = "readable"
+	return []OpenedNode{{Node: n, File: os.NewFile(uintptr(fd), path)}}, nil
 }
 
 func (c collector) selectedNode(path, parent string) (Node, error) {

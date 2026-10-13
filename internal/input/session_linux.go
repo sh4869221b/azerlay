@@ -102,9 +102,8 @@ func startSession(ctx context.Context, group device.Group, generations Generatio
 				if report.malformed {
 					snapshot = reducer.invalidate(ERR_INPUT_EVENT)
 				} else {
-					reducer.apply(report.event)
 					reducer.latest.ReadAt = report.readAt
-					snapshot = reducer.snapshot()
+					snapshot = reducer.apply(report.event)
 				}
 				s.latest.Store(snapshot)
 				s.notify()

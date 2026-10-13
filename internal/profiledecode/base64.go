@@ -99,8 +99,6 @@ func decodeBase64(text string, form outerForm) ([]byte, error) {
 		codec = base64.URLEncoding.Strict()
 	case outerBase64StandardPadded, outerBase64StandardUnpadded:
 		codec = base64.StdEncoding.Strict()
-	case outerRawJSON:
-		return nil, newDecodeError(ERR_IMPORT_ENCODING, nil)
 	default:
 		return nil, newDecodeError(ERR_IMPORT_ENCODING, nil)
 	}

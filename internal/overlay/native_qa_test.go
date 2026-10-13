@@ -197,11 +197,11 @@ func runNativeQAChild() int {
 				attach()
 				regionMode = "empty"
 			case "show", "hide":
-				failure = w.SetVisible(parts[0] == "show")
+				w.SetVisible(parts[0] == "show")
 				regionMode = "empty"
 			case "recreate":
 				w.invalidated = true
-				failure = w.reconcile()
+				w.reconcile()
 				attach()
 				regionMode = "empty"
 			case "full":
