@@ -171,30 +171,50 @@ value tokens aren't round-trip guarantees. A scalar decode failure resets its
 receiver before returning `ERR_IMPORT_ROOT`; `Parse` maps a container-valued
 `version` to `ERR_IMPORT_UNSUPPORTED_VERSION`.
 
-Parsing scans the complete JSON token stream before model construction. It
-rejects malformed or trailing JSON, invalid UTF-8, duplicate decoded keys at
+Parsing validates JSON before model construction and stops at the first
+malformed value or exceeded limit. Accepted candidates are scanned completely.
+It rejects malformed or trailing JSON, invalid UTF-8, duplicate decoded keys at
 any depth, decoded strings over 65,536 UTF-8 bytes, and container depth over
 64. Escaped and literal spellings of the same object key are duplicates. The
 limits are inclusive: depth 64 and strings of 65,536 bytes are accepted.
 Bundles allow at most 512 profiles, and each profile allows at most 256 inputs.
+These counts are checked while traversing the modeled arrays, before allocating
+their complete member lists. The counts do not constrain arrays inside opaque
+input fields or other unknown fields. After UTF-8 validation, a shallow root-key
+inspection selects the count scope from the JSON's key-presence predicates,
+independently of the provisional `Document.Kind`. It skips raw value spans
+without constructing values or reporting validation errors. Complete roots
+matching both or neither predicate receive only generic preflight checks before
+root rejection; incomplete root inspection conservatively checks both modeled
+array names during preflight. An actual bundle's root-level `inputs` remains
+opaque even when its provisional kind is wrong or unknown.
+
+Once the allowed count is reached, an
+indication of another member returns `ERR_IMPORT_LIMIT_EXCEEDED` without
+decoding or validating that member or the remaining tail. JSON token errors in
+the unvalidated tail do not take precedence over this resource bound; whole-input UTF-8
+validation still runs first.
+
 Every profile and input must be an object, every profile must contain `inputs`,
 and `inputs` must be an array. Container-valued `id` or `name` is invalid. A
 bundle member doesn't need `id` or `name`. The canonical synthetic roots
 `{"version":"synthetic-1","profiles":[]}` and `{"id":null,"inputs":[]}`
 therefore pass structural validation.
 
-Root selection repeats the decoder's key-presence classifier and requires its
-result to match `Document.Kind`. Both predicates, neither predicate, an unknown
-kind, a kind mismatch, invalid field types, malformed JSON, invalid UTF-8, and
-duplicate keys return `ERR_IMPORT_ROOT`. Exact structural overflows return
+After preflight succeeds, root selection repeats the decoder's key-presence
+classifier and requires its result to match `Document.Kind`. Both predicates,
+neither predicate, an unknown kind, a kind mismatch, invalid field types,
+malformed JSON, invalid UTF-8, and duplicate keys return `ERR_IMPORT_ROOT`.
+Exact structural overflows return
 `ERR_IMPORT_LIMIT_EXCEEDED`. An optional `version` may be absent or any scalar,
 including null; an object or array version returns
 `ERR_IMPORT_UNSUPPORTED_VERSION`. Scalar preservation is raw evidence only. It
 doesn't admit that version or establish support for any Azeron Software
 generation, and this boundary exposes no generation-admission API.
 
-Validation follows this order: full-stream preflight, root classification and
-kind agreement, root version representation, then profile and input shape and
+Validation follows this order: UTF-8, shallow root-key inspection, bounded JSON
+preflight, root classification and kind agreement, root version representation,
+then profile and input shape and
 count checks in input order. Within a profile, version is checked before
 `id`/`name`, then `inputs`. The first preflight failure wins. Model-boundary
 errors are `ParseError` values whose text is only their stable code. Every
@@ -264,6 +284,14 @@ long, and double slots. Other values produce one `trigger:unknown` outcome. An
 unmatched slot has `kind:unknown`, no action, timing, or release fields, and
 reason `unmapped_binding`. Unknown is successful normalization, not a default
 unassigned value.
+
+Unknown display hints contain only scalar values from `types` and, for a known
+trigger slot, that slot's key and modifier fields. Labels, macros, and unrelated
+fields do not enter the hint. The hint is limited to 256 ASCII bytes, including
+an ellipsis when the next display token would exceed the budget. Array members
+are visited without constructing a complete decoded list, and hint generation
+stops when that budget is exceeded. Exact binding predicates inspect only their
+expected shape. Unsupported arrays remain intact in the opaque raw references.
 
 The only recognized `unbound` outcome is the SINGLE slot of the complete
 anonymous empty-setting predicate in

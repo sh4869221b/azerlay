@@ -25,15 +25,17 @@ func normalizeMacro(raw profileraw.RawInput, bindings []profile.TriggerBinding) 
 		!matchesNumberToken(macro, "v", "1") || !isJSONBoolean(macro["repeat"]) {
 		return bindings
 	}
-	var steps []json.RawMessage
-	if json.Unmarshal(macro["steps"], &steps) != nil || len(steps) != 2 {
+	steps := newRawArray(macro["steps"])
+	buttonToken, buttonOK := steps.next()
+	delayToken, delayOK := steps.next()
+	if !buttonOK || !delayOK || !steps.ended() {
 		return bindings
 	}
 	var button, delay map[string]json.RawMessage
-	if json.Unmarshal(steps[0], &button) != nil || len(button) != 4 ||
+	if json.Unmarshal(buttonToken, &button) != nil || len(button) != 4 ||
 		!matchesJSONString(button["type"], "Button") || !matchesJSONString(button["direction"], "Full") ||
 		!matchesNumberToken(button, "duration", "50") || !matchesNumberToken(button, "keyCode", "87") ||
-		json.Unmarshal(steps[1], &delay) != nil || len(delay) != 3 ||
+		json.Unmarshal(delayToken, &delay) != nil || len(delay) != 3 ||
 		!matchesJSONString(delay["type"], "Delay") || !matchesJSONString(delay["direction"], "Full") ||
 		!matchesNumberToken(delay, "duration", "100") {
 		return bindings
@@ -74,16 +76,19 @@ func recognizedMacroExceedsLimit(raw profileraw.RawInput) bool {
 	if len(stepsToken) == 0 || stepsToken[0] != '[' {
 		return false
 	}
-	var steps []json.RawMessage
-	if json.Unmarshal(stepsToken, &steps) != nil {
-		return false
-	}
-	for _, step := range steps {
+	steps := newRawArray(stepsToken)
+	count := 0
+	for {
+		step, ok := steps.next()
+		if !ok {
+			break
+		}
 		if !isRecognizedMacroStep(step) {
 			return false
 		}
+		count++
 	}
-	return len(steps) > maxRecognizedMacroSteps
+	return steps.ended() && count > maxRecognizedMacroSteps
 }
 
 func isRecognizedMacroStep(raw json.RawMessage) bool {
@@ -107,6 +112,12 @@ func isRecognizedMacroStep(raw json.RawMessage) bool {
 }
 
 func matchesJSONString(raw json.RawMessage, expected string) bool {
+	raw = bytes.TrimSpace(raw)
+	// Every byte of an equal decoded string needs at most six source bytes
+	// (a Unicode escape). Reject unequal oversized tokens before decoding them.
+	if len(raw) < 2 || raw[0] != '"' || len(raw) > 6*len(expected)+2 {
+		return false
+	}
 	var value string
 	return json.Unmarshal(raw, &value) == nil && value == expected
 }

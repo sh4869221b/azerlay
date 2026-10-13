@@ -25,47 +25,50 @@ func unknownDisplay(input profileraw.RawInput, trigger profile.TriggerKind) stri
 		index = 2
 		fields = append(fields, "keyValuesDouble", "metaValuesDouble")
 	}
-	var tokens []string
+	var result strings.Builder
 	for _, field := range fields {
-		var values []json.RawMessage
-		if json.Unmarshal(input[field], &values) != nil {
-			continue
-		}
-		for i, value := range values {
+		values := newRawArray(input[field])
+		for i := 0; ; i++ {
+			value, ok := values.next()
+			if !ok {
+				break
+			}
 			if field == "types" && index >= 0 && i != index {
 				continue
 			}
 			if token := displayScalar(value); token != "" {
-				tokens = append(tokens, field+"["+strconv.Itoa(i)+"]="+token)
+				token = field + "[" + strconv.Itoa(i) + "]=" + token
+				separator := ""
+				if result.Len() > 0 {
+					separator = ", "
+				}
+				if result.Len()+len(separator)+len(token) > 253 {
+					result.WriteString("...")
+					return result.String()
+				}
+				result.WriteString(separator)
+				result.WriteString(token)
+			}
+			if field == "types" && index >= 0 {
+				break
 			}
 		}
-	}
-	var result strings.Builder
-	for _, token := range tokens {
-		separator := ""
-		if result.Len() > 0 {
-			separator = ", "
-		}
-		if result.Len()+len(separator)+len(token) > 253 {
-			result.WriteString("...")
-			break
-		}
-		result.WriteString(separator)
-		result.WriteString(token)
 	}
 	return result.String()
 }
 
 func displayScalar(raw json.RawMessage) string {
-	var value any
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.UseNumber()
-	if decoder.Decode(&value) != nil {
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 || (raw[0] != '"' && !isJSONNumber(raw)) {
 		return ""
 	}
-	switch value := value.(type) {
-	case string:
-		if value == "0" {
+	if raw[0] == '"' {
+		// These are the only valid JSON spellings of the skipped string "0".
+		if bytes.Equal(raw, []byte(`"0"`)) || bytes.Equal(raw, []byte(`"\u0030"`)) {
+			return ""
+		}
+		var value string
+		if json.Unmarshal(raw, &value) != nil {
 			return ""
 		}
 		var quoted strings.Builder
@@ -80,15 +83,27 @@ func displayScalar(raw json.RawMessage) string {
 			value = value[size:]
 		}
 		return `"` + quoted.String() + `"`
-	case json.Number:
-		if number, err := value.Float64(); err == nil && number == 0 {
-			return ""
+	}
+	// Literal zero mantissas are common inactive-slot values. Checking them in
+	// place also handles arbitrarily long zero spellings without scratch copies.
+	zero := true
+	for _, b := range raw {
+		if b == 'e' || b == 'E' {
+			break
 		}
-		if len(value) > 80 {
-			return string(value[:80]) + "..."
+		if b >= '1' && b <= '9' {
+			zero = false
+			break
 		}
-		return string(value)
-	default:
+	}
+	if zero {
 		return ""
 	}
+	if number, err := strconv.ParseFloat(string(raw), 64); err == nil && number == 0 {
+		return ""
+	}
+	if len(raw) > 80 {
+		return string(raw[:80]) + "..."
+	}
+	return string(raw)
 }

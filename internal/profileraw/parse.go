@@ -3,6 +3,8 @@ package profileraw
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"io"
 
 	"github.com/sh4869221b/azerlay/internal/profiledecode"
 )
@@ -14,7 +16,7 @@ const (
 
 // Parse constructs an authoritative raw model from a decoded document.
 func Parse(document profiledecode.Document) (RawExport, error) {
-	if err := validateJSON(document.JSON); err != nil {
+	if err := validateJSON(document.JSON, exportJSON); err != nil {
 		return RawExport{}, err
 	}
 
@@ -63,16 +65,9 @@ func parseBundle(fields map[string]json.RawMessage) (RawBundle, error) {
 		return RawBundle{}, err
 	}
 
-	profilesToken := bytes.TrimSpace(fields["profiles"])
-	if len(profilesToken) == 0 || profilesToken[0] != '[' {
-		return RawBundle{}, &ParseError{Code: ERR_IMPORT_ROOT}
-	}
-	var rawProfiles []json.RawMessage
-	if err := json.Unmarshal(profilesToken, &rawProfiles); err != nil {
-		return RawBundle{}, &ParseError{Code: ERR_IMPORT_ROOT}
-	}
-	if len(rawProfiles) > maxProfiles {
-		return RawBundle{}, &ParseError{Code: ERR_IMPORT_LIMIT_EXCEEDED}
+	rawProfiles, err := parseArray(fields["profiles"], maxProfiles)
+	if err != nil {
+		return RawBundle{}, err
 	}
 
 	profiles := make([]RawProfile, len(rawProfiles))
@@ -115,16 +110,9 @@ func parseProfile(fields map[string]json.RawMessage) (RawProfile, error) {
 		return RawProfile{}, err
 	}
 
-	inputsToken := bytes.TrimSpace(fields["inputs"])
-	if len(inputsToken) == 0 || inputsToken[0] != '[' {
-		return RawProfile{}, &ParseError{Code: ERR_IMPORT_ROOT}
-	}
-	var rawInputs []json.RawMessage
-	if err := json.Unmarshal(inputsToken, &rawInputs); err != nil {
-		return RawProfile{}, &ParseError{Code: ERR_IMPORT_ROOT}
-	}
-	if len(rawInputs) > maxInputs {
-		return RawProfile{}, &ParseError{Code: ERR_IMPORT_LIMIT_EXCEEDED}
+	rawInputs, err := parseArray(fields["inputs"], maxInputs)
+	if err != nil {
+		return RawProfile{}, err
 	}
 
 	inputs := make([]RawInput, len(rawInputs))
@@ -147,6 +135,35 @@ func parseProfile(fields map[string]json.RawMessage) (RawProfile, error) {
 		}
 	}
 	return RawProfile{ID: id, Name: name, Version: version, Inputs: inputs, Unknown: unknown}, nil
+}
+
+func parseArray(raw json.RawMessage, limit int) ([]json.RawMessage, error) {
+	token := bytes.TrimSpace(raw)
+	if len(token) == 0 || token[0] != '[' {
+		return nil, &ParseError{Code: ERR_IMPORT_ROOT}
+	}
+	decoder := json.NewDecoder(bytes.NewReader(token))
+	if opening, err := decoder.Token(); err != nil || opening != json.Delim('[') {
+		return nil, &ParseError{Code: ERR_IMPORT_ROOT}
+	}
+	values := make([]json.RawMessage, 0)
+	for decoder.More() {
+		if len(values) == limit {
+			return nil, &ParseError{Code: ERR_IMPORT_LIMIT_EXCEEDED}
+		}
+		var value json.RawMessage
+		if err := decoder.Decode(&value); err != nil {
+			return nil, &ParseError{Code: ERR_IMPORT_ROOT}
+		}
+		values = append(values, value)
+	}
+	if closing, err := decoder.Token(); err != nil || closing != json.Delim(']') {
+		return nil, &ParseError{Code: ERR_IMPORT_ROOT}
+	}
+	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
+		return nil, &ParseError{Code: ERR_IMPORT_ROOT}
+	}
+	return values, nil
 }
 
 func parseVersion(raw json.RawMessage) (*RawScalar, error) {

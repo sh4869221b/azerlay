@@ -61,7 +61,7 @@ func TestValidateJSON(t *testing.T) {
 			t.Parallel()
 
 			// When
-			err := validateJSON(tt.raw)
+			err := validateJSON(tt.raw, opaqueJSON)
 
 			// Then
 			if tt.wantCode == "" {

@@ -3,7 +3,6 @@ package profileadapter
 import (
 	"bytes"
 	"encoding/json"
-	"slices"
 
 	"github.com/sh4869221b/azerlay/internal/profile"
 	"github.com/sh4869221b/azerlay/internal/profileraw"
@@ -120,8 +119,18 @@ func matchesFollowupDouble(raw profileraw.RawInput) bool {
 }
 
 func matchesStringArray(raw profileraw.RawInput, field string, expected []string) bool {
-	var actual []string
-	return json.Unmarshal(raw[field], &actual) == nil && slices.Equal(actual, expected)
+	return matchesRawStringArray(raw[field], expected)
+}
+
+func matchesRawStringArray(raw json.RawMessage, expected []string) bool {
+	values := newRawArray(raw)
+	for _, wanted := range expected {
+		value, ok := values.next()
+		if !ok || !matchesJSONString(value, wanted) {
+			return false
+		}
+	}
+	return values.ended()
 }
 
 func matchesFalse(raw profileraw.RawInput, field string) bool {
