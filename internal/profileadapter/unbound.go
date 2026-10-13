@@ -3,7 +3,6 @@ package profileadapter
 import (
 	"bytes"
 	"encoding/json"
-	"reflect"
 
 	"github.com/sh4869221b/azerlay/internal/profile"
 	"github.com/sh4869221b/azerlay/internal/profileraw"
@@ -58,22 +57,90 @@ func normalizeUnbound(raw profileraw.RawInput, bindings []profile.TriggerBinding
 	if len(bindings) != 3 || bindings[0].Trigger != profile.TriggerSingle {
 		return bindings
 	}
-	semantic := make(map[string]any, len(raw))
+	semanticCount := 0
+	expected := emptySetting.(map[string]any)
 	for field, value := range raw {
 		switch field {
 		case "id", "pinOne", "pinTwo", "label":
 			continue
 		}
-		decoded := decodeSemanticJSON(value)
-		if decoded == nil {
+		wanted, present := expected[field]
+		if !present || !matchesEmptySettingValue(value, wanted) {
 			return bindings
 		}
-		semantic[field] = decoded
+		semanticCount++
 	}
-	if reflect.DeepEqual(semantic, emptySetting) {
+	if semanticCount == len(expected) {
 		bindings[0] = profile.TriggerBinding{Trigger: profile.TriggerSingle, Kind: profile.BindingUnbound}
 	}
 	return bindings
+}
+
+// Compare only the fixed empty-setting shape. An opaque extra array or object
+// member never becomes an allocated semantic value merely to reject it.
+func matchesEmptySettingValue(raw json.RawMessage, expected any) bool {
+	raw = bytes.TrimSpace(raw)
+	switch expected := expected.(type) {
+	case string:
+		return matchesJSONString(raw, expected)
+	case json.Number:
+		return bytes.Equal(raw, []byte(expected))
+	case bool:
+		if expected {
+			return bytes.Equal(raw, []byte("true"))
+		}
+		return bytes.Equal(raw, []byte("false"))
+	case []any:
+		values := newRawArray(raw)
+		for _, wanted := range expected {
+			value, ok := values.next()
+			if !ok || !matchesEmptySettingValue(value, wanted) {
+				return false
+			}
+		}
+		return values.ended()
+	case map[string]any:
+		if len(raw) == 0 || raw[0] != '{' {
+			return false
+		}
+		maxKeyLength := 0
+		for key := range expected {
+			if len(key) > maxKeyLength {
+				maxKeyLength = len(key)
+			}
+		}
+		rest := bytes.TrimSpace(raw[1:])
+		count := 0
+		for len(rest) > 0 && rest[0] != '}' {
+			keyToken, next := takeRawValue(rest)
+			if len(keyToken) < 2 || keyToken[0] != '"' || len(keyToken) > 6*maxKeyLength+2 {
+				return false
+			}
+			var key string
+			if json.Unmarshal(keyToken, &key) != nil {
+				return false
+			}
+			wanted, present := expected[key]
+			next = bytes.TrimSpace(next)
+			if !present || len(next) == 0 || next[0] != ':' {
+				return false
+			}
+			value, next := takeRawValue(next[1:])
+			if value == nil || !matchesEmptySettingValue(value, wanted) {
+				return false
+			}
+			count++
+			rest = bytes.TrimSpace(next)
+			if len(rest) > 0 && rest[0] == ',' {
+				rest = bytes.TrimSpace(rest[1:])
+				continue
+			}
+			break
+		}
+		return count == len(expected) && len(rest) > 0 && rest[0] == '}' && len(bytes.TrimSpace(rest[1:])) == 0
+	default:
+		return false
+	}
 }
 
 func decodeSemanticJSON(raw json.RawMessage) any {

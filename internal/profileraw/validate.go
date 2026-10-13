@@ -13,7 +13,18 @@ const (
 	maxJSONStringBytes    = 65_536
 )
 
-func validateJSON(raw json.RawMessage) error {
+type jsonContext uint8
+
+const (
+	opaqueJSON jsonContext = iota
+	rootJSON
+	bundleJSON
+	profileJSON
+	profilesJSON
+	inputsJSON
+)
+
+func validateJSON(raw json.RawMessage, context jsonContext) error {
 	if !utf8.Valid(raw) {
 		return &ParseError{Code: ERR_IMPORT_ROOT}
 	}
@@ -24,7 +35,7 @@ func validateJSON(raw json.RawMessage) error {
 	if err != nil {
 		return &ParseError{Code: ERR_IMPORT_ROOT}
 	}
-	if err := validateJSONToken(decoder, token, 0); err != nil {
+	if err := validateJSONToken(decoder, token, 0, context); err != nil {
 		return err
 	}
 	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
@@ -33,7 +44,7 @@ func validateJSON(raw json.RawMessage) error {
 	return nil
 }
 
-func validateJSONToken(decoder *json.Decoder, token json.Token, depth int) error {
+func validateJSONToken(decoder *json.Decoder, token json.Token, depth int, context jsonContext) error {
 	delimiter, isDelimiter := token.(json.Delim)
 	if !isDelimiter {
 		if value, isString := token.(string); isString && len(value) > maxJSONStringBytes {
@@ -71,7 +82,7 @@ func validateJSONToken(decoder *json.Decoder, token json.Token, depth int) error
 			if err != nil {
 				return &ParseError{Code: ERR_IMPORT_ROOT}
 			}
-			if err := validateJSONToken(decoder, valueToken, containerDepth); err != nil {
+			if err := validateJSONToken(decoder, valueToken, containerDepth, fieldContext(context, key)); err != nil {
 				return err
 			}
 		}
@@ -80,14 +91,28 @@ func validateJSONToken(decoder *json.Decoder, token json.Token, depth int) error
 			return &ParseError{Code: ERR_IMPORT_ROOT}
 		}
 	case '[':
+		limit, memberContext := 0, opaqueJSON
+		switch context {
+		case profilesJSON:
+			limit, memberContext = maxProfiles, profileJSON
+		case inputsJSON:
+			limit = maxInputs
+		}
+		count := 0
 		for decoder.More() {
+			// Reject before decoding or retaining the next member. Array-like
+			// values inside unknown fields and inputs remain opaque here.
+			if limit != 0 && count == limit {
+				return &ParseError{Code: ERR_IMPORT_LIMIT_EXCEEDED}
+			}
 			valueToken, err := decoder.Token()
 			if err != nil {
 				return &ParseError{Code: ERR_IMPORT_ROOT}
 			}
-			if err := validateJSONToken(decoder, valueToken, containerDepth); err != nil {
+			if err := validateJSONToken(decoder, valueToken, containerDepth, memberContext); err != nil {
 				return err
 			}
+			count++
 		}
 		closing, err := decoder.Token()
 		if err != nil || closing != json.Delim(']') {
@@ -97,4 +122,25 @@ func validateJSONToken(decoder *json.Decoder, token json.Token, depth int) error
 		return &ParseError{Code: ERR_IMPORT_ROOT}
 	}
 	return nil
+}
+
+func fieldContext(context jsonContext, key string) jsonContext {
+	switch context {
+	case rootJSON:
+		if key == "profiles" {
+			return profilesJSON
+		}
+		if key == "inputs" {
+			return inputsJSON
+		}
+	case bundleJSON:
+		if key == "profiles" {
+			return profilesJSON
+		}
+	case profileJSON:
+		if key == "inputs" {
+			return inputsJSON
+		}
+	}
+	return opaqueJSON
 }

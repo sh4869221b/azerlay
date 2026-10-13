@@ -1,8 +1,8 @@
 package profileadapter
 
 import (
+	"bytes"
 	"encoding/json"
-	"slices"
 
 	"github.com/sh4869221b/azerlay/internal/profile"
 	"github.com/sh4869221b/azerlay/internal/profileraw"
@@ -59,9 +59,14 @@ func normalizeStick(raw profileraw.RawInput, bindings []profile.TriggerBinding) 
 			name string
 			key  string
 		}{{"up", "87"}, {"right", "68"}, {"down", "83"}, {"left", "65"}} {
-			var tuple []json.RawMessage
-			if json.Unmarshal(keys.Left[direction.name], &tuple) != nil ||
-				!slices.EqualFunc(tuple, []json.RawMessage{json.RawMessage(direction.key), json.RawMessage("0"), json.RawMessage("0")}, func(a, b json.RawMessage) bool { return string(a) == string(b) }) {
+			tuple := newRawArray(keys.Left[direction.name])
+			for _, expected := range []string{direction.key, "0", "0"} {
+				value, ok := tuple.next()
+				if !ok || !bytes.Equal(value, []byte(expected)) {
+					return bindings
+				}
+			}
+			if !tuple.ended() {
 				return bindings
 			}
 		}

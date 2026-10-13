@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/sh4869221b/azerlay/internal/profile"
@@ -33,6 +34,18 @@ func TestNormalizeUnbound(t *testing.T) {
 	if string(control.Raw.Fields["pinTwo"]) != "255" {
 		t.Fatal("raw fields changed")
 	}
+
+	t.Run("equivalent escaped strings and object keys", func(t *testing.T) {
+		t.Parallel()
+		escaped := strings.NewReplacer(`"left"`, `"\u006ceft"`, `"0"`, `"\u0030"`).Replace(string(fixture))
+		result, err := profileadapter.Normalize(parseExport(t, escaped), admittedSource)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result.Profiles[0].Controls[0].Bindings[0].Kind != profile.BindingUnbound {
+			t.Fatal("equivalent JSON spellings did not retain the exact unbound setting")
+		}
+	})
 
 	mutations := []struct {
 		name, field, value string

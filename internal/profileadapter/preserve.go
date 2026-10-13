@@ -2,7 +2,6 @@ package profileadapter
 
 import (
 	"encoding/json"
-	"slices"
 
 	"github.com/sh4869221b/azerlay/internal/profile"
 	"github.com/sh4869221b/azerlay/internal/profileraw"
@@ -55,13 +54,10 @@ func preserveControl(raw profileraw.RawInput, rootKind profile.RootKind, profile
 
 func unknownBindings(rawTypes json.RawMessage) []profile.TriggerBinding {
 	triggers := []profile.TriggerKind{profile.TriggerUnknown}
-	var types []string
-	if json.Unmarshal(rawTypes, &types) == nil {
-		for _, recognized := range recognizedTypeArrays {
-			if slices.Equal(types, recognized) {
-				triggers = []profile.TriggerKind{profile.TriggerSingle, profile.TriggerLong, profile.TriggerDouble}
-				break
-			}
+	for _, recognized := range recognizedTypeArrays {
+		if matchesRawStringArray(rawTypes, recognized) {
+			triggers = []profile.TriggerKind{profile.TriggerSingle, profile.TriggerLong, profile.TriggerDouble}
+			break
 		}
 	}
 	bindings := make([]profile.TriggerBinding, len(triggers))
