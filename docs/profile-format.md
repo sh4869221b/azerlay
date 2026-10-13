@@ -180,10 +180,19 @@ limits are inclusive: depth 64 and strings of 65,536 bytes are accepted.
 Bundles allow at most 512 profiles, and each profile allows at most 256 inputs.
 These counts are checked while traversing the modeled arrays, before allocating
 their complete member lists. The counts do not constrain arrays inside opaque
-input fields or other unknown fields. Once the allowed count is reached, an
+input fields or other unknown fields. After UTF-8 validation, a shallow root-key
+inspection selects the count scope from the JSON's key-presence predicates,
+independently of the provisional `Document.Kind`. It skips raw value spans
+without constructing values or reporting validation errors. Complete roots
+matching both or neither predicate receive only generic preflight checks before
+root rejection; incomplete root inspection conservatively checks both modeled
+array names during preflight. An actual bundle's root-level `inputs` remains
+opaque even when its provisional kind is wrong or unknown.
+
+Once the allowed count is reached, an
 indication of another member returns `ERR_IMPORT_LIMIT_EXCEEDED` without
-examining that member or the remaining tail. JSON token errors in the unread
-tail do not take precedence over this resource bound; whole-input UTF-8
+decoding or validating that member or the remaining tail. JSON token errors in
+the unvalidated tail do not take precedence over this resource bound; whole-input UTF-8
 validation still runs first.
 
 Every profile and input must be an object, every profile must contain `inputs`,
@@ -195,16 +204,17 @@ therefore pass structural validation.
 After preflight succeeds, root selection repeats the decoder's key-presence
 classifier and requires its result to match `Document.Kind`. Both predicates,
 neither predicate, an unknown kind, a kind mismatch, invalid field types,
-malformed JSON, invalid UTF-8, and
-duplicate keys return `ERR_IMPORT_ROOT`. Exact structural overflows return
+malformed JSON, invalid UTF-8, and duplicate keys return `ERR_IMPORT_ROOT`.
+Exact structural overflows return
 `ERR_IMPORT_LIMIT_EXCEEDED`. An optional `version` may be absent or any scalar,
 including null; an object or array version returns
 `ERR_IMPORT_UNSUPPORTED_VERSION`. Scalar preservation is raw evidence only. It
 doesn't admit that version or establish support for any Azeron Software
 generation, and this boundary exposes no generation-admission API.
 
-Validation follows this order: UTF-8 and bounded JSON preflight, root classification and
-kind agreement, root version representation, then profile and input shape and
+Validation follows this order: UTF-8, shallow root-key inspection, bounded JSON
+preflight, root classification and kind agreement, root version representation,
+then profile and input shape and
 count checks in input order. Within a profile, version is checked before
 `id`/`name`, then `inputs`. The first preflight failure wins. Model-boundary
 errors are `ParseError` values whose text is only their stable code. Every

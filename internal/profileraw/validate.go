@@ -17,6 +17,7 @@ type jsonContext uint8
 
 const (
 	opaqueJSON jsonContext = iota
+	exportJSON
 	rootJSON
 	bundleJSON
 	profileJSON
@@ -27,6 +28,9 @@ const (
 func validateJSON(raw json.RawMessage, context jsonContext) error {
 	if !utf8.Valid(raw) {
 		return &ParseError{Code: ERR_IMPORT_ROOT}
+	}
+	if context == exportJSON {
+		context = preflightRootContext(raw)
 	}
 
 	decoder := json.NewDecoder(bytes.NewReader(raw))

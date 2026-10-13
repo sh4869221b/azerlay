@@ -16,14 +16,7 @@ const (
 
 // Parse constructs an authoritative raw model from a decoded document.
 func Parse(document profiledecode.Document) (RawExport, error) {
-	context := rootJSON
-	if document.Kind == profiledecode.RootBundle {
-		// A bundle may preserve a root-level inputs field as opaque data.
-		// The provisional kind scopes early counts; root agreement is still
-		// independently checked below before adopting a model.
-		context = bundleJSON
-	}
-	if err := validateJSON(document.JSON, context); err != nil {
+	if err := validateJSON(document.JSON, exportJSON); err != nil {
 		return RawExport{}, err
 	}
 
