@@ -31,8 +31,13 @@ class ReleaseDryRunTests(unittest.TestCase):
         self.output = self.base / "output"
         self.tools = self.base / "tools"
         self.tools.mkdir()
+        self.syft_version = next(
+            line.split("=", 1)[1].removeprefix("v")
+            for line in (self.repo / ".github/ci-tools.env").read_text().splitlines()
+            if line.startswith("SYFT_VERSION=")
+        )
         for name, content in {"go": '#!/bin/sh\necho go1.27.2\n',
-                              "syft": '#!/bin/sh\necho \'{"version":"1.54.1"}\'\n'}.items():
+                              "syft": f'#!/bin/sh\necho \'{{"version":"{self.syft_version}"}}\'\n'}.items():
             tool = self.tools / name
             tool.write_text(content)
             tool.chmod(0o755)
@@ -75,6 +80,12 @@ class ReleaseDryRunTests(unittest.TestCase):
                 result = self.run_candidate(version, ref)
                 self.assert_rejected_before_package(result)
                 self.assertFalse(self.output.exists())
+
+    def test_mismatched_syft_version_fails_before_packaging(self):
+        (self.tools / "syft").write_text('#!/bin/sh\necho \'{"version":"0.0.0"}\'\n')
+        result = self.run_candidate()
+        self.assert_rejected_before_package(result)
+        self.assertIn(f"Release candidates require Syft v{self.syft_version}.", result.stderr)
 
     def test_modified_and_untracked_files_fail_before_packaging(self):
         tracked = self.repo / ".gitignore"
