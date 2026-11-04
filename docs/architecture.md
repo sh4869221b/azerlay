@@ -173,10 +173,11 @@ bindings separately. A single candidate is only one known possibility, not
 proof of the physical source. An empty candidate list does not rule out an
 Unknown binding's output.
 
-`input.ProjectMatching` retains the static index and separately projects all 30
-physical regions from the snapshot, independent of duplicate, unbound or unknown
-output assignments or profile availability. Valid layout, connection and raw
-observation knowledge determine physical state; USB identity does not establish
+`input.ProjectPhysical` projects all 30 physical regions from the snapshot,
+independent of duplicate, unbound or unknown output assignments or profile
+availability. The coordinator builds the static index when rebuilding cached
+assignments; physical projection neither consumes nor copies that index. Valid
+layout, connection and raw observation knowledge determine physical state; USB identity does not establish
 mode or firmware prerequisites. Disconnection produces unknown physical state.
 Static output candidates have no live known/down fields. The coordinator supplies
 the projection and selected-profile assignments to the renderer.

@@ -17,7 +17,6 @@ type Assembly struct {
 	profile                            *control.ProfileSnapshot
 	layoutGeneration, labelsGeneration uint64
 	assignments                        map[string]renderer.Control
-	index                              matching.Index
 	content                            renderer.Content
 	snapshot                           *renderer.OverlaySnapshot
 }
@@ -37,19 +36,18 @@ func (a *Assembly) Build(state AssemblyState) *renderer.OverlaySnapshot {
 	if staticChanged {
 		a.profile, a.layoutGeneration, a.labelsGeneration = state.Profile, state.LayoutGeneration, state.LabelsGeneration
 		a.assignments = make(map[string]renderer.Control)
-		a.index = matching.Index{}
 		if state.Profile.Profile != nil {
 			selected := *state.Profile.Profile
-			a.index = matching.Build(selected, state.Profile.Source, state.Definition)
+			index := matching.Build(selected, state.Profile.Source, state.Definition)
 			ambiguous := make(map[[2]int]bool)
-			for _, output := range a.index.Outputs {
+			for _, output := range index.Outputs {
 				if output.Ambiguous {
 					for _, candidate := range output.Candidates {
 						ambiguous[[2]int{candidate.ControlIndex, candidate.BindingIndex}] = true
 					}
 				}
 			}
-			for _, mapped := range a.index.Controls {
+			for _, mapped := range index.Controls {
 				if mapped.MappingState != matching.MappingMapped {
 					continue
 				}
@@ -67,8 +65,7 @@ func (a *Assembly) Build(state AssemblyState) *renderer.OverlaySnapshot {
 	for region, assignment := range a.assignments {
 		content.Controls[region] = assignment
 	}
-	physical := input.ProjectMatching(state.Input, a.index, state.Definition)
-	for _, observation := range physical.Physical {
+	for _, observation := range input.ProjectPhysical(state.Input, state.Definition) {
 		value := content.Controls[observation.RegionID]
 		value.Known, value.Down = observation.Known, observation.Down
 		content.Controls[observation.RegionID] = value
