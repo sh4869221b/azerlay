@@ -1008,7 +1008,8 @@ last-good状態を維持する。回復は新たな個別通知のみで、状�
 ### 13.3 表示への境界
 
 静的profile/layoutと出力候補は割当表示用に保持し、入力元の決定には使わない。
-ProjectMatchingは選択したleft-hand Cyborg II layoutとConnected/Knownから30領域を投影する。
+ProjectPhysicalは選択したleft-hand Cyborg II layoutとConnected/Knownから30領域を投影する。
+静的indexはcoordinatorの割当cache構築時だけに使い、物理投影へ渡したり各観測で複製したりしない。
 Software2.0.2、表示firmware111、SOFTWARE modeは文書上の運用前提であり、
 呼び出し側の申告やruntime確認は行わない。実際のsource formatとdevice admissionは保持する。
 analog/live出力キー/long・double・macro発火完了は未対応のままとする。
