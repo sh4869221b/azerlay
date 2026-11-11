@@ -38,8 +38,34 @@ def native_roots():
     return (*ROOTS, *owners)
 
 
-def package_name(requirement):
-    return re.split(r"[<>=]", requirement, maxsplit=1)[0]
+def dependency(requirement):
+    match = re.fullmatch(r"([^<>=\s]+)(?:(>=|<=|=|>|<)([^<>=\s]+))?", requirement)
+    if match is None:
+        raise ValueError("Invalid installed build dependency: " + requirement)
+    return match.groups()
+
+
+def version_compare(actual, required):
+    # Use pacman's own ordering, including epochs, pkgrel and alphanumeric
+    # versions. Python/semver/string ordering is not equivalent to libalpm.
+    result = subprocess.run(["vercmp", actual, required], check=True,
+                            capture_output=True, text=True)
+    comparison = int(result.stdout.strip())
+    if comparison not in (-1, 0, 1):
+        raise ValueError("Invalid vercmp result: " + result.stdout.strip())
+    return comparison
+
+
+def satisfies(actual, operator, required):
+    if operator is None:
+        return True
+    # An unversioned PROVIDES entry cannot satisfy a versioned dependency;
+    # its owner's package version is not the version of the virtual library.
+    if actual is None:
+        return False
+    comparison = version_compare(actual, required)
+    return {"=": comparison == 0, ">=": comparison >= 0, "<=": comparison <= 0,
+            ">": comparison > 0, "<": comparison < 0}[operator]
 
 
 def inventory(database, roots=ROOTS):
@@ -59,15 +85,23 @@ def inventory(database, roots=ROOTS):
             raise ValueError("Duplicate installed package: " + name)
         packages[name] = (version, arch, fields.get("DEPENDS", []))
         for provided in fields.get("PROVIDES", []):
-            providers.setdefault(package_name(provided), set()).add(name)
+            virtual_name, operator, provided_version = dependency(provided)
+            if operator not in (None, "="):
+                raise ValueError("Invalid installed package provision: " + provided)
+            providers.setdefault(virtual_name, set()).add((name, provided_version))
     selected = set()
     pending = list(roots)
     while pending:
-        name = package_name(pending.pop())
-        if name not in packages:
-            choices = providers.get(name, set())
+        requirement = pending.pop()
+        name, operator, required_version = dependency(requirement)
+        # Prefer a satisfying literal package before considering providers,
+        # matching pacman. Keep the full constraint even for selected packages:
+        # another dependency on the same name may require a different ABI.
+        if name not in packages or not satisfies(packages[name][0], operator, required_version):
+            choices = {owner for owner, version in providers.get(name, set())
+                       if satisfies(version, operator, required_version)}
             if len(choices) != 1:
-                raise ValueError("Missing or ambiguous installed build dependency: " + name)
+                raise ValueError("Missing or ambiguous installed build dependency: " + requirement)
             name = next(iter(choices))
         if name in selected:
             continue

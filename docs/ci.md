@@ -356,10 +356,14 @@ setup-go caches; core CGo/race still uses a fresh step-local GOCACHE.
   plus their complete dependency closure (including virtual providers), rather
   than all installed packages. This follows header/library package splits and
   avoids selecting an unrelated introspection generator merely by name.
-  Missing or ambiguous build
-  dependencies fail before restore. Package-level transitive identities are
-  deliberately conservative; dependencies of a selected native package still
-  invalidate, even if a particular compilation does not use every file.
+  Dependency constraints are checked against installed package versions or the
+  explicit virtual `PROVIDES` version using pacman's `vercmp`. This distinguishes
+  coinstalled ABI providers such as `libcrypto.so=3-64` and `libcrypto.so=4-64`;
+  an unversioned provision cannot satisfy a versioned requirement. Missing or
+  genuinely ambiguous build dependencies fail before restore. Package-level
+  transitive identities are deliberately conservative; dependencies of a
+  selected native package still invalidate, even if a particular compilation
+  does not use every file.
   Both retain compiler/linker/pkg-config metadata and effective Go target,
   CGO, compiler and link settings. Nix compiler-wrapper settings are retained.
   Arch captures Go settings after setup-go, before restore; its uploaded
