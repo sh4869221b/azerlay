@@ -138,10 +138,12 @@ func (s *ImportedSource) Load(ctx context.Context, ref SourceRef) (bundle *profi
 	return &prepared.bundle, nil
 }
 
-func loadCacheSet(ctx context.Context, root *os.Root, source diskSource) (bundle profile.ProfileBundle, err error) {
-	paths := []string{"profiles/" + source.SourceHash + "/bundle.json"}
+func loadCacheSet(ctx context.Context, root *os.Root, source diskSource) (profile.ProfileBundle, error) {
+	var bundle profile.ProfileBundle
+	dir := "profiles/" + source.SourceHash + "/"
+	paths := []string{dir + "bundle.json"}
 	for i := range source.ProfileCount {
-		paths = append(paths, fmt.Sprintf("profiles/%s/p%d.json", source.SourceHash, i+1))
+		paths = append(paths, fmt.Sprintf("%sp%d.json", dir, i+1))
 	}
 	// Reject unsafe existing members even when another member is absent.
 	for _, path := range paths {
@@ -149,26 +151,43 @@ func loadCacheSet(ctx context.Context, root *os.Root, source diskSource) (bundle
 			return bundle, err
 		}
 	}
-	readers := make([]io.Reader, 0, len(paths))
-	for _, path := range paths {
-		if err := ctx.Err(); err != nil {
-			return bundle, err
-		}
-		file, err := openPrivateFile(root, path, os.O_RDONLY)
-		if err != nil {
-			return bundle, err
-		}
-		defer func() { err = errors.Join(err, file.Close()) }()
-		info, err := file.Stat()
-		if err != nil {
-			return bundle, err
-		}
-		// Avoid allocating the full cap for an already-known oversized artifact;
-		// decodeCacheSet still applies cap-plus-one reads if a file grows later.
-		if info.Size() > maxCacheBytes {
-			return bundle, errCodecLimit
-		}
-		readers = append(readers, file)
+	if err := ctx.Err(); err != nil {
+		return bundle, err
 	}
-	return decodeCacheSet(source, readers[0], readers[1:])
+	if err := readCacheArtifact(root, paths[0], func(reader io.Reader) error {
+		var err error
+		bundle, err = decodeBundleCache(reader, source)
+		return err
+	}); err != nil {
+		return profile.ProfileBundle{}, err
+	}
+	for i, path := range paths[1:] {
+		if err := ctx.Err(); err != nil {
+			return profile.ProfileBundle{}, err
+		}
+		if err := readCacheArtifact(root, path, func(reader io.Reader) error {
+			return checkProfileCache(reader, source, i+1, bundle.Profiles[i])
+		}); err != nil {
+			return profile.ProfileBundle{}, err
+		}
+	}
+	return bundle, nil
+}
+
+// Only one cache file is held open at a time, regardless of bundle size.
+func readCacheArtifact(root *os.Root, path string, decode func(io.Reader) error) (err error) {
+	file, err := openPrivateFile(root, path, os.O_RDONLY)
+	if err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, file.Close()) }()
+	info, err := file.Stat()
+	if err != nil {
+		return err
+	}
+	// Avoid the read allocation for files already known to exceed the codec cap.
+	if info.Size() > maxCacheBytes {
+		return errCodecLimit
+	}
+	return decode(file)
 }

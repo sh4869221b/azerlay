@@ -101,9 +101,10 @@ func TestLocalControllerWatchAndRestart(t *testing.T) {
 	if err := os.WriteFile(path, []byte("{"), 0600); err != nil {
 		t.Fatal(err)
 	}
+	beforeFailure := status.Generation
 	status = awaitLocalStatus(t, c, func(s Status) bool { return hasLocalDiagnostic(s, profilesource.ERR_PROFILE_LOCAL_UNSUPPORTED) })
-	if *status.ActiveProfile.Name != "Local first" {
-		t.Fatal("partial definition replaced last-good")
+	if *status.ActiveProfile.Name != "Local first" || status.Generation != beforeFailure+1 {
+		t.Fatalf("partial definition did not publish a new degraded generation with last-good: %+v", status)
 	}
 	temp := filepath.Join(filepath.Dir(path), "replacement.tmp")
 	writeLocalControllerProfile(t, temp, "Local repaired")
@@ -122,9 +123,10 @@ func TestLocalControllerWatchAndRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeLocalControllerProfile(t, path, "Local state failure")
+	beforeFailure = status.Generation
 	status = awaitLocalStatus(t, c, func(s Status) bool { return hasLocalDiagnostic(s, profilesource.ERR_PROFILE_LOCAL_STATE) })
-	if *status.ActiveProfile.Name != "Local repaired" {
-		t.Fatal("state publication failure replaced active definition")
+	if *status.ActiveProfile.Name != "Local repaired" || status.Generation != beforeFailure+1 {
+		t.Fatalf("state publication failure did not publish a new degraded generation with last-good: %+v", status)
 	}
 	after, err := os.ReadFile(statePath)
 	if err != nil || !bytes.Equal(before, after) {

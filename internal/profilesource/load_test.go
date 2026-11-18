@@ -8,9 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/sh4869221b/azerlay/internal/profile"
@@ -52,6 +54,52 @@ func TestImportedLoadRestart(t *testing.T) {
 	// Then: the full model and explicit ordinal survive restart.
 	if err != nil || selection != wantSelection || got == nil || !reflect.DeepEqual(*got, want) {
 		t.Fatalf("restart = %+v, %v", selection, err)
+	}
+}
+
+func TestImportedLoadLowFileLimit(t *testing.T) {
+	const fixtureEnv = "AZERLAY_TEST_LOW_NOFILE_HOME"
+	counts := []int{128, 512}
+	if base := os.Getenv(fixtureEnv); base != "" {
+		// Lower the limit inside the child, after Go's startup raises it.
+		var limit syscall.Rlimit
+		if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &limit); err != nil {
+			t.Fatal(err)
+		}
+		limit.Cur = min(limit.Max, 128)
+		if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &limit); err != nil {
+			t.Fatal(err)
+		}
+		for _, count := range counts {
+			source := NewImportedSource(filepath.Join(base, fmt.Sprint(count)))
+			selected, err := source.Selected(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			bundle, err := source.Load(t.Context(), selected.Source)
+			if err != nil {
+				t.Fatalf("load %d profiles with nofile=%d: %v (%v)", count, limit.Cur, err, errors.Unwrap(err))
+			}
+			if len(bundle.Profiles) != count || selected.ProfileIndex != count {
+				t.Fatalf("loaded %d profiles and ordinal %d, want %d", len(bundle.Profiles), selected.ProfileIndex, count)
+			}
+		}
+		return
+	}
+
+	base := t.TempDir()
+	for _, count := range counts {
+		member := `{"id":"synthetic","inputs":[]}`
+		prepared := storePrepared(t, `{"profiles":[`+strings.Repeat(member+",", count-1)+member+`]}`)
+		source := NewImportedSource(filepath.Join(base, fmt.Sprint(count)))
+		if _, err := source.Import(t.Context(), prepared, count, Origin{Kind: "stdin"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	child := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestImportedLoadLowFileLimit$")
+	child.Env = append(os.Environ(), fixtureEnv+"="+base)
+	if output, err := child.CombinedOutput(); err != nil {
+		t.Fatalf("limited subprocess: %v\n%s", err, output)
 	}
 }
 

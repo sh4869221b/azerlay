@@ -3,6 +3,7 @@ package live
 import (
 	"context"
 	"errors"
+	"os"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -37,7 +38,7 @@ func (s *ownerSession) Latest() *input.Snapshot {
 }
 func (s *ownerSession) Changes() <-chan struct{} { return s.changes }
 func (s *ownerSession) Done() <-chan struct{}    { return s.done }
-func (s *ownerSession) Err() error               { return nil }
+func (s *ownerSession) CleanupErr() error        { return nil }
 func (s *ownerSession) Close() error {
 	s.once.Do(func() {
 		s.mu.Lock()
@@ -76,7 +77,7 @@ func TestLiveDeviceLifecycle(t *testing.T) {
 			resultMu.Lock()
 			defer resultMu.Unlock()
 			return result, nil
-		}, start: func(_ context.Context, _ device.Group, g input.Generations) (deviceSession, error) {
+		}, start: func(_ context.Context, _ device.Group, g input.Generations, _ func(device.Group) ([]device.OpenedNode, error)) (deviceSession, error) {
 			if first != nil {
 				select {
 				case <-first.Done():
@@ -136,7 +137,9 @@ func TestLiveDeviceLifecycle(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var attempts atomic.Int32
-			d := startDevice(context.Background(), config.Device{Model: "cyborg-ii", Hand: tc.hand}, deviceOps{discover: func() (*device.Result, *device.Diagnostic) { attempts.Add(1); return tc.discovery, nil }, start: func(context.Context, device.Group, input.Generations) (deviceSession, error) { return nil, tc.openErr }})
+			d := startDevice(context.Background(), config.Device{Model: "cyborg-ii", Hand: tc.hand}, deviceOps{discover: func() (*device.Result, *device.Diagnostic) { attempts.Add(1); return tc.discovery, nil }, start: func(context.Context, device.Group, input.Generations, func(device.Group) ([]device.OpenedNode, error)) (deviceSession, error) {
+				return nil, tc.openErr
+			}})
 			state := awaitDevice(t, d, func(s input.ManagedSnapshot) bool { return s.Diagnostic != nil })
 			if state.Diagnostic.Code != tc.code || state.Snapshot.Connected || state.Snapshot.Generations.Device != 0 {
 				t.Fatal(state)
@@ -198,4 +201,61 @@ func TestLiveDeviceLifecycle(t *testing.T) {
 			t.Fatal(attempts.Load())
 		}
 	})
+}
+
+func TestLiveDeviceSingleOpenUsesTarget(t *testing.T) {
+	settings := config.Device{Model: "cyborg-ii", Hand: "left", Serial: "selected"}
+	result := discoveryFixture("/usb/a", "selected", "/hidraw1")
+	d := startDevice(t.Context(), settings, deviceOps{
+		discover: func() (*device.Result, *device.Diagnostic) { return result, nil },
+		start: func(ctx context.Context, group device.Group, g input.Generations, open func(device.Group) ([]device.OpenedNode, error)) (deviceSession, error) {
+			// An invalid group is rejected by the target before raw admission.
+			group.HIDPaths = nil
+			return input.StartWithOpener(ctx, group, g, open)
+		},
+	})
+	t.Cleanup(func() { d.Close() })
+	state := awaitDevice(t, d, func(s input.ManagedSnapshot) bool { return s.Diagnostic != nil })
+	if state.Diagnostic.Code != device.ERR_DEVICE_METADATA || state.Diagnostic.Stage != "reconnect" || state.Snapshot.Connected {
+		t.Fatalf("single open skipped target admission: %+v", state.Diagnostic)
+	}
+}
+
+func TestLiveDeviceSingleSessionShutdown(t *testing.T) {
+	for _, cleanupFailure := range []bool{false, true} {
+		t.Run(map[bool]string{false: "disconnect", true: "cleanup-failure"}[cleanupFailure], func(t *testing.T) {
+			t.Parallel()
+			reader, writer, err := os.Pipe()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer writer.Close()
+			settings := config.Device{Model: "cyborg-ii", Hand: "left"}
+			result := discoveryFixture("/usb/a", "a", "/hidraw1")
+			d := startDevice(t.Context(), settings, deviceOps{
+				discover: func() (*device.Result, *device.Diagnostic) { return result, nil },
+				start: func(ctx context.Context, group device.Group, g input.Generations, _ func(device.Group) ([]device.OpenedNode, error)) (deviceSession, error) {
+					return input.StartWithOpener(ctx, group, g, func(device.Group) ([]device.OpenedNode, error) {
+						return []device.OpenedNode{{File: reader}}, nil
+					})
+				},
+			})
+			t.Cleanup(func() { d.Close(); reader.Close() })
+			awaitDevice(t, d, func(s input.ManagedSnapshot) bool { return s.Snapshot.Connected })
+			end := writer
+			if cleanupFailure {
+				end = reader
+			}
+			if err := end.Close(); err != nil {
+				t.Fatal(err)
+			}
+			state := awaitDevice(t, d, func(s input.ManagedSnapshot) bool { return s.Diagnostic != nil })
+			if state.State != input.ManagedDegraded || state.Snapshot.Connected || state.Diagnostic.Code != input.ERR_INPUT_READ {
+				t.Fatalf("terminal input status: %+v", state)
+			}
+			if err := d.Close(); (err != nil) != cleanupFailure {
+				t.Fatalf("device close: %v, expected cleanup failure = %t", err, cleanupFailure)
+			}
+		})
+	}
 }

@@ -121,6 +121,10 @@ func (s *Session) Close() error             { s.cancel(); <-s.done; return s.err
 func (s *Session) Done() <-chan struct{}    { return s.done }
 func (s *Session) Err() error               { return s.err }
 func (s *Session) Changes() <-chan struct{} { return s.changes }
+
+// CleanupErr reports descriptor cleanup failures after Done closes.
+func (s *Session) CleanupErr() error { return s.cleanupErr }
+
 func (s *Session) notify() {
 	select {
 	case s.changes <- struct{}{}:

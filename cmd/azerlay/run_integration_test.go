@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -189,6 +190,29 @@ func TestRunLocalWithoutImportedHome(t *testing.T) {
 			controlCLIResult[control.QuitResult](t, fixture.env, "quit")
 			stoppedRunProcess(t, process, fixture)
 		})
+	}
+}
+
+func TestRunLocalWithoutProfileGuidance(t *testing.T) {
+	fixture := newRunFixture(t)
+	cliWrite(t, fixture.config, []byte("schema_version=1\n[profile]\nsource='local'\n"), 0600)
+	process := startRunProcess(t, fixture)
+	status := readyRunProcess(t, process, fixture)
+	if status.ActiveProfile != nil || !slices.ContainsFunc(status.DegradedReasons, func(d control.Diagnostic) bool {
+		return d.Code == control.ERR_PROFILE_SOURCE_UNAVAILABLE
+	}) {
+		t.Fatalf("unexpected local startup status: %+v", status)
+	}
+	controlCLIResult[control.QuitResult](t, fixture.env, "quit")
+	stoppedRunProcess(t, process, fixture)
+	output := process.stdout.buffer.String()
+	for _, want := range []string{"azerlay status", "profile.local_device", "profile.local_profile_file", "profile.local_store_path", "restart azerlay run"} {
+		if !strings.Contains(output, want) {
+			t.Errorf("startup guidance missing %q: %s", want, output)
+		}
+	}
+	if strings.Contains(output, "azerlay profiles select") {
+		t.Errorf("startup guidance suggests unavailable selection: %s", output)
 	}
 }
 

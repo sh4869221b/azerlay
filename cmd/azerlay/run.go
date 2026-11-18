@@ -144,7 +144,11 @@ func runForeground(ctx context.Context, configPath string, stdout, stderr io.Wri
 		return status
 	}
 	if current, ok := response.Result.(control.Status); ok && current.ActiveProfile == nil {
-		if _, err := fmt.Fprintln(stdout, "Import a supported profile with azerlay import, then use azerlay status and azerlay profiles select."); err != nil {
+		guidance := "Import a supported profile with azerlay import, then use azerlay status and azerlay profiles select."
+		if !controller.AllowsImportedSelection() {
+			guidance = "Use azerlay status to check the local profile error. Check profile.local_device, profile.local_profile_file, and profile.local_store_path, then restart azerlay run."
+		}
+		if _, err := fmt.Fprintln(stdout, guidance); err != nil {
 			return 1
 		}
 	}

@@ -1,10 +1,41 @@
 package device
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+func TestRawReconnectOpenRejectsReplacementSerial(t *testing.T) {
+	t.Parallel()
+	c := fixtureCollector(t)
+	fixtureNode(t, c, "unit", 1, 4)
+	discovered, _ := c.collect("")
+	group := discovered.Groups[0]
+	target, err := NewReconnectTarget(discovered, group)
+	if err != nil {
+		t.Fatal(err)
+	}
+	file, err := os.Open(group.HIDPaths[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	replacement := discovered.Nodes[0]
+	serial := "replacement"
+	replacement.Serial = &serial
+	opened, err := target.open(group, func(Group) ([]OpenedNode, error) {
+		return []OpenedNode{{File: file, Node: replacement}}, nil
+	})
+	var diagnostic *Diagnostic
+	if opened != nil || !errors.As(err, &diagnostic) || diagnostic.Code != ERR_DEVICE_METADATA {
+		t.Fatalf("replacement admitted: %v, %v", opened, err)
+	}
+	if _, err := file.Stat(); !errors.Is(err, os.ErrClosed) {
+		t.Fatalf("replacement descriptor leaked: %v", err)
+	}
+}
 
 func TestRawReconnectIdentity(t *testing.T) {
 	for _, serial := range []bool{true, false} {
