@@ -149,7 +149,6 @@ func (c *Controller) selectProfile(ctx context.Context, request Request) Respons
 	changed := c.selectionFailure != nil || c.localFailure != nil || c.localWatchFailure != nil
 	if c.active == nil || c.active.selection != candidate.selection {
 		c.active = candidate
-		c.generation++
 		c.publishProfileLocked()
 		changed = true
 	}
@@ -157,6 +156,7 @@ func (c *Controller) selectProfile(ctx context.Context, request Request) Respons
 	c.localFailure = nil
 	c.localWatchFailure = nil
 	if changed {
+		c.generation++
 		c.notifyChangedLocked()
 	}
 	return SuccessResponse(request, SelectionResult{ActiveProfile: c.active.status(), Generation: c.generation})

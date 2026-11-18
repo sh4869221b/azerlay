@@ -203,6 +203,26 @@ func TestLiveDeviceLifecycle(t *testing.T) {
 	})
 }
 
+func TestLiveDeviceSelectionRequiresSerialOnOpenNode(t *testing.T) {
+	t.Parallel()
+	replacement := discoveryFixture("/usb/a", "replacement", "/hidraw1")
+	sibling := replacement.Nodes[0]
+	serial := "selected"
+	sibling.Path, sibling.Serial = "/hidraw2", &serial
+	sibling.Interface, sibling.Admission = &device.Interface{Number: 1, Class: 3}, "unsupported"
+	replacement.Nodes = append(replacement.Nodes, sibling)
+
+	var failure *device.Diagnostic
+	if _, _, err := selectDevice(replacement, serial); !errors.As(err, &failure) || failure.Code != device.ERR_DEVICE_NOT_FOUND {
+		t.Fatalf("sibling-only serial selected a device: %v", err)
+	}
+	selected := discoveryFixture("/usb/b", serial, "/hidraw3")
+	result := &device.Result{Groups: append(replacement.Groups, selected.Groups...), Nodes: append(replacement.Nodes, selected.Nodes...)}
+	if group, target, err := selectDevice(result, serial); err != nil || !target.Valid() || group.USBParent != "/usb/b" {
+		t.Fatalf("matching interface04 did not resolve uniquely: %v %v", group, err)
+	}
+}
+
 func TestLiveDeviceSingleOpenUsesTarget(t *testing.T) {
 	settings := config.Device{Model: "cyborg-ii", Hand: "left", Serial: "selected"}
 	result := discoveryFixture("/usb/a", "selected", "/hidraw1")

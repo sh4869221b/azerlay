@@ -21,19 +21,14 @@ func NewReconnectTarget(result *Result, selected Group) (ReconnectTarget, error)
 	return target, nil
 }
 func (t ReconnectTarget) Valid() bool { return t.parent != "" }
+
 func (t ReconnectTarget) Select(result *Result) (Group, error) {
 	if !t.Valid() || result == nil {
 		return Group{}, reconnectDiagnostic(ERR_DEVICE_METADATA)
 	}
 	var selected *Group
 	for _, group := range result.Groups {
-		matching := false
-		for _, node := range result.Nodes {
-			if node.USBParent != nil && *node.USBParent == group.USBParent && t.matches(node) {
-				matching = true
-			}
-		}
-		if !matching {
+		if !result.groupHasNode(group, t.matches) {
 			continue
 		}
 		if selected != nil || len(group.HIDPaths) != 1 {

@@ -246,16 +246,7 @@ func selectDevice(result *device.Result, serial string) (device.Group, device.Re
 	var selected *device.Group
 	if result != nil {
 		for _, group := range result.Groups {
-			if !group.Complete {
-				continue
-			}
-			match := serial == ""
-			for _, node := range result.Nodes {
-				if node.USBParent != nil && *node.USBParent == group.USBParent && node.Serial != nil && *node.Serial == serial {
-					match = true
-				}
-			}
-			if !match {
+			if !group.Complete || serial != "" && !result.GroupHasSerial(group, serial) {
 				continue
 			}
 			if selected != nil {

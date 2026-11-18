@@ -44,6 +44,21 @@ func groupNodes(nodes []Node) ([]Group, []Diagnostic) {
 	return groups, findings
 }
 
+// GroupHasSerial checks the serial on an admitted member of the group.
+func (r *Result) GroupHasSerial(group Group, serial string) bool {
+	return r.groupHasNode(group, func(node Node) bool { return node.Serial != nil && *node.Serial == serial })
+}
+
+func (r *Result) groupHasNode(group Group, matches func(Node) bool) bool {
+	for _, node := range r.Nodes {
+		if node.Admission == "admitted" && node.USBParent != nil && *node.USBParent == group.USBParent &&
+			slices.Contains(group.HIDPaths, node.Path) && matches(node) {
+			return true
+		}
+	}
+	return false
+}
+
 func sortResult(r *Result) {
 	slices.SortFunc(r.Nodes, func(a, b Node) int { return comparePaths(a.Path, b.Path) })
 	slices.SortStableFunc(r.Diagnostics, func(a, b Diagnostic) int {

@@ -178,6 +178,21 @@ func TestLocalControllerPriority(t *testing.T) {
 			if err != nil || strings.Contains(string(wire), root) || strings.Contains(string(wire), "9.9.9") {
 				t.Fatalf("unsafe diagnostics: %s %v", wire, err)
 			}
+			if policy == "auto" {
+				profile := c.ProfileSnapshot()
+				request := controllerRequest(MethodSelect, "Second")
+				want := status.Generation + 1
+				for range 2 {
+					response := c.Dispatch(t.Context(), request)
+					if !response.OK || response.Result.(SelectionResult).Generation != want {
+						t.Fatalf("reselect generation, want %d: %+v", want, response)
+					}
+					after := controllerStatus(t, c)
+					if after.Generation != want || hasLocalDiagnostic(after, profilesource.ERR_PROFILE_LOCAL_UNSUPPORTED) || c.ProfileSnapshot() != profile {
+						t.Fatalf("reselect did not clear the diagnostic with the same profile: %+v", after)
+					}
+				}
+			}
 		})
 	}
 }
