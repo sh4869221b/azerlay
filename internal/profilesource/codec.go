@@ -875,13 +875,20 @@ func decodeCacheSet(source diskSource, bundleReader io.Reader, profileReaders []
 		return profile.ProfileBundle{}, err
 	}
 	for i, reader := range profileReaders {
-		value, err := decodeProfileCache(reader, source, i+1)
-		if err != nil {
+		if err := checkProfileCache(reader, source, i+1, bundle.Profiles[i]); err != nil {
 			return profile.ProfileBundle{}, err
-		}
-		if !reflect.DeepEqual(value, bundle.Profiles[i]) {
-			return profile.ProfileBundle{}, &codecError{errCodecShape}
 		}
 	}
 	return bundle, nil
+}
+
+func checkProfileCache(reader io.Reader, source diskSource, index int, expected profile.Profile) error {
+	value, err := decodeProfileCache(reader, source, index)
+	if err != nil {
+		return err
+	}
+	if !reflect.DeepEqual(value, expected) {
+		return &codecError{errCodecShape}
+	}
+	return nil
 }

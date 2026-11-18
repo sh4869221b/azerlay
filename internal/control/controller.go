@@ -101,6 +101,9 @@ func (c *Controller) Dispatch(ctx context.Context, request Request) Response {
 
 func (c *Controller) VisibilityChanges() <-chan struct{} { return c.visibilityChanges }
 
+// AllowsImportedSelection reports the source policy fixed at startup.
+func (c *Controller) AllowsImportedSelection() bool { return c.imported }
+
 func (c *Controller) RequestedVisible() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -120,7 +123,7 @@ func (c *Controller) SetOverlayStatus(status OverlayStatus, diagnostic *Diagnost
 }
 
 func (c *Controller) selectProfile(ctx context.Context, request Request) Response {
-	if !c.imported {
+	if !c.AllowsImportedSelection() {
 		return FailureResponse(&request.ID, NewError(ERR_PROFILE_SOURCE_UNAVAILABLE))
 	}
 	candidate, err := resolveProfile(ctx, c.source, request.Params.Selector, false)
@@ -146,7 +149,6 @@ func (c *Controller) selectProfile(ctx context.Context, request Request) Respons
 	changed := c.selectionFailure != nil || c.localFailure != nil || c.localWatchFailure != nil
 	if c.active == nil || c.active.selection != candidate.selection {
 		c.active = candidate
-		c.generation++
 		c.publishProfileLocked()
 		changed = true
 	}
@@ -154,6 +156,7 @@ func (c *Controller) selectProfile(ctx context.Context, request Request) Respons
 	c.localFailure = nil
 	c.localWatchFailure = nil
 	if changed {
+		c.generation++
 		c.notifyChangedLocked()
 	}
 	return SuccessResponse(request, SelectionResult{ActiveProfile: c.active.status(), Generation: c.generation})

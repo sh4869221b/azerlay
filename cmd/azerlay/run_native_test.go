@@ -176,8 +176,8 @@ func runVisibilityChild() int {
 				found = found || diagnostic.Code == "OVERLAY_MONITOR_UNAVAILABLE" && diagnostic.Stage == "overlay"
 			}
 			if !found {
-				failure = errors.New("missing monitor diagnostic was not published")
-				break
+				// The requested visibility can reach status before GTK applies it.
+				return true
 			}
 			requestGeneration = status.Generation
 			failure = call(control.MethodShow)
@@ -198,6 +198,9 @@ func runVisibilityChild() int {
 	})
 	status := runForeground(ctx, path, io.Discard, os.Stderr)
 	glib.SourceRemove(source)
+	if failure == nil && phase != 10 {
+		failure = ctx.Err()
+	}
 	if status != 0 || failure != nil || phase != 10 || gtk.WindowGetToplevels().NItems() != 0 {
 		fmt.Fprintf(os.Stderr, "visibility lifecycle: status=%d phase=%d failure=%v windows=%d\n", status, phase, failure, gtk.WindowGetToplevels().NItems())
 		return 1

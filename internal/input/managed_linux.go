@@ -164,32 +164,12 @@ func (m *Managed) run(ctx context.Context, target device.ReconnectTarget, genera
 				}
 			}
 		}
-		m.err = errors.Join(m.err, managedCleanupFailure(err))
+		m.err = errors.Join(m.err, StartCleanupError(err))
 		m.publish(nil, ManagedSnapshot{Snapshot: last, State: ManagedDegraded, Diagnostic: managedDiagnostic(err)}, ops.observe)
 		if !waitManagedRetry(ctx, ops.retry) {
 			return
 		}
 	}
-}
-
-func managedCleanupFailure(err error) error {
-	switch err := err.(type) {
-	case *sessionSetupError:
-		return err.cleanup
-	case *device.Diagnostic:
-		if err.Stage == "close" {
-			return err
-		}
-	case interface{ Unwrap() []error }:
-		var cleanup error
-		for _, cause := range err.Unwrap() {
-			cleanup = errors.Join(cleanup, managedCleanupFailure(cause))
-		}
-		return cleanup
-	case interface{ Unwrap() error }:
-		return managedCleanupFailure(err.Unwrap())
-	}
-	return nil
 }
 
 func (m *Managed) publish(session *Session, state ManagedSnapshot, observe func(ManagedSnapshot)) {

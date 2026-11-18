@@ -101,9 +101,10 @@ func TestLocalControllerWatchAndRestart(t *testing.T) {
 	if err := os.WriteFile(path, []byte("{"), 0600); err != nil {
 		t.Fatal(err)
 	}
+	beforeFailure := status.Generation
 	status = awaitLocalStatus(t, c, func(s Status) bool { return hasLocalDiagnostic(s, profilesource.ERR_PROFILE_LOCAL_UNSUPPORTED) })
-	if *status.ActiveProfile.Name != "Local first" {
-		t.Fatal("partial definition replaced last-good")
+	if *status.ActiveProfile.Name != "Local first" || status.Generation != beforeFailure+1 {
+		t.Fatalf("partial definition did not publish a new degraded generation with last-good: %+v", status)
 	}
 	temp := filepath.Join(filepath.Dir(path), "replacement.tmp")
 	writeLocalControllerProfile(t, temp, "Local repaired")
@@ -122,9 +123,10 @@ func TestLocalControllerWatchAndRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeLocalControllerProfile(t, path, "Local state failure")
+	beforeFailure = status.Generation
 	status = awaitLocalStatus(t, c, func(s Status) bool { return hasLocalDiagnostic(s, profilesource.ERR_PROFILE_LOCAL_STATE) })
-	if *status.ActiveProfile.Name != "Local repaired" {
-		t.Fatal("state publication failure replaced active definition")
+	if *status.ActiveProfile.Name != "Local repaired" || status.Generation != beforeFailure+1 {
+		t.Fatalf("state publication failure did not publish a new degraded generation with last-good: %+v", status)
 	}
 	after, err := os.ReadFile(statePath)
 	if err != nil || !bytes.Equal(before, after) {
@@ -175,6 +177,21 @@ func TestLocalControllerPriority(t *testing.T) {
 			wire, err := json.Marshal(status)
 			if err != nil || strings.Contains(string(wire), root) || strings.Contains(string(wire), "9.9.9") {
 				t.Fatalf("unsafe diagnostics: %s %v", wire, err)
+			}
+			if policy == "auto" {
+				profile := c.ProfileSnapshot()
+				request := controllerRequest(MethodSelect, "Second")
+				want := status.Generation + 1
+				for range 2 {
+					response := c.Dispatch(t.Context(), request)
+					if !response.OK || response.Result.(SelectionResult).Generation != want {
+						t.Fatalf("reselect generation, want %d: %+v", want, response)
+					}
+					after := controllerStatus(t, c)
+					if after.Generation != want || hasLocalDiagnostic(after, profilesource.ERR_PROFILE_LOCAL_UNSUPPORTED) || c.ProfileSnapshot() != profile {
+						t.Fatalf("reselect did not clear the diagnostic with the same profile: %+v", after)
+					}
+				}
 			}
 		})
 	}

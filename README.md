@@ -457,14 +457,18 @@ Startup requires a reachable Wayland display and Layer Shell support before it
 prints readiness. Display failure reports `ERR_RUNTIME_WAYLAND`; missing Layer
 Shell reports `ERR_LAYER_SHELL_UNAVAILABLE`. GTK is restricted to Wayland.
 
-`run` prints initial text status and stays running. With no saved profile, status
-has `active_profile:null` and degraded reasons, and startup prints guidance to
-import a supported profile and use `status` and `profiles select`. `run`
-connects raw-only physical-button observations and the selected imported or
-local profile to the overlay. Initial and reopened snapshots are unknown; an
-undetected final lost release can leave the last
-observation stale, as described in [Status](#status). Live analog and output-key
-state remain unsupported. See [overlay appearance](docs/overlay.md).
+`run` prints initial text status and stays running. With no active profile,
+`status` reports `active_profile:null` and degraded reasons. For
+`profile.source = "local"`, run `azerlay status`, check the configured
+`profile.local_device`, `profile.local_profile_file`, and `profile.local_store_path`,
+then restart `azerlay run`. For `auto` or `imported`, import a supported profile
+and use `azerlay status` and `azerlay profiles select`.
+
+`run` connects raw-only physical-button observations and the selected imported or
+local profile to the overlay. Initial and reopened snapshots are unknown. An
+undetected final lost release can leave the last observation stale, as described
+in [Status](#status). Live analog and output-key state remain unsupported. See
+[overlay appearance](docs/overlay.md).
 A second `run` against a responsive instance
 prints its status and exits 0 without loading the second invocation's config.
 
@@ -513,8 +517,9 @@ and monitor recovery were exercised on the Hyprland v1 target; see
 [overlay troubleshooting](docs/troubleshooting.md#overlay-click-through-and-monitor-recovery)
 for the scope and remaining limits.
 
-`reload` acknowledges acceptance; inspect `status` for the eventual configuration
-result. `profiles select` requires an exact, unique imported profile ID or name.
+`reload` acknowledges acceptance. Inspect `status` for the eventual configuration
+result. With `auto` and `imported`, `profiles select` accepts an exact, unique
+imported profile ID or name.
 Its session-only selection survives configuration reloads and leaves persisted
 selection unchanged; `profiles show` continues to show the saved selection.
 The next controller initialization uses configuration and saved selection again.

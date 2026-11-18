@@ -16,7 +16,7 @@ type deviceSession interface {
 	Changes() <-chan struct{}
 	Done() <-chan struct{}
 	Close() error
-	Err() error
+	CleanupErr() error
 }
 type managedInput interface {
 	Latest() input.ManagedSnapshot
@@ -26,7 +26,7 @@ type managedInput interface {
 }
 type deviceOps struct {
 	discover func() (*device.Result, *device.Diagnostic)
-	start    func(context.Context, device.Group, input.Generations) (deviceSession, error)
+	start    func(context.Context, device.Group, input.Generations, func(device.Group) ([]device.OpenedNode, error)) (deviceSession, error)
 	managed  func(context.Context, device.ReconnectTarget, input.Generations) (managedInput, error)
 	retry    <-chan time.Time
 }
@@ -48,8 +48,8 @@ type Device struct {
 
 func StartDevice(ctx context.Context, settings config.Device) *Device {
 	return startDevice(ctx, settings, deviceOps{discover: device.Discover,
-		start: func(ctx context.Context, group device.Group, generations input.Generations) (deviceSession, error) {
-			return input.Start(ctx, group, generations)
+		start: func(ctx context.Context, group device.Group, generations input.Generations, open func(device.Group) ([]device.OpenedNode, error)) (deviceSession, error) {
+			return input.StartWithOpener(ctx, group, generations, open)
 		},
 		managed: func(ctx context.Context, target device.ReconnectTarget, generations input.Generations) (managedInput, error) {
 			return input.StartManaged(ctx, target, generations)
@@ -168,10 +168,14 @@ func (d *Device) run(ctx context.Context, settings config.Device, baseline *inpu
 				}
 			} else {
 				var session deviceSession
-				session, err = d.ops.start(ctx, group, generations)
-				if err == nil {
+				session, err = d.ops.start(ctx, group, generations, target.Open)
+				if err != nil {
+					d.err = errors.Join(d.err, input.StartCleanupError(err))
+				} else {
 					defer func() {
-						d.err = errors.Join(d.err, session.Close())
+						// Report a read failure in status and return only cleanup failures.
+						sessionErr := session.Close()
+						d.err = errors.Join(d.err, session.CleanupErr())
 						snapshot := session.Latest()
 						snapshot.EventCount += baseline.EventCount
 						snapshot.InvalidationCount += baseline.InvalidationCount
@@ -179,7 +183,7 @@ func (d *Device) run(ctx context.Context, settings config.Device, baseline *inpu
 						if ctx.Err() == nil {
 							state = input.ManagedDegraded
 						}
-						d.publish(input.ManagedSnapshot{Snapshot: snapshot, State: state, Diagnostic: deviceFailure(session.Err())})
+						d.publish(input.ManagedSnapshot{Snapshot: snapshot, State: state, Diagnostic: deviceFailure(sessionErr)})
 					}()
 					for {
 						snapshot := session.Latest()
@@ -244,16 +248,7 @@ func selectDevice(result *device.Result, serial string) (device.Group, device.Re
 	var selected *device.Group
 	if result != nil {
 		for _, group := range result.Groups {
-			if !group.Complete {
-				continue
-			}
-			match := serial == ""
-			for _, node := range result.Nodes {
-				if node.USBParent != nil && *node.USBParent == group.USBParent && node.Serial != nil && *node.Serial == serial {
-					match = true
-				}
-			}
-			if !match {
+			if !group.Complete || serial != "" && !result.GroupHasSerial(group, serial) {
 				continue
 			}
 			if selected != nil {

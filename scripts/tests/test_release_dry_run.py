@@ -106,6 +106,14 @@ class ReleaseDryRunTests(unittest.TestCase):
         result = self.run_candidate()
         self.assertEqual(result.returncode, 42, result.stderr)
 
+    def test_git_status_failure_stops_before_creating_output(self):
+        # Git cannot read a corrupt index even though it can find the checkout.
+        (self.repo / ".git/index").write_bytes(b"invalid index")
+        result = self.run_candidate()
+        self.assert_rejected_before_package(result)
+        self.assertIn("Could not verify the release candidate checkout", result.stderr)
+        self.assertFalse(self.output.exists())
+
     def test_nonempty_output_including_hidden_files_is_rejected(self):
         self.output.mkdir()
         (self.output / ".existing").write_text("preserve\n")

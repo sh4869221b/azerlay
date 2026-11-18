@@ -19,7 +19,11 @@ if [[ ${GITHUB_REF:-} == refs/tags/* ]]; then
 fi
 
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
-if [[ -n $(git -C "$repo_root" status --porcelain --untracked-files=all) ]]; then
+if ! checkout_status=$(git -C "$repo_root" status --porcelain --untracked-files=all); then
+  printf 'Could not verify the release candidate checkout with git status.\n' >&2
+  exit 1
+fi
+if [[ -n "$checkout_status" ]]; then
   printf 'Release candidates require a clean checkout, including untracked files.\n' >&2
   exit 1
 fi

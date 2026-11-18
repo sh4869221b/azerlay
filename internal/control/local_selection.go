@@ -184,13 +184,13 @@ func (c *Controller) consumeLocal(ctx context.Context, state profilesource.Local
 				}
 			} else if change.Candidate != nil {
 				c.active = localActive(change.Ref.Local, *change.Candidate)
-				c.generation++
 				c.publishProfileLocked()
 				c.localFailure = nil
 				c.selectionFailure = nil
 				changed = true
 			}
 			if changed {
+				c.generation++
 				c.notifyChangedLocked()
 			}
 		}
