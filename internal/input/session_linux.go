@@ -27,6 +27,28 @@ type sessionSetupError struct {
 }
 
 func (e *sessionSetupError) Unwrap() error { return e.error }
+
+// StartCleanupError extracts descriptor cleanup failures from a session start error.
+func StartCleanupError(err error) error {
+	switch err := err.(type) {
+	case *sessionSetupError:
+		return err.cleanup
+	case *device.Diagnostic:
+		if err.Stage == "close" {
+			return err
+		}
+	case interface{ Unwrap() []error }:
+		var cleanup error
+		for _, cause := range err.Unwrap() {
+			cleanup = errors.Join(cleanup, StartCleanupError(cause))
+		}
+		return cleanup
+	case interface{ Unwrap() error }:
+		return StartCleanupError(err.Unwrap())
+	}
+	return nil
+}
+
 func Start(ctx context.Context, group device.Group, generations Generations) (*Session, error) {
 	return startSession(ctx, group, generations, sessionOps{open: device.OpenGroup})
 }

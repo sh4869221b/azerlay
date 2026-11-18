@@ -169,7 +169,9 @@ func (d *Device) run(ctx context.Context, settings config.Device, baseline *inpu
 			} else {
 				var session deviceSession
 				session, err = d.ops.start(ctx, group, generations, target.Open)
-				if err == nil {
+				if err != nil {
+					d.err = errors.Join(d.err, input.StartCleanupError(err))
+				} else {
 					defer func() {
 						// Report a read failure in status and return only cleanup failures.
 						sessionErr := session.Close()

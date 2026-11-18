@@ -241,6 +241,61 @@ func TestLiveDeviceSingleOpenUsesTarget(t *testing.T) {
 	}
 }
 
+func TestLiveDeviceSingleStartCleanupFailure(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		cleanup, cancel bool
+	}{
+		{name: "serial-mismatch"},
+		{name: "serial-mismatch-and-cleanup-failure", cleanup: true},
+		{name: "canceled-during-open", cleanup: true, cancel: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			result := discoveryFixture("/usb/a", "selected", "/hidraw1")
+			settings := config.Device{Model: "cyborg-ii", Hand: "left", Serial: "selected"}
+			mismatch := &device.Diagnostic{Code: device.ERR_DEVICE_METADATA, Stage: "reconnect"}
+			cleanup := &device.Diagnostic{Code: device.ERR_DEVICE_METADATA, Stage: "close"}
+			var openErr error = mismatch
+			if tc.cleanup {
+				openErr = errors.Join(mismatch, cleanup)
+			}
+			opened := make(chan struct{})
+			d := startDevice(ctx, settings, deviceOps{
+				discover: func() (*device.Result, *device.Diagnostic) { return result, nil },
+				start: func(ctx context.Context, group device.Group, g input.Generations, _ func(device.Group) ([]device.OpenedNode, error)) (deviceSession, error) {
+					return input.StartWithOpener(ctx, group, g, func(device.Group) ([]device.OpenedNode, error) {
+						if tc.cancel {
+							cancel()
+						}
+						close(opened)
+						return nil, openErr
+					})
+				},
+			})
+			t.Cleanup(func() { d.Close() })
+			if tc.cancel {
+				select {
+				case <-opened:
+				case <-time.After(3 * time.Second):
+					t.Fatal("open not attempted")
+				}
+			} else {
+				state := awaitDevice(t, d, func(s input.ManagedSnapshot) bool { return s.Diagnostic != nil })
+				if state.State != input.ManagedDegraded || state.Snapshot.Connected || *state.Diagnostic != *mismatch {
+					t.Fatalf("startup diagnostic: %+v", state)
+				}
+			}
+			err := d.Close()
+			if (err != nil) != tc.cleanup || errors.Is(err, mismatch) || errors.Is(err, cleanup) != tc.cleanup {
+				t.Fatalf("close returned %v, want only cleanup failure = %t", err, tc.cleanup)
+			}
+		})
+	}
+}
+
 func TestLiveDeviceSingleSessionShutdown(t *testing.T) {
 	for _, cleanupFailure := range []bool{false, true} {
 		t.Run(map[bool]string{false: "disconnect", true: "cleanup-failure"}[cleanupFailure], func(t *testing.T) {

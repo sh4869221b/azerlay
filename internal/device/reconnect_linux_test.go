@@ -25,15 +25,27 @@ func TestRawReconnectOpenRejectsReplacementSerial(t *testing.T) {
 	replacement := discovered.Nodes[0]
 	serial := "replacement"
 	replacement.Serial = &serial
-	opened, err := target.open(group, func(Group) ([]OpenedNode, error) {
+	openReplacement := func(Group) ([]OpenedNode, error) {
 		return []OpenedNode{{File: file, Node: replacement}}, nil
-	})
+	}
+	opened, err := target.open(group, openReplacement)
 	var diagnostic *Diagnostic
 	if opened != nil || !errors.As(err, &diagnostic) || diagnostic.Code != ERR_DEVICE_METADATA {
 		t.Fatalf("replacement admitted: %v, %v", opened, err)
 	}
 	if _, err := file.Stat(); !errors.Is(err, os.ErrClosed) {
 		t.Fatalf("replacement descriptor leaked: %v", err)
+	}
+	// Returning the closed descriptor simulates a rollback close failure.
+	opened, err = target.open(group, openReplacement)
+	joined, ok := err.(interface{ Unwrap() []error })
+	if opened != nil || !ok || len(joined.Unwrap()) != 2 {
+		t.Fatalf("replacement rollback did not report both failures: %v %v", opened, err)
+	}
+	for i, stage := range []string{"reconnect", "close"} {
+		if !errors.As(joined.Unwrap()[i], &diagnostic) || diagnostic.Stage != stage {
+			t.Fatalf("missing %s diagnostic: %v", stage, err)
+		}
 	}
 }
 
